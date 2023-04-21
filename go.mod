@@ -11,6 +11,7 @@ require (
 	github.com/sigstore/protobuf-specs v0.1.0
 	github.com/sigstore/rekor v1.1.0
 	github.com/sigstore/sigstore v1.6.2
+	github.com/sigstore/timestamp-authority v1.0.0
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/protobuf v1.30.0
 )
@@ -67,7 +68,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sassoftware/relic v7.2.1+incompatible // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/timestamp-authority v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
