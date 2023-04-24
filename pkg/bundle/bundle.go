@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/in-toto/in-toto-golang/in_toto"
@@ -32,12 +33,37 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) *ProtobufBundle {
 	return &ProtobufBundle{Bundle: *pbundle}
 }
 
+func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
+	var bundle ProtobufBundle
+
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	err = bundle.UnmarshalJSON(contents)
+	if err != nil {
+		return nil, err
+	}
+
+	return &bundle, nil
+}
+
 func (b *ProtobufBundle) MarshalJSON() ([]byte, error) {
 	return protojson.Marshal(&b.Bundle)
 }
 
 func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
-	return protojson.Unmarshal(data, &b.Bundle)
+	err := protojson.Unmarshal(data, &b.Bundle)
+	if err != nil {
+		return err
+	}
+
+	if b.Bundle.MediaType != SigstoreBundleMediaType01 {
+		return ErrIncorrectMediaType
+	}
+
+	return nil
 }
 
 func (b *ProtobufBundle) CertificateChain() ([]*x509.Certificate, error) {
