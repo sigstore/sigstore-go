@@ -25,27 +25,39 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 	if tsaProvider, ok = artifact.(TSASignatureProvider); !ok {
 		return nil
 	}
+
+	tsaSignatures := tsaProvider.TSASignatures()
+
+	if certificateProvider, ok = entity.(CertificateProvider); !ok {
+		return errors.New("entity does not provide a certificate")
+	}
+
+	certs, err := certProvider.CertificateChain()
+	if err != nil || len(certs) == 0 {
+		return errors.New("artifact does not provide a certificate")
+	}
+
 	if envelopeProvider, ok = artifact.(EnvelopeProvider); !ok {
 		return nil
 	}
 
-	tsaSignatures := tsaProvider.TSASignatures()
+    // TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
 	envelope, err := envelopeProvider.Envelope()
 	if err != nil {
 		return err
 	}
 
+    if len(envelope.Signatures) != 1 {
+        return errors.New("Envelope should only have 1 signature")
+    }
+
+    dseeSignatureBytes, err := base64.StdEncoding.DecodeString(envelope.Signatures[0].Sig)
+    if err != nil {
+        return err
+    }
+
 	for i, tsaSignature := range tsaSignatures {
 		tsaBytes, err := base64.StdEncoding.DecodeString(string(tsaSignature))
-		if err != nil {
-			return err
-		}
-
-		if i >= len(envelope.Signatures) {
-			return errors.New("Unable to find matching signature for timestamp")
-		}
-
-		dseeSignatureBytes, err := base64.StdEncoding.DecodeString(envelope.Signatures[i].Sig)
 		if err != nil {
 			return err
 		}
@@ -57,8 +69,11 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 			return err
 		}
 
-		// TODO - what should we check the timestamp against?
-		_ = timestamp
+        for _, cert := range(certs) {
+            if timestamp < cert.NotBefore || timestamp > cert.NotAfter {
+                return errors.New("Timestamp outside of permitted range")
+            }
+        }
 	}
 	return nil
 }
