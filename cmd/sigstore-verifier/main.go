@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
@@ -24,27 +23,13 @@ func usage() {
 }
 
 func main() {
-	bundleFile, err := os.Open(flag.Arg(0))
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer bundleFile.Close()
-
-	bundleBytes, err := ioutil.ReadAll(bundleFile)
+	b, err := bundle.LoadJSONFromPath(flag.Arg(0))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	var b bundle.ProtobufBundle
-	err = b.UnmarshalJSON(bundleBytes)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	err = policy.VerifyKeyless(&b)
+	err = policy.VerifyKeyless(b)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
