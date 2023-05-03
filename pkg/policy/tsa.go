@@ -23,13 +23,15 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 	var envelopeProvider EnvelopeProvider
 	var ok bool
 
+	tsaOptions := p.opts.TsaOptions
+
 	// TODO check policy in ArtifactVerificationOptions
 	if signedTimestampProvider, ok = artifact.(SignedTimestampProvider); !ok {
 		return nil
 	}
 
 	signedTimestamps, err := signedTimestampProvider.Timestamps()
-	if err != nil {
+	if err != nil || (len(signedTimestamps) < int(tsaOptions.Threshold) && !tsaOptions.Disable) {
 		return errors.New("unable to get timestamp verification data")
 	}
 

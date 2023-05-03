@@ -26,3 +26,14 @@ func NewSigstorePolicy() (*SigstorePolicy, error) {
 		opts:        root.GetDefaultOptions(),
 	}, nil
 }
+
+func NewSigstorePolicyWithOpts(opts *protoverification.ArtifactVerificationOptions) (*SigstorePolicy, error) {
+	trustedRoot, err := root.GetSigstoreTrustedRoot()
+	if err != nil {
+		return nil, err
+	}
+	return &SigstorePolicy{
+		trustedRoot: trustedRoot,
+		opts:        opts,
+	}, nil
+}

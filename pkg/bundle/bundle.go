@@ -135,6 +135,10 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 
 	signedTimestamps := make([][]byte, 0)
 
+	if b.VerificationMaterial.TimestampVerificationData == nil {
+		return signedTimestamps, nil
+	}
+
 	for _, timestamp := range b.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps {
 		signedTimestamps = append(signedTimestamps, timestamp.SignedTimestamp)
 	}
