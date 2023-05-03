@@ -25,7 +25,6 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 
 	tsaOptions := p.opts.TsaOptions
 
-	// TODO check policy in ArtifactVerificationOptions
 	if signedTimestampProvider, ok = artifact.(SignedTimestampProvider); !ok {
 		return nil
 	}
