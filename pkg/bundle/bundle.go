@@ -128,6 +128,20 @@ func (b *ProtobufBundle) Envelope() (*dsse.Envelope, error) {
 	return nil, ErrMissingVerificationMaterial
 }
 
+func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
+	if b.VerificationMaterial == nil {
+		return nil, ErrMissingVerificationMaterial
+	}
+
+	signedTimestamps := make([][]byte, 0)
+
+	for _, timestamp := range b.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps {
+		signedTimestamps = append(signedTimestamps, timestamp.SignedTimestamp)
+	}
+
+	return signedTimestamps, nil
+}
+
 func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
 	envelope, err := b.Envelope()
 	if err != nil {

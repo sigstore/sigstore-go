@@ -2,6 +2,7 @@ package policy
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 
@@ -17,22 +18,26 @@ type TimestampAuthorityPolicy struct {
 }
 
 func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
-	var tsaProvider TSASignatureProvider
+	var signedTimestampProvider SignedTimestampProvider
+	var certificateProvider CertificateProvider
 	var envelopeProvider EnvelopeProvider
 	var ok bool
 
 	// TODO check policy in ArtifactVerificationOptions
-	if tsaProvider, ok = artifact.(TSASignatureProvider); !ok {
+	if signedTimestampProvider, ok = artifact.(SignedTimestampProvider); !ok {
 		return nil
 	}
 
-	tsaSignatures := tsaProvider.TSASignatures()
+	signedTimestamps, err := signedTimestampProvider.Timestamps()
+	if err != nil {
+		return errors.New("unable to get timestamp verification data")
+	}
 
-	if certificateProvider, ok = entity.(CertificateProvider); !ok {
+	if certificateProvider, ok = artifact.(CertificateProvider); !ok {
 		return errors.New("entity does not provide a certificate")
 	}
 
-	certs, err := certProvider.CertificateChain()
+	certs, err := certificateProvider.CertificateChain()
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
 	}
@@ -41,39 +46,62 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 		return nil
 	}
 
-    // TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
+	// TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
 	envelope, err := envelopeProvider.Envelope()
 	if err != nil {
 		return err
 	}
 
-    if len(envelope.Signatures) != 1 {
-        return errors.New("Envelope should only have 1 signature")
-    }
-
-    dseeSignatureBytes, err := base64.StdEncoding.DecodeString(envelope.Signatures[0].Sig)
-    if err != nil {
-        return err
-    }
-
-	for i, tsaSignature := range tsaSignatures {
-		tsaBytes, err := base64.StdEncoding.DecodeString(string(tsaSignature))
-		if err != nil {
-			return err
-		}
-
-		// TODO - Add in support for tsaverification.VerifyOpts{}
-		// like Roots, maybe also Common Name?
-		timestamp, err := tsaverification.VerifyTimestampResponse(tsaBytes, bytes.NewReader(dseeSignatureBytes), tsaverification.VerifyOpts{})
-		if err != nil {
-			return err
-		}
-
-        for _, cert := range(certs) {
-            if timestamp < cert.NotBefore || timestamp > cert.NotAfter {
-                return errors.New("Timestamp outside of permitted range")
-            }
-        }
+	if len(envelope.Signatures) != 1 {
+		return errors.New("Envelope should only have 1 signature")
 	}
+
+	dseeSignatureBytes, err := base64.StdEncoding.DecodeString(envelope.Signatures[0].Sig)
+	if err != nil {
+		return err
+	}
+
+	tsaRootCerts, tsaIntermediateCerts := p.trustedRoot.GetTSACerts()
+
+	trustedRootVerificationOptions := tsaverification.VerifyOpts{
+		Roots:         tsaRootCerts,
+		Intermediates: tsaIntermediateCerts,
+	}
+
+	tsaRootCertPool := x509.NewCertPool()
+	for _, rootCert := range tsaRootCerts {
+		tsaRootCertPool.AddCert(rootCert)
+	}
+
+	tsaIntermediateCertPool := x509.NewCertPool()
+	for _, intermediateCert := range tsaIntermediateCerts {
+		tsaIntermediateCertPool.AddCert(intermediateCert)
+	}
+
+	for _, signedTimestamp := range signedTimestamps {
+		// Ensure timestamp responses are from trusted sources
+		timestamp, err := tsaverification.VerifyTimestampResponse(signedTimestamp, bytes.NewReader(dseeSignatureBytes), trustedRootVerificationOptions)
+		if err != nil {
+			return err
+		}
+
+		// Check that the timestamp is valid for the provided certificate
+		verificationOptions := x509.VerifyOptions{
+			CurrentTime:   timestamp.Time,
+			Roots:         tsaRootCertPool,
+			Intermediates: tsaIntermediateCertPool,
+			KeyUsages: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageTimeStamping,
+			},
+		}
+
+		for _, cert := range certs {
+			_, err = cert.Verify(verificationOptions)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

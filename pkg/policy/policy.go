@@ -23,8 +23,8 @@ type EnvelopeProvider interface {
 	Envelope() (*dsse.Envelope, error)
 }
 
-type TSASignatureProvider interface {
-	TSASignatures() [][]byte // TODO: define type to represent TSA signature
+type SignedTimestampProvider interface {
+	Timestamps() ([][]byte, error)
 }
 
 type TlogEntryProvider interface {
