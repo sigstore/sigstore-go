@@ -27,13 +27,9 @@ func NewSigstorePolicy() (*SigstorePolicy, error) {
 	}, nil
 }
 
-func NewSigstorePolicyWithOpts(opts *protoverification.ArtifactVerificationOptions) (*SigstorePolicy, error) {
-	trustedRoot, err := root.GetSigstoreTrustedRoot()
-	if err != nil {
-		return nil, err
-	}
+func NewPolicy(trustedRoot *root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *SigstorePolicy {
 	return &SigstorePolicy{
 		trustedRoot: trustedRoot,
 		opts:        opts,
-	}, nil
+	}
 }
