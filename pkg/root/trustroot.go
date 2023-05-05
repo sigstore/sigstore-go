@@ -24,10 +24,11 @@ type TrustedRoot struct {
 	intermediateCerts    []*x509.Certificate
 	tsaRootCerts         []*x509.Certificate
 	tsaIntermediateCerts []*x509.Certificate
+	tsaLeafCert          *x509.Certificate
 }
 
-func (tr *TrustedRoot) GetTSACerts() (roots []*x509.Certificate, intermediates []*x509.Certificate) {
-	return tr.tsaRootCerts, tr.tsaIntermediateCerts
+func (tr *TrustedRoot) GetTSACerts() (roots, intermediates []*x509.Certificate, leaf *x509.Certificate) {
+	return tr.tsaRootCerts, tr.tsaIntermediateCerts, tr.tsaLeafCert
 }
 
 func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *TrustedRoot, err error) {
@@ -41,12 +42,15 @@ func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsed
 		return nil, err
 	}
 
-	parsedTrustedRoot.rootCerts, parsedTrustedRoot.intermediateCerts, err = ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
+    roots, intermediates, leaf, err := ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
 	if err != nil {
 		return nil, err
 	}
+	parsedTrustedRoot.rootCerts = roots
+	intermediates = append(intermediates, leaf)
+	parsedTrustedRoot.intermediateCerts = intermediates
 
-	parsedTrustedRoot.tsaRootCerts, parsedTrustedRoot.tsaIntermediateCerts, err = ParseCertificateAuthorities(trustedRoot.GetTimestampAuthorities())
+	parsedTrustedRoot.tsaRootCerts, parsedTrustedRoot.tsaIntermediateCerts, parsedTrustedRoot.tsaLeafCert, err = ParseCertificateAuthorities(trustedRoot.GetTimestampAuthorities())
 	if err != nil {
 		return nil, err
 	}
@@ -99,31 +103,34 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 	return tlogVerifiers, nil
 }
 
-func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (roots []*x509.Certificate, intermediates []*x509.Certificate, err error) {
-	roots = make([]*x509.Certificate, 0)
+func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (roots, intermediates []*x509.Certificate, leaf *x509.Certificate, err error) {
 	intermediates = make([]*x509.Certificate, 0)
+	roots = make([]*x509.Certificate, 0)
+
 	for _, ca := range certAuthorities {
 		if ca == nil {
-			return nil, nil, fmt.Errorf("TrustedRoot CertificateAuthority is nil")
+			return nil, nil, nil, fmt.Errorf("TrustedRoot CertificateAuthority is nil")
 		}
 		certChain := ca.GetCertChain()
 		if certChain == nil {
-			return nil, nil, fmt.Errorf("TrustedRoot CertificateAuthority missing cert chain")
+			return nil, nil, nil, fmt.Errorf("TrustedRoot CertificateAuthority missing cert chain")
 		}
 		chainLen := len(certChain.GetCertificates())
 		if chainLen < 1 {
-			return nil, nil, fmt.Errorf("TrustedRoot CertificateAuthority cert chain is empty")
+			return nil, nil, nil, fmt.Errorf("TrustedRoot CertificateAuthority cert chain is empty")
 		}
 
 		for i, cert := range certChain.GetCertificates() {
 			parsedCert, err := x509.ParseCertificate(cert.RawBytes)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
-			if i == chainLen-1 {
-				roots = append(roots, parsedCert)
-			} else {
+			if i == 0 {
+                leaf = parsedCert
+			} else if i < chainLen-1 {
 				intermediates = append(intermediates, parsedCert)
+			} else {
+				roots = append(roots, parsedCert)
 			}
 		}
 
@@ -131,7 +138,7 @@ func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAu
 		// TODO: Handle validity period (ca.ValidFor)
 	}
 
-	return roots, intermediates, nil
+	return roots, intermediates, leaf, nil
 }
 
 //go:embed trustroot.json

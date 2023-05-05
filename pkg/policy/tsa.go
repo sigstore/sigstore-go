@@ -62,7 +62,7 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 		return err
 	}
 
-	tsaRootCerts, tsaIntermediateCerts := p.trustedRoot.GetTSACerts()
+	tsaRootCerts, tsaIntermediateCerts, tsaLeafCert := p.trustedRoot.GetTSACerts()
 
 	trustedRootVerificationOptions := tsaverification.VerifyOpts{
 		Roots:         tsaRootCerts,
@@ -96,11 +96,9 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 			},
 		}
 
-		for _, cert := range certs {
-			_, err = cert.Verify(verificationOptions)
-			if err != nil {
-				return err
-			}
+		_, err = tsaLeafCert.Verify(verificationOptions)
+		if err != nil {
+			return err
 		}
 	}
 
