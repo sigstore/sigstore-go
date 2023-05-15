@@ -26,15 +26,16 @@ var ErrDecodingJSON = fmt.Errorf("%w: decoding json", ErrInvalidAttestation)
 var ErrDecodingB64 = fmt.Errorf("%w: decoding base64", ErrInvalidAttestation)
 
 type ProtobufBundle struct {
-	protobundle.Bundle
+	*protobundle.Bundle
 }
 
 func NewProtobufBundle(pbundle *protobundle.Bundle) *ProtobufBundle {
-	return &ProtobufBundle{Bundle: *pbundle}
+	return &ProtobufBundle{Bundle: pbundle}
 }
 
 func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
 	var bundle ProtobufBundle
+	bundle.Bundle = new(protobundle.Bundle)
 
 	contents, err := os.ReadFile(path)
 	if err != nil {
@@ -50,11 +51,11 @@ func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
 }
 
 func (b *ProtobufBundle) MarshalJSON() ([]byte, error) {
-	return protojson.Marshal(&b.Bundle)
+	return protojson.Marshal(b.Bundle)
 }
 
 func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
-	err := protojson.Unmarshal(data, &b.Bundle)
+	err := protojson.Unmarshal(data, b.Bundle)
 	if err != nil {
 		return err
 	}
