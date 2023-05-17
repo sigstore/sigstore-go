@@ -10,7 +10,7 @@ type CertificateTransparencyLogPolicy struct {
 	opts        *protoverification.ArtifactVerificationOptions
 }
 
-func (p *CertificateTransparencyLogPolicy) VerifyPolicy(artifact any) error {
+func (p *CertificateTransparencyLogPolicy) VerifyPolicy(_ any) error {
 	// TODO CT verification
 	return nil
 }

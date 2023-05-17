@@ -42,7 +42,7 @@ func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsed
 		return nil, err
 	}
 
-    roots, intermediates, leaf, err := ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
+	roots, intermediates, leaf, err := ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +125,8 @@ func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAu
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			if i == 0 {
-                leaf = parsedCert
+			if i == 0 { //nolint:gocritic
+				leaf = parsedCert
 			} else if i < chainLen-1 {
 				intermediates = append(intermediates, parsedCert)
 			} else {

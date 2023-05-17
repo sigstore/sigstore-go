@@ -111,7 +111,7 @@ func (b *ProtobufBundle) KeyID() (string, error) {
 		return "", ErrMissingVerificationMaterial
 	}
 
-	switch content := b.VerificationMaterial.Content.(type) {
+	switch content := b.VerificationMaterial.Content.(type) { //nolint:gocritic
 	case *protobundle.VerificationMaterial_PublicKey:
 		if content.PublicKey == nil {
 			return "", ErrMissingVerificationMaterial
@@ -122,7 +122,7 @@ func (b *ProtobufBundle) KeyID() (string, error) {
 }
 
 func (b *ProtobufBundle) Envelope() (*dsse.Envelope, error) {
-	switch content := b.Content.(type) {
+	switch content := b.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		return parseEnvelope(content.DsseEnvelope)
 	}
@@ -195,7 +195,7 @@ func (e ErrVerification) Error() string {
 }
 
 func ErrValidationError(err error) error {
-	return fmt.Errorf("%w: %s", ErrValidation, err)
+	return fmt.Errorf("%w: %w", ErrValidation, err)
 }
 
 func parseEnvelope(input *protodsse.Envelope) (*dsse.Envelope, error) {

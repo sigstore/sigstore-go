@@ -31,5 +31,5 @@ func (e ErrVerification) Error() string {
 }
 
 func ErrValidationError(err error) error {
-	return fmt.Errorf("%w: %s", ErrValidation, err)
+	return fmt.Errorf("%w: %w", ErrValidation, err)
 }
