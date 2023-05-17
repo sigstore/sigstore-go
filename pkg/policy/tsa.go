@@ -66,8 +66,9 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
 	tsaRootCerts, tsaIntermediateCerts, tsaLeafCert := p.trustedRoot.GetTSACerts()
 
 	trustedRootVerificationOptions := tsaverification.VerifyOpts{
-		Roots:         tsaRootCerts,
-		Intermediates: tsaIntermediateCerts,
+		Roots:          tsaRootCerts,
+		Intermediates:  tsaIntermediateCerts,
+		TSACertificate: tsaLeafCert,
 	}
 
 	tsaRootCertPool := x509.NewCertPool()
