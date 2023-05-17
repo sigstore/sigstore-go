@@ -39,7 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !*requireTSA && *trustedrootJSONpath != "" {
+	if !*requireTSA && *trustedrootJSONpath == "" {
 		err = policy.VerifyKeyless(b)
 		if err != nil {
 			fmt.Println(err)
