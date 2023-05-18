@@ -38,14 +38,14 @@ This example includes the standard flow of loading a Sigstore Bundle from its JS
 To use the example CLI, invoke with `go run` like so:
 
 ```shell
-go run ./cmd/sigstore-verifier examples/provenance.json
+go run ./cmd/sigstore-verifier examples/bundle-provenance.json
 ```
 
 Alternatively, you can install a binary of the CLI like so:
 
 ```shell
 go install ./cmd/sigstore-verifier
-sigstore-verifier examples/provenance.json
+sigstore-verifier examples/bundle-provenance.json
 ```
 
 ## Testing
@@ -58,6 +58,25 @@ Tests are invoked using the standard Go testing framework. A helper exists in th
 
 ## Example bundles
 
-### examples/provenance.json
+### examples/bundle-provenance.json
 
 This came from https://www.npmjs.com/package/sigstore/v/1.3.0/provenance, with the outermost "bundle" key stripped off.
+
+## examples/bundle-github-staging.json
+
+This bundle is created by sigstore-js by attesting the file `examples/attestation-provenance.json` using the GitHub staging instances of Fulcio and TSA.
+
+In case this needs to be regenerated (in the event of key rotation), the following command will produce the equivalent file:
+
+```shell
+# Install sigstore-js CLI
+npm install -g @sigstore/cli
+# Sign an attestation. Note that you must be connected to the GitHub VPN in order to reach these services.
+sigstore attest --fulcio-url=https://fulcio-staging.service.iad.github.net --tsa-server-url=https://timestamp-authority-staging.service.iad.github.net --no-tlog-upload examples/attestation-provenance.json | jq > examples/bundle-github-staging.json
+```
+
+To verify this attestation using the GitHub staging trusted root, issue the following command:
+
+```shell
+go run cmd/sigstore-verifier/main.go -requireTSA -trustedrootJSONpath examples/trusted-root-github-staging.json examples/bundle-github-staging.json
+```
