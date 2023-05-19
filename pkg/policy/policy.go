@@ -2,10 +2,13 @@ package policy
 
 import (
 	"crypto/x509"
+	"errors"
 
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
+
+var errNotImplemented = errors.New("not implemented")
 
 type SignatureProvider interface {
 	Signature() ([]byte, error)
@@ -32,14 +35,52 @@ type TlogEntryProvider interface {
 }
 
 type Policy interface {
-	VerifyPolicy(any) error
+	VerifyPolicy(SignedEntity) error
 }
 
-func Verify(entity any, policies ...Policy) error {
+type SignedEntity interface {
+	CertificateProvider
+	EnvelopeProvider
+	KeyIDProvider
+	SignedTimestampProvider
+	TlogEntryProvider
+}
+
+func Verify(entity SignedEntity, policies ...Policy) error {
 	for _, policy := range policies {
 		if err := policy.VerifyPolicy(entity); err != nil {
 			return NewVerificationError(err)
 		}
 	}
 	return nil
+}
+
+// BaseSignedEntity is a helper struct that implements all the interfaces
+// of SignedEntity. It can be embedded in a struct to implement the SignedEntity
+// interface. This may be useful for testing, or for implementing a SignedEntity
+// that only implements a subset of the interfaces.
+type BaseSignedEntity struct{}
+
+func (b *BaseSignedEntity) CertificateChain() ([]*x509.Certificate, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) Envelope() (*dsse.Envelope, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) KeyID() (string, error) {
+	return "", errNotImplemented
+}
+
+func (b *BaseSignedEntity) Signature() ([]byte, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) Timestamps() ([][]byte, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) TlogEntries() ([]*tlog.Entry, error) {
+	return nil, errNotImplemented
 }

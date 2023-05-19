@@ -16,13 +16,8 @@ type EnvelopeSignaturePolicy struct {
 	verifier dsse.EnvelopeVerifier
 }
 
-func (p *EnvelopeSignaturePolicy) VerifyPolicy(entity any) error {
-	var envelopeProvider EnvelopeProvider
-	var ok bool
-	if envelopeProvider, ok = entity.(EnvelopeProvider); !ok {
-		return errors.New("entity does not provide an envelope")
-	}
-	envelope, err := envelopeProvider.Envelope()
+func (p *EnvelopeSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
+	envelope, err := entity.Envelope()
 	if err != nil {
 		return errors.New("entity does not provide an envelope")
 	}
@@ -35,23 +30,13 @@ func (p *EnvelopeSignaturePolicy) VerifyPolicy(entity any) error {
 
 type EnvelopeCertificateSignaturePolicy struct{}
 
-func (p *EnvelopeCertificateSignaturePolicy) VerifyPolicy(entity any) error {
-	var envelopeProvider EnvelopeProvider
-	var ok bool
-	if envelopeProvider, ok = entity.(EnvelopeProvider); !ok {
-		return errors.New("entity does not provide an envelope")
-	}
-	envelope, err := envelopeProvider.Envelope()
+func (p *EnvelopeCertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
+	envelope, err := entity.Envelope()
 	if err != nil {
 		return errors.New("entity does not provide an envelope")
 	}
 
-	var certificateProvider CertificateProvider
-	if certificateProvider, ok = entity.(CertificateProvider); !ok {
-		return errors.New("entity does not provide a certificate")
-	}
-
-	certificateChain, err := certificateProvider.CertificateChain()
+	certificateChain, err := entity.CertificateChain()
 	if err != nil {
 		return errors.New("entity does not provide a certificate")
 	}
@@ -92,23 +77,13 @@ func NewMappedEnvelopeSignaturePolicyFromKeys(keyMap map[string]*ecdsa.PublicKey
 	return &MappedEnvelopeSignaturePolicy{verifierMapping}, nil
 }
 
-func (p *MappedEnvelopeSignaturePolicy) VerifyPolicy(entity any) error {
-	var envelopeProvider EnvelopeProvider
-	var keyIDProvider KeyIDProvider
-	var ok bool
-
-	if envelopeProvider, ok = entity.(EnvelopeProvider); !ok {
-		return errors.New("entity does not provide an envelope")
-	}
-	envelope, err := envelopeProvider.Envelope()
+func (p *MappedEnvelopeSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
+	envelope, err := entity.Envelope()
 	if err != nil {
 		return errors.New("entity does not provide an envelope")
 	}
 
-	if keyIDProvider, ok = entity.(KeyIDProvider); !ok {
-		return errors.New("entity does not provide an envelope")
-	}
-	keyID, err := keyIDProvider.KeyID()
+	keyID, err := entity.KeyID()
 	if err != nil {
 		return errors.New("entity does not provide a key id")
 	}

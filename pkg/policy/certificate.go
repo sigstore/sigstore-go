@@ -18,13 +18,8 @@ type CertificateSignaturePolicy struct {
 	opts        *protoverification.ArtifactVerificationOptions
 }
 
-func (p *CertificateSignaturePolicy) VerifyPolicy(artifact any) error {
-	var certProvider CertificateProvider
-	var ok bool
-	if certProvider, ok = artifact.(CertificateProvider); !ok {
-		return errors.New("artifact is not a CertificateProvider")
-	}
-	certs, err := certProvider.CertificateChain()
+func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
+	certs, err := entity.CertificateChain()
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
 	}
@@ -33,11 +28,7 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(artifact any) error {
 		return fmt.Errorf("invalid certificate: %w", err)
 	}
 
-	var envelopeProvider EnvelopeProvider
-	if envelopeProvider, ok = artifact.(EnvelopeProvider); !ok {
-		return errors.New("artifact is not an EnvelopeProvider")
-	}
-	envelope, err := envelopeProvider.Envelope()
+	envelope, err := entity.Envelope()
 	if err != nil {
 		return errors.New("artifact does not provide an envelope")
 	}

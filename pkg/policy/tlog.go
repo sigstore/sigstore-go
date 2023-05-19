@@ -1,8 +1,6 @@
 package policy
 
 import (
-	"errors"
-
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
@@ -13,13 +11,8 @@ type ArtifactTransparencyLogPolicy struct {
 	opts        *protoverification.ArtifactVerificationOptions
 }
 
-func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity any) error {
-	var tlogProvider TlogEntryProvider
-	var ok bool
-	if tlogProvider, ok = entity.(TlogEntryProvider); !ok {
-		return errors.New("entity is not a TLogProvider")
-	}
-	entries, err := tlogProvider.TlogEntries()
+func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error {
+	entries, err := entity.TlogEntries()
 	if err != nil {
 		return err
 	}

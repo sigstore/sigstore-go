@@ -10,8 +10,8 @@ type SigstorePolicy struct {
 	opts        *protoverification.ArtifactVerificationOptions
 }
 
-func (p *SigstorePolicy) VerifyPolicy(artifact any) error {
-	return Verify(artifact,
+func (p *SigstorePolicy) VerifyPolicy(entity SignedEntity) error {
+	return Verify(entity,
 		&TrustedRootPolicy{p.trustedRoot, p.opts},
 	)
 }

@@ -17,43 +17,26 @@ type TimestampAuthorityPolicy struct {
 	opts        *protoverification.ArtifactVerificationOptions
 }
 
-func (p *TimestampAuthorityPolicy) VerifyPolicy(artifact any) error {
-	var signedTimestampProvider SignedTimestampProvider
-	var certificateProvider CertificateProvider
-	var envelopeProvider EnvelopeProvider
-	var ok bool
-
+func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
 	tsaOptions := p.opts.TsaOptions
 
 	if tsaOptions.Disable {
 		return nil
 	}
 
-	if signedTimestampProvider, ok = artifact.(SignedTimestampProvider); !ok {
-		return errors.New("unable to get timestamp verification data")
-	}
-
-	signedTimestamps, err := signedTimestampProvider.Timestamps()
+	signedTimestamps, err := entity.Timestamps()
 	if err != nil || (len(signedTimestamps) < int(tsaOptions.Threshold)) {
 		return errors.New("unable to get timestamp verification data")
 	}
 
-	if certificateProvider, ok = artifact.(CertificateProvider); !ok {
-		return errors.New("entity does not provide a certificate")
-	}
-
 	// TODO - shouldn't we check the time in these certificates?
-	certs, err := certificateProvider.CertificateChain()
+	certs, err := entity.CertificateChain()
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
 	}
 
-	if envelopeProvider, ok = artifact.(EnvelopeProvider); !ok {
-		return errors.New("artifact does not provide an envelope")
-	}
-
 	// TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
-	envelope, err := envelopeProvider.Envelope()
+	envelope, err := entity.Envelope()
 	if err != nil {
 		return err
 	}

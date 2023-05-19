@@ -10,8 +10,8 @@ type TrustedRootPolicy struct {
 	opts        *protoverification.ArtifactVerificationOptions
 }
 
-func (p *TrustedRootPolicy) VerifyPolicy(artifact any) error {
-	return Verify(artifact,
+func (p *TrustedRootPolicy) VerifyPolicy(entity SignedEntity) error {
+	return Verify(entity,
 		&CertificateSignaturePolicy{p.trustedRoot, p.opts},
 		&ArtifactTransparencyLogPolicy{p.trustedRoot, p.opts},
 		&CertificateTransparencyLogPolicy{p.trustedRoot, p.opts},

@@ -1,6 +1,6 @@
 package policy
 
-func VerifyKeyless(e any) error {
+func VerifyKeyless(e SignedEntity) error {
 	policy, err := NewSigstorePolicy()
 	if err != nil {
 		return err
