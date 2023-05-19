@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
@@ -18,21 +19,26 @@ import (
 const TrustedRootMediaType01 = "application/vnd.dev.sigstore.trustedroot+json;version=0.1"
 
 type TrustedRoot struct {
-	trustedRoot        *prototrustroot.TrustedRoot
-	tlogVerifiers      map[string]signature.Verifier
-	rootCerts          []*x509.Certificate
-	intermediateCerts  []*x509.Certificate
-	tsaCertAuthorities []*CertificateAuthority
+	trustedRoot           *prototrustroot.TrustedRoot
+	tlogVerifiers         map[string]signature.Verifier
+	fulcioCertAuthorities []*CertificateAuthority
+	tsaCertAuthorities    []*CertificateAuthority
 }
 
 type CertificateAuthority struct {
-	Root          *x509.Certificate
-	Intermediates []*x509.Certificate
-	Leaf          *x509.Certificate
+	Root                *x509.Certificate
+	Intermediates       []*x509.Certificate
+	Leaf                *x509.Certificate
+	ValidityPeriodStart time.Time
+	ValidityPeriodEnd   time.Time
 }
 
-func (tr *TrustedRoot) GetTSACertAuthorities() []*CertificateAuthority {
+func (tr *TrustedRoot) TSACertificateAuthorities() []*CertificateAuthority {
 	return tr.tsaCertAuthorities
+}
+
+func (tr *TrustedRoot) FulcioCertificateAuthorities() []*CertificateAuthority {
+	return tr.fulcioCertAuthorities
 }
 
 func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *TrustedRoot, err error) {
@@ -46,28 +52,14 @@ func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsed
 		return nil, err
 	}
 
-	roots, intermediates, leafs, err := ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
+	parsedTrustedRoot.fulcioCertAuthorities, err = ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
 	if err != nil {
 		return nil, err
 	}
-	parsedTrustedRoot.rootCerts = roots
-	intermediates = append(intermediates, leafs...)
-	parsedTrustedRoot.intermediateCerts = intermediates
 
-	for _, tsaCA := range trustedRoot.GetTimestampAuthorities() {
-		tsaRootCert, tsaIntermediateCerts, tsaLeafCert, err := ParseCertificateAuthority(tsaCA)
-
-		if err != nil {
-			return nil, err
-		}
-
-		ca := &CertificateAuthority{
-			Root:          tsaRootCert,
-			Intermediates: tsaIntermediateCerts,
-			Leaf:          tsaLeafCert,
-		}
-
-		parsedTrustedRoot.tsaCertAuthorities = append(parsedTrustedRoot.tsaCertAuthorities, ca)
+	parsedTrustedRoot.tsaCertAuthorities, err = ParseCertificateAuthorities(trustedRoot.GetTimestampAuthorities())
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO: Handle CT logs (trustedRoot.Ctlogs)
@@ -118,58 +110,62 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 	return tlogVerifiers, nil
 }
 
-func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (roots, intermediates, leafs []*x509.Certificate, err error) {
-	roots = make([]*x509.Certificate, 0)
-	intermediates = make([]*x509.Certificate, 0)
-	leafs = make([]*x509.Certificate, 0)
-
-	for _, ca := range certAuthorities {
-		r, i, l, err := ParseCertificateAuthority(ca)
+func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (certificateAuthorities []*CertificateAuthority, err error) {
+	certificateAuthorities = make([]*CertificateAuthority, len(certAuthorities))
+	for i, certAuthority := range certAuthorities {
+		certificateAuthority, err := ParseCertificateAuthority(certAuthority)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
-
-		roots = append(roots, r)
-		intermediates = append(intermediates, i...)
-		leafs = append(leafs, l)
+		certificateAuthorities[i] = certificateAuthority
 	}
-
-	return roots, intermediates, leafs, nil
+	return certificateAuthorities, nil
 }
 
-func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthority) (root *x509.Certificate, intermediates []*x509.Certificate, leaf *x509.Certificate, err error) {
-	intermediates = make([]*x509.Certificate, 0)
-
+func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthority) (certificateAuthority *CertificateAuthority, err error) {
 	if certAuthority == nil {
-		return nil, nil, nil, fmt.Errorf("CertificateAuthority is nil")
+		return nil, fmt.Errorf("CertificateAuthority is nil")
 	}
 	certChain := certAuthority.GetCertChain()
 	if certChain == nil {
-		return nil, nil, nil, fmt.Errorf("CertificateAuthority missing cert chain")
+		return nil, fmt.Errorf("CertificateAuthority missing cert chain")
 	}
 	chainLen := len(certChain.GetCertificates())
 	if chainLen < 1 {
-		return nil, nil, nil, fmt.Errorf("CertificateAuthority cert chain is empty")
+		return nil, fmt.Errorf("CertificateAuthority cert chain is empty")
 	}
 
+	certificateAuthority = &CertificateAuthority{}
 	for i, cert := range certChain.GetCertificates() {
 		parsedCert, err := x509.ParseCertificate(cert.RawBytes)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
-		if i == 0 { //nolint:gocritic
-			leaf = parsedCert
-		} else if i < chainLen-1 {
-			intermediates = append(intermediates, parsedCert)
-		} else {
-			root = parsedCert
+		switch {
+		case i == 0 && !parsedCert.IsCA:
+			certificateAuthority.Leaf = parsedCert
+		case i < chainLen-1:
+			certificateAuthority.Intermediates = append(certificateAuthority.Intermediates, parsedCert)
+		case i == chainLen-1:
+			certificateAuthority.Root = parsedCert
+		}
+	}
+	validFor := certAuthority.GetValidFor()
+	if validFor != nil {
+		start := validFor.GetStart()
+		if start != nil {
+			certificateAuthority.ValidityPeriodStart = start.AsTime()
+		}
+		end := validFor.GetEnd()
+		if end != nil {
+			certificateAuthority.ValidityPeriodEnd = end.AsTime()
 		}
 	}
 
 	// TODO: Should we inspect/enforce ca.Subject and ca.Uri?
 	// TODO: Handle validity period (ca.ValidFor)
 
-	return root, intermediates, leaf, nil
+	return certificateAuthority, nil
 }
 
 //go:embed trustroot.json

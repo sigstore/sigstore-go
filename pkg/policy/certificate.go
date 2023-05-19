@@ -3,6 +3,7 @@ package policy
 import (
 	"context"
 	"crypto"
+	"crypto/x509"
 	"errors"
 	"fmt"
 
@@ -23,7 +24,8 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
 	}
-	verifier, err := signature.LoadVerifier(certs[0].PublicKey, crypto.SHA256)
+	leafCert := certs[0]
+	verifier, err := signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
 	if err != nil {
 		return fmt.Errorf("invalid certificate: %w", err)
 	}
@@ -37,7 +39,40 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
 		return fmt.Errorf("envelope verification failed: %w", err)
 	}
 
-	return nil
+	for _, ca := range p.trustedRoot.FulcioCertificateAuthorities() {
+		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
+			continue
+		}
+		if !ca.ValidityPeriodEnd.IsZero() && leafCert.NotAfter.After(ca.ValidityPeriodEnd) {
+			continue
+		}
+
+		rootCertPool := x509.NewCertPool()
+		rootCertPool.AddCert(ca.Root)
+		intermediateCertPool := x509.NewCertPool()
+		for _, cert := range ca.Intermediates {
+			intermediateCertPool.AddCert(cert)
+		}
+
+		opts := x509.VerifyOptions{
+			// CurrentTime is intentionally set to the leaf certificate's
+			// NotBefore time to ensure that we can continue to verify
+			// old bundles after they expire.
+			CurrentTime:   certs[0].NotBefore,
+			Roots:         rootCertPool,
+			Intermediates: intermediateCertPool,
+			KeyUsages: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageCodeSigning,
+			},
+		}
+
+		_, err = leafCert.Verify(opts)
+		if err == nil {
+			return nil
+		}
+	}
+
+	return errors.New("certificate verification failed")
 }
 
 func verifyEnvelope(envelope *dsse.Envelope, verifier signature.Verifier) error {

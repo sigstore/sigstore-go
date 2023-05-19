@@ -29,12 +29,6 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
 		return errors.New("unable to get timestamp verification data")
 	}
 
-	// TODO - shouldn't we check the time in these certificates?
-	certs, err := entity.CertificateChain()
-	if err != nil || len(certs) == 0 {
-		return errors.New("artifact does not provide a certificate")
-	}
-
 	// TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
 	envelope, err := entity.Envelope()
 	if err != nil {
@@ -50,55 +44,64 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
 		return err
 	}
 
+	certAuthorities := p.trustedRoot.TSACertificateAuthorities()
+
+	for _, timestamp := range signedTimestamps {
+		err = verifySignedTimestamp(timestamp, dsseSignatureBytes, certAuthorities)
+		if err != nil {
+			return errors.New("unable to verify timestamp")
+		}
+	}
+	return nil
+}
+
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, certAuthorities []*root.CertificateAuthority) error {
 	// Iterate through TSA certificate authorities to find one that verifies
-	verifiedTSA := false
-
-	for _, tsaCA := range p.trustedRoot.GetTSACertAuthorities() {
-		tsaRoots := make([]*x509.Certificate, 0)
-		tsaRoots = append(tsaRoots, tsaCA.Root)
-
+	for _, ca := range certAuthorities {
 		trustedRootVerificationOptions := tsaverification.VerifyOpts{
-			Roots:          tsaRoots,
-			Intermediates:  tsaCA.Intermediates,
-			TSACertificate: tsaCA.Leaf,
+			Roots:          []*x509.Certificate{ca.Root},
+			Intermediates:  ca.Intermediates,
+			TSACertificate: ca.Leaf,
 		}
 
 		tsaRootCertPool := x509.NewCertPool()
-		tsaRootCertPool.AddCert(tsaCA.Root)
+		tsaRootCertPool.AddCert(ca.Root)
 
 		tsaIntermediateCertPool := x509.NewCertPool()
-		for _, intermediateCert := range tsaCA.Intermediates {
+		for _, intermediateCert := range ca.Intermediates {
 			tsaIntermediateCertPool.AddCert(intermediateCert)
 		}
 
-		for _, signedTimestamp := range signedTimestamps {
-			// Ensure timestamp responses are from trusted sources
-			timestamp, err := tsaverification.VerifyTimestampResponse(signedTimestamp, bytes.NewReader(dsseSignatureBytes), trustedRootVerificationOptions)
-			if err != nil {
-				continue
-			}
-
-			// Check that the timestamp is valid for the provided certificate
-			verificationOptions := x509.VerifyOptions{
-				CurrentTime:   timestamp.Time,
-				Roots:         tsaRootCertPool,
-				Intermediates: tsaIntermediateCertPool,
-				KeyUsages: []x509.ExtKeyUsage{
-					x509.ExtKeyUsageTimeStamping,
-				},
-			}
-
-			_, err = tsaCA.Leaf.Verify(verificationOptions)
-			if err == nil {
-				verifiedTSA = true
-				break
-			}
+		// Ensure timestamp responses are from trusted sources
+		timestamp, err := tsaverification.VerifyTimestampResponse(signedTimestamp, bytes.NewReader(dsseSignatureBytes), trustedRootVerificationOptions)
+		if err != nil {
+			continue
 		}
+
+		// Check that the timestamp is valid for the provided certificate
+		verificationOptions := x509.VerifyOptions{
+			CurrentTime:   timestamp.Time,
+			Roots:         tsaRootCertPool,
+			Intermediates: tsaIntermediateCertPool,
+			KeyUsages: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageTimeStamping,
+			},
+		}
+
+		_, err = ca.Leaf.Verify(verificationOptions)
+		if err != nil {
+			continue
+		}
+		if !ca.ValidityPeriodStart.IsZero() && timestamp.Time.Before(ca.ValidityPeriodStart) {
+			continue
+		}
+		if !ca.ValidityPeriodEnd.IsZero() && timestamp.Time.After(ca.ValidityPeriodEnd) {
+			continue
+		}
+
+		// All above verification successful, so return nil
+		return nil
 	}
 
-	if !verifiedTSA {
-		return errors.New("Unable to verify signed timestamps")
-	}
-
-	return nil
+	return errors.New("Unable to verify signed timestamps")
 }
