@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetSigstoreTrustedRoot(t *testing.T) {
-	trustedRoot, err := GetSigstoreTrustedRoot()
+	trustedRoot, err := GetDefaultTrustedRoot()
 	assert.Nil(t, err)
 	assert.NotNil(t, trustedRoot)
 }

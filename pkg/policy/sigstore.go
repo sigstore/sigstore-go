@@ -16,20 +16,25 @@ func (p *SigstorePolicy) VerifyPolicy(entity SignedEntity) error {
 	)
 }
 
-func NewSigstorePolicy() (*SigstorePolicy, error) {
-	trustedRoot, err := root.GetSigstoreTrustedRoot()
-	if err != nil {
-		return nil, err
-	}
-	return &SigstorePolicy{
-		trustedRoot: trustedRoot,
-		opts:        root.GetDefaultOptions(),
-	}, nil
-}
-
 func NewPolicy(trustedRoot *root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *SigstorePolicy {
 	return &SigstorePolicy{
 		trustedRoot: trustedRoot,
 		opts:        opts,
 	}
+}
+
+func NewSigstorePolicy() (*SigstorePolicy, error) {
+	trustedRoot, err := root.GetDefaultTrustedRoot()
+	if err != nil {
+		return nil, err
+	}
+	return NewPolicy(trustedRoot, root.GetDefaultOptions()), nil
+}
+
+func NewGitHubStagingPolicy() (*SigstorePolicy, error) {
+	trustedRoot, err := root.GetGitHubStagingTrustedRoot()
+	if err != nil {
+		return nil, err
+	}
+	return NewPolicy(trustedRoot, root.GetDefaultOptions()), nil
 }

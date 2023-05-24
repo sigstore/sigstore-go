@@ -168,13 +168,26 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 	return certificateAuthority, nil
 }
 
-//go:embed trustroot.json
-var trustedRootJSON []byte
+//go:embed trusted-root-public-good.json
+var trustedRootPublicGoodJSON []byte
 
-// GetSigstoreTrustedRoot returns the Sigstore trusted root.
+//go:embed trusted-root-github-staging.json
+var trustedRootGitHubStagingJSON []byte
+
+// GetDefaultTrustedRoot returns the public good Sigstore trusted root.
+func GetDefaultTrustedRoot() (*TrustedRoot, error) {
+	return NewTrustedRootFromJSON(trustedRootPublicGoodJSON)
+}
+
+// GetGitHubStagingTrustedRoot returns the GitHub staging trusted root.
+func GetGitHubStagingTrustedRoot() (*TrustedRoot, error) {
+	return NewTrustedRootFromJSON(trustedRootGitHubStagingJSON)
+}
+
+// NewTrustedRootFromJSON returns the Sigstore trusted root.
 // TODO: Update to use TUF client
-func GetSigstoreTrustedRoot() (*TrustedRoot, error) {
-	pbTrustedRoot, err := GetSigstoreTrustedRootProtobuf()
+func NewTrustedRootFromJSON(rootJSON []byte) (*TrustedRoot, error) {
+	pbTrustedRoot, err := NewTrustedRootProtobuf(rootJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -182,10 +195,10 @@ func GetSigstoreTrustedRoot() (*TrustedRoot, error) {
 	return NewTrustedRootFromProtobuf(pbTrustedRoot)
 }
 
-// GetSigstoreTrustedRootProtobuf returns the Sigstore trusted root as a protobuf.
-func GetSigstoreTrustedRootProtobuf() (*prototrustroot.TrustedRoot, error) {
+// NewTrustedRootProtobuf returns the Sigstore trusted root as a protobuf.
+func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error) {
 	pbTrustedRoot := &prototrustroot.TrustedRoot{}
-	err := protojson.Unmarshal(trustedRootJSON, pbTrustedRoot)
+	err := protojson.Unmarshal(rootJSON, pbTrustedRoot)
 	if err != nil {
 		return nil, err
 	}

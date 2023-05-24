@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
 	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/policy"
@@ -55,20 +53,13 @@ func main() {
 				os.Exit(1)
 			}
 
-			pbTrustedRoot := &prototrustroot.TrustedRoot{}
-			err = protojson.Unmarshal(trustedrootJSON, pbTrustedRoot)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-
-			tr, err = root.NewTrustedRootFromProtobuf(pbTrustedRoot)
+			tr, err = root.NewTrustedRootFromJSON(trustedrootJSON)
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
 		} else {
-			tr, err = root.GetSigstoreTrustedRoot()
+			tr, err = root.GetDefaultTrustedRoot()
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)

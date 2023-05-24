@@ -1,0 +1,52 @@
+{
+  "mediaType": "application/vnd.dev.sigstore.trustedroot+json;version=0.1",
+  "tlogs": [],
+  "certificateAuthorities": [
+    {
+      "subject": {
+        "organization": "GitHub, Inc.",
+        "commonName": "Internal Services Root"
+      },
+      "uri": "https://fulcio-staging.service.iad.github.net/",
+      "certChain": {
+        "certificates": [
+          {
+            "rawBytes": "MIICITCCAaegAwIBAgIUeTLQjB2gw3CBvlbV6f4M3t3VW8IwCgYIKoZIzj0EAwMwQjEVMBMGA1UEChMMR2l0SHViLCBJbmMuMSkwJwYDVQQDEyBGdWxjaW8gSW50ZXJtZWRpYXRlIGwxIC0gc3RhZ2luZzAeFw0yMzA0MjgwMDAwMDBaFw0yNDA0MjcwMDAwMDBaMEIxFTATBgNVBAoTDEdpdEh1YiwgSW5jLjEpMCcGA1UEAxMgRnVsY2lvIEludGVybWVkaWF0ZSBsMiAtIHN0YWdpbmcwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASdBcdj9KXSdvKv8y8EX1RlBz9m39lmyvgclLizH84eD6zQahXY+XjmF6HR8EVeGSIZMetiKsvPYNY7tae2DcYYo3sweTAOBgNVHQ8BAf8EBAMCAQYwEwYDVR0lBAwwCgYIKwYBBQUHAwMwEgYDVR0TAQH/BAgwBgEB/wIBADAdBgNVHQ4EFgQU7Jh0Qw4tt5XZLIg4tRvJTdGMRiQwHwYDVR0jBBgwFoAUl3ZXWR03Y3W8wA2eMBF67zBFNvgwCgYIKoZIzj0EAwMDaAAwZQIwaq7Nno5NfdQ/1L6MFibLwAfNRcY08tTTXjHj1Eg389xzJb5gf9R7GbRq8qlJho5qAjEAx8M8r2DEEWdVKA8+FmNQTrILspfjFVMv46CtLZLby3LQ3ywTXDCbzhAj6wwC76k/"
+          },
+          {
+            "rawBytes": "MIICKTCCAa+gAwIBAgIUUtqidSyxNquhpEZEo+3AjEba+LEwCgYIKoZIzj0EAwMwQjEVMBMGA1UEChMMR2l0SHViLCBJbmMuMSkwJwYDVQQDEyBJbnRlcm5hbCBTZXJ2aWNlcyBSb290IC0gc3RhZ2luZzAeFw0yMzA0MjYwMDAwMDBaFw0yODA0MjQwMDAwMDBaMEIxFTATBgNVBAoTDEdpdEh1YiwgSW5jLjEpMCcGA1UEAxMgRnVsY2lvIEludGVybWVkaWF0ZSBsMSAtIHN0YWdpbmcwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAASsub8qvq8sW+uc65s3msWlolUDGrZqnbbo33weYYuw8hvqwkVhuKJmSVoXoXOCavNYFLVEMO0V3Y8Kld9xp/ycYd2hk9cnYEvapFn99Y2SuOUxrvixGsL71VVw6XwBFOqjZjBkMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEBMB0GA1UdDgQWBBSXdldZHTdjdbzADZ4wEXrvMEU2+DAfBgNVHSMEGDAWgBRe7TqH0+tcWvxptMrEYZexojFBwzAKBggqhkjOPQQDAwNoADBlAjAvtBMGX9b6LtcJlsZd6LSTVghjabamk87S1BA2mobAbPtgg7Sk9X4SseYb9OMRftoCMQDEpyktEtGK7AHfooOYqJoMd6mHvvk1h31vlGKFcRjPOOzxDOyga3PGEkCvyg7DDVw="
+          }
+        ]
+      },
+      "validFor": {
+        "start": "2023-04-28T00:00:00.000Z"
+      }
+    }
+  ],
+  "ctlogs": [],
+  "timestampAuthorities": [
+    {
+      "subject": {
+        "organization": "GitHub, Inc.",
+        "commonName": "Internal Services Root"
+      },
+      "uri": "https://timestamp-authority-staging.service.iad.github.net/",
+      "certChain": {
+        "certificates": [
+          {
+            "rawBytes": "MIICEjCCAZigAwIBAgIUNPeEIYF5BunCIuITWsiFZIpxWHQwCgYIKoZIzj0EAwMwPDEVMBMGA1UEChMMR2l0SHViLCBJbmMuMSMwIQYDVQQDExpUU0EgaW50ZXJtZWRpYXRlIC0gc3RhZ2luZzAeFw0yMzA0MTkwMDAwMDBaFw0yNDA0MTgwMDAwMDBaMDwxFTATBgNVBAoTDEdpdEh1YiwgSW5jLjEjMCEGA1UEAxMaVFNBIFRpbWVzdGFtcGluZyAtIHN0YWdpbmcwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATWAMg1BEHAzb03PHUKJiRJZdXcKIL0K/ks3Ylq5F5YDRIxUN4o8yeIaCWXa6i16zi8nXMFsa+3XrYM8mUyi9F6o3gwdjAOBgNVHQ8BAf8EBAMCB4AwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUr+RZdcTNo31p3FuR0pajelcnr40wHwYDVR0jBBgwFoAUOjtujIOKXIe1HfK+d+FGbyN0JtQwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwCgYIKoZIzj0EAwMDaAAwZQIwEDyTqVZmBbnW364YtJlRZJg191sFgOW5lcJRjLoQlO1j3ViQQsxlVq/Lx4sm3qzkAjEA78NLPEsyHbPV3QzrFvbQ3ExcHKIy6ME4bKweboy/GFsbnMAIbe/s1XCwSNJsjmHM"
+          },
+          {
+            "rawBytes": "MIICOTCCAb6gAwIBAgIUb76JFFG6ZAMk2WiM701uas/R+8IwCgYIKoZIzj0EAwMwQjEVMBMGA1UEChMMR2l0SHViLCBJbmMuMSkwJwYDVQQDEyBJbnRlcm5hbCBTZXJ2aWNlcyBSb290IC0gc3RhZ2luZzAeFw0yMzA0MTkwMDAwMDBaFw0yODA0MTcwMDAwMDBaMDwxFTATBgNVBAoTDEdpdEh1YiwgSW5jLjEjMCEGA1UEAxMaVFNBIGludGVybWVkaWF0ZSAtIHN0YWdpbmcwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAARvlhn8J+iSEIpolIBtyV7a4iKVf4W/M0u5WlAYPQl07Egt03ZU9o3enYVfYCJb20/c9fDtvxyVoXZvuUpcJ19thIcks0/EACA/mU+ez6Q8elkNWDDqK2G77oUGFfMaOCujezB5MA4GA1UdDwEB/wQEAwIBBjATBgNVHSUEDDAKBggrBgEFBQcDCDASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBQ6O26Mg4pch7Ud8r534UZvI3Qm1DAfBgNVHSMEGDAWgBRe7TqH0+tcWvxptMrEYZexojFBwzAKBggqhkjOPQQDAwNpADBmAjEAwfxr1QVHc3uA2i7FD34OMEA3+ebJqZ35cIZHMl7kDaRFPqu8XXgZB9n9fH4b1vh5AjEAgHmHqwGC5A8gJ830+g769vgYDG4TU04pwUxxbzr5xncB4qLHHay+Cjdqawy91cqT"
+          },
+          {
+            "rawBytes": "MIICCDCCAY6gAwIBAgIUe+OIc3vfSJWb7XN4oqTchva/gTkwCgYIKoZIzj0EAwMwQjEVMBMGA1UEChMMR2l0SHViLCBJbmMuMSkwJwYDVQQDEyBJbnRlcm5hbCBTZXJ2aWNlcyBSb290IC0gc3RhZ2luZzAeFw0yMzA0MTkwMDAwMDBaFw0zMzA0MTYwMDAwMDBaMEIxFTATBgNVBAoTDEdpdEh1YiwgSW5jLjEpMCcGA1UEAxMgSW50ZXJuYWwgU2VydmljZXMgUm9vdCAtIHN0YWdpbmcwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQ8U7KpNL6RNGIZAB4EwIsqwF9waxZNZvLAU+2KwRhpHlhAAolhuyKiJbLelY3vfo0kpSK7CMN1wwL6QPlm+AHYh1yjcVKRl9wDiSNN9+5zzuw84aLISKegzVcNZ2vawimjRTBDMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgECMB0GA1UdDgQWBBRe7TqH0+tcWvxptMrEYZexojFBwzAKBggqhkjOPQQDAwNoADBlAjEAnUh0g/UMhCJQsByICOa8FFIXSTnAEar1KRBLpx58g+I8P8f7yvoP1JUY8o08JdtRAjAm2ioSR6eAluK6gbgpJkPlu2pR4bymHwBnshnVGyPZb1qAu1C/8j7MnbHi9Tm5tyo="
+          }
+        ]
+      },
+      "validFor": {
+        "start": "2023-04-14T00:00:00.000Z"
+      }
+    }
+  ]
+}
