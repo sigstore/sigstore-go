@@ -31,6 +31,8 @@ func NewSigstorePolicy() (*SigstorePolicy, error) {
 	return NewPolicy(trustedRoot, root.GetDefaultOptions()), nil
 }
 
+// NewGitHubPolicy returns a policy that verifies signatures using the GitHub
+// staging root. This is temporary until we distribute the root via TUF.
 func NewGitHubStagingPolicy() (*SigstorePolicy, error) {
 	trustedRoot, err := root.GetGitHubStagingTrustedRoot()
 	if err != nil {

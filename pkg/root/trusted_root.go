@@ -179,13 +179,13 @@ func GetDefaultTrustedRoot() (*TrustedRoot, error) {
 	return NewTrustedRootFromJSON(trustedRootPublicGoodJSON)
 }
 
-// GetGitHubStagingTrustedRoot returns the GitHub staging trusted root.
+// GetGitHubStagingTrustedRoot returns the GitHub staging trusted root. This
+// is temporary until we can distribute the trusted root via TUF.
 func GetGitHubStagingTrustedRoot() (*TrustedRoot, error) {
 	return NewTrustedRootFromJSON(trustedRootGitHubStagingJSON)
 }
 
 // NewTrustedRootFromJSON returns the Sigstore trusted root.
-// TODO: Update to use TUF client
 func NewTrustedRootFromJSON(rootJSON []byte) (*TrustedRoot, error) {
 	pbTrustedRoot, err := NewTrustedRootProtobuf(rootJSON)
 	if err != nil {
