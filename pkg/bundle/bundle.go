@@ -55,6 +55,7 @@ func (b *ProtobufBundle) MarshalJSON() ([]byte, error) {
 }
 
 func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
+	b.Bundle = new(protobundle.Bundle)
 	err := protojson.Unmarshal(data, b.Bundle)
 	if err != nil {
 		return err
