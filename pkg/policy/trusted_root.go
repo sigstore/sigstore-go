@@ -6,15 +6,31 @@ import (
 )
 
 type TrustedRootPolicy struct {
-	trustedRoot *root.TrustedRoot
-	opts        *protoverification.ArtifactVerificationOptions
+	subPolicies []Policy
 }
 
 func (p *TrustedRootPolicy) VerifyPolicy(entity SignedEntity) error {
-	return Verify(entity,
-		&CertificateSignaturePolicy{p.trustedRoot, p.opts},
-		&ArtifactTransparencyLogPolicy{p.trustedRoot, p.opts},
-		&CertificateTransparencyLogPolicy{p.trustedRoot, p.opts},
-		&TimestampAuthorityPolicy{p.trustedRoot, p.opts},
-	)
+	return Verify(entity, p.subPolicies...)
+}
+
+func NewTrustedRootPolicy(trustedRoot *root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *TrustedRootPolicy {
+	subPolicies := []Policy{NewCertificateSignaturePolicy(trustedRoot)}
+
+	if tsaOpts := opts.GetTsaOptions(); tsaOpts != nil {
+		if !tsaOpts.GetDisable() {
+			subPolicies = append(subPolicies, NewTimestampAuthorityPolicy(trustedRoot, int(tsaOpts.GetThreshold())))
+		}
+	}
+	if tlogOptions := opts.GetTlogOptions(); tlogOptions != nil {
+		if !tlogOptions.GetDisable() {
+			subPolicies = append(subPolicies, NewArtifactTransparencyLogPolicy(trustedRoot, int(tlogOptions.GetThreshold())))
+		}
+	}
+	if ctlogOptions := opts.GetCtlogOptions(); ctlogOptions != nil {
+		if !ctlogOptions.GetDisable() {
+			subPolicies = append(subPolicies, NewCertificateTransparencyLogPolicy(trustedRoot, int(ctlogOptions.GetThreshold())))
+		}
+	}
+
+	return &TrustedRootPolicy{subPolicies}
 }

@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
 
-	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
 	"github.com/github/sigstore-verifier/pkg/root"
@@ -14,19 +14,13 @@ import (
 
 type TimestampAuthorityPolicy struct {
 	trustedRoot *root.TrustedRoot
-	opts        *protoverification.ArtifactVerificationOptions
+	threshold   int
 }
 
 func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
-	tsaOptions := p.opts.TsaOptions
-
-	if tsaOptions.Disable {
-		return nil
-	}
-
 	signedTimestamps, err := entity.Timestamps()
-	if err != nil || (len(signedTimestamps) < int(tsaOptions.Threshold)) {
-		return errors.New("unable to get timestamp verification data")
+	if err != nil || (len(signedTimestamps) < p.threshold) {
+		return fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
 	}
 
 	// TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
@@ -104,4 +98,11 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, ce
 	}
 
 	return errors.New("Unable to verify signed timestamps")
+}
+
+func NewTimestampAuthorityPolicy(trustedRoot *root.TrustedRoot, threshold int) *TimestampAuthorityPolicy {
+	return &TimestampAuthorityPolicy{
+		trustedRoot: trustedRoot,
+		threshold:   threshold,
+	}
 }

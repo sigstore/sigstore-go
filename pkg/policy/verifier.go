@@ -1,7 +1,7 @@
 package policy
 
 func VerifyKeyless(e SignedEntity) error {
-	policy, err := NewSigstorePolicy()
+	policy, err := NewSigstorePublicPolicy()
 	if err != nil {
 		return err
 	}

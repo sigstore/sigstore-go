@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"os"
 
-	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
-
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/policy"
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
 var requireTSA *bool
+var requireTlog *bool
 var trustedrootJSONpath *string
 
 func init() {
 	requireTSA = flag.Bool("requireTSA", false, "Require RFC 3161 signed timestamp")
+	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "", "Path to trustedroot JSON file")
 	flag.Parse()
 	if flag.NArg() == 0 {
@@ -37,59 +37,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !*requireTSA && *trustedrootJSONpath == "" {
-		err = policy.VerifyKeyless(b)
+	opts := root.GetDefaultOptions()
+	opts.TsaOptions.Disable = !*requireTSA
+	opts.TlogOptions.Disable = !*requireTlog
+
+	var tr *root.TrustedRoot
+	if *trustedrootJSONpath != "" {
+		trustedrootJSON, err := os.ReadFile(*trustedrootJSONpath)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		tr, err = root.NewTrustedRootFromJSON(trustedrootJSON)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 	} else {
-		var tr *root.TrustedRoot
-
-		if *trustedrootJSONpath != "" {
-			trustedrootJSON, err := os.ReadFile(*trustedrootJSONpath)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-
-			tr, err = root.NewTrustedRootFromJSON(trustedrootJSON)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-		} else {
-			tr, err = root.GetDefaultTrustedRoot()
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-		}
-
-		opts := &protoverification.ArtifactVerificationOptions{
-			Signers: nil,
-			TlogOptions: &protoverification.ArtifactVerificationOptions_TlogOptions{
-				Threshold:                 0,
-				PerformOnlineVerification: false,
-				Disable:                   true,
-			},
-			CtlogOptions: &protoverification.ArtifactVerificationOptions_CtlogOptions{
-				Threshold:   0,
-				DetachedSct: false,
-				Disable:     true,
-			},
-			TsaOptions: &protoverification.ArtifactVerificationOptions_TimestampAuthorityOptions{
-				Threshold: 1,
-				Disable:   false,
-			},
-		}
-
-		p := policy.NewPolicy(tr, opts)
-		err = p.VerifyPolicy(b)
+		tr, err = root.GetDefaultTrustedRoot()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+	}
+
+	p := policy.NewTrustedRootPolicy(tr, opts)
+	err = p.VerifyPolicy(b)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	fmt.Println("Verification successful!")

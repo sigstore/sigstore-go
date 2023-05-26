@@ -219,7 +219,7 @@ func GetDefaultOptions() *protoverification.ArtifactVerificationOptions {
 			Disable:     false,
 		},
 		TsaOptions: &protoverification.ArtifactVerificationOptions_TimestampAuthorityOptions{
-			Threshold: 0,
+			Threshold: 1,
 			Disable:   true,
 		},
 	}

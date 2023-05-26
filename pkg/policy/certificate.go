@@ -9,14 +9,12 @@ import (
 
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
 )
 
 type CertificateSignaturePolicy struct {
 	trustedRoot *root.TrustedRoot
-	opts        *protoverification.ArtifactVerificationOptions
 }
 
 func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
@@ -92,4 +90,10 @@ func verifyEnvelope(envelope *dsse.Envelope, verifier signature.Verifier) error 
 		return err
 	}
 	return nil
+}
+
+func NewCertificateSignaturePolicy(trustedRoot *root.TrustedRoot) *CertificateSignaturePolicy {
+	return &CertificateSignaturePolicy{
+		trustedRoot: trustedRoot,
+	}
 }

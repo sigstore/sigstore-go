@@ -1,20 +1,24 @@
 package policy
 
 import (
+	"fmt"
+
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tlog"
-	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
 )
 
 type ArtifactTransparencyLogPolicy struct {
 	trustedRoot *root.TrustedRoot
-	opts        *protoverification.ArtifactVerificationOptions
+	threshold   int
 }
 
 func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error {
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return err
+	}
+	if len(entries) < p.threshold {
+		return fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
 	}
 	for _, entry := range entries {
 		err := tlog.ValidateEntry(entry)
@@ -30,4 +34,11 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 	}
 
 	return nil
+}
+
+func NewArtifactTransparencyLogPolicy(trustedRoot *root.TrustedRoot, threshold int) *ArtifactTransparencyLogPolicy {
+	return &ArtifactTransparencyLogPolicy{
+		trustedRoot: trustedRoot,
+		threshold:   threshold,
+	}
 }
