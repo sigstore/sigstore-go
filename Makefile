@@ -5,7 +5,7 @@ export GONOSUMDB = github.com/github/*
 
 .PHONY: build
 build:
-	go build -o $@ ./cmd/sigstore-verifier
+	go build ./cmd/sigstore-verifier
 
 .PHONY: test
 test:
