@@ -8,7 +8,7 @@ import (
 )
 
 type ArtifactTransparencyLogPolicy struct {
-	trustedRoot *root.TrustedRoot
+	trustedRoot root.TrustedRoot
 	threshold   int
 }
 
@@ -36,7 +36,7 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 	return nil
 }
 
-func NewArtifactTransparencyLogPolicy(trustedRoot *root.TrustedRoot, threshold int) *ArtifactTransparencyLogPolicy {
+func NewArtifactTransparencyLogPolicy(trustedRoot root.TrustedRoot, threshold int) *ArtifactTransparencyLogPolicy {
 	return &ArtifactTransparencyLogPolicy{
 		trustedRoot: trustedRoot,
 		threshold:   threshold,

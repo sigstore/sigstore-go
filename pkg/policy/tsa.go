@@ -13,7 +13,7 @@ import (
 )
 
 type TimestampAuthorityPolicy struct {
-	trustedRoot *root.TrustedRoot
+	trustedRoot root.TrustedRoot
 	threshold   int
 }
 
@@ -49,7 +49,7 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
 	return nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, certAuthorities []*root.CertificateAuthority) error {
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, certAuthorities []root.CertificateAuthority) error {
 	// Iterate through TSA certificate authorities to find one that verifies
 	for _, ca := range certAuthorities {
 		trustedRootVerificationOptions := tsaverification.VerifyOpts{
@@ -100,7 +100,7 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, ce
 	return errors.New("Unable to verify signed timestamps")
 }
 
-func NewTimestampAuthorityPolicy(trustedRoot *root.TrustedRoot, threshold int) *TimestampAuthorityPolicy {
+func NewTimestampAuthorityPolicy(trustedRoot root.TrustedRoot, threshold int) *TimestampAuthorityPolicy {
 	return &TimestampAuthorityPolicy{
 		trustedRoot: trustedRoot,
 		threshold:   threshold,

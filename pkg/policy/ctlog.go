@@ -5,7 +5,7 @@ import (
 )
 
 type CertificateTransparencyLogPolicy struct {
-	trustedRoot *root.TrustedRoot
+	trustedRoot root.TrustedRoot
 	threshold   int
 }
 
@@ -14,7 +14,7 @@ func (p *CertificateTransparencyLogPolicy) VerifyPolicy(_ SignedEntity) error {
 	return nil
 }
 
-func NewCertificateTransparencyLogPolicy(trustedRoot *root.TrustedRoot, threshold int) *CertificateTransparencyLogPolicy {
+func NewCertificateTransparencyLogPolicy(trustedRoot root.TrustedRoot, threshold int) *CertificateTransparencyLogPolicy {
 	return &CertificateTransparencyLogPolicy{
 		trustedRoot: trustedRoot,
 		threshold:   threshold,

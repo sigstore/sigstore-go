@@ -13,7 +13,7 @@ func (p *TrustedRootPolicy) VerifyPolicy(entity SignedEntity) error {
 	return Verify(entity, p.subPolicies...)
 }
 
-func NewTrustedRootPolicy(trustedRoot *root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *TrustedRootPolicy {
+func NewTrustedRootPolicy(trustedRoot root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *TrustedRootPolicy {
 	subPolicies := []Policy{NewCertificateSignaturePolicy(trustedRoot)}
 
 	if tsaOpts := opts.GetTsaOptions(); tsaOpts != nil {

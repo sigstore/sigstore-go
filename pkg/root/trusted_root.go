@@ -18,11 +18,16 @@ import (
 
 const TrustedRootMediaType01 = "application/vnd.dev.sigstore.trustedroot+json;version=0.1"
 
-type TrustedRoot struct {
+type TrustedRoot interface {
+	TSACertificateAuthorities() []CertificateAuthority
+	FulcioCertificateAuthorities() []CertificateAuthority
+}
+
+type ProtobufTrustedRoot struct {
 	trustedRoot           *prototrustroot.TrustedRoot
 	tlogVerifiers         map[string]signature.Verifier
-	fulcioCertAuthorities []*CertificateAuthority
-	tsaCertAuthorities    []*CertificateAuthority
+	fulcioCertAuthorities []CertificateAuthority
+	tsaCertAuthorities    []CertificateAuthority
 }
 
 type CertificateAuthority struct {
@@ -33,20 +38,20 @@ type CertificateAuthority struct {
 	ValidityPeriodEnd   time.Time
 }
 
-func (tr *TrustedRoot) TSACertificateAuthorities() []*CertificateAuthority {
+func (tr *ProtobufTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
 	return tr.tsaCertAuthorities
 }
 
-func (tr *TrustedRoot) FulcioCertificateAuthorities() []*CertificateAuthority {
+func (tr *ProtobufTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 	return tr.fulcioCertAuthorities
 }
 
-func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *TrustedRoot, err error) {
+func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *ProtobufTrustedRoot, err error) {
 	if trustedRoot.GetMediaType() != TrustedRootMediaType01 {
 		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", trustedRoot.GetMediaType())
 	}
 
-	parsedTrustedRoot = &TrustedRoot{trustedRoot: trustedRoot}
+	parsedTrustedRoot = &ProtobufTrustedRoot{trustedRoot: trustedRoot}
 	parsedTrustedRoot.tlogVerifiers, err = ParseTlogVerifiers(trustedRoot)
 	if err != nil {
 		return nil, err
@@ -110,14 +115,14 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 	return tlogVerifiers, nil
 }
 
-func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (certificateAuthorities []*CertificateAuthority, err error) {
-	certificateAuthorities = make([]*CertificateAuthority, len(certAuthorities))
+func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (certificateAuthorities []CertificateAuthority, err error) {
+	certificateAuthorities = make([]CertificateAuthority, len(certAuthorities))
 	for i, certAuthority := range certAuthorities {
 		certificateAuthority, err := ParseCertificateAuthority(certAuthority)
 		if err != nil {
 			return nil, err
 		}
-		certificateAuthorities[i] = certificateAuthority
+		certificateAuthorities[i] = *certificateAuthority
 	}
 	return certificateAuthorities, nil
 }
@@ -175,18 +180,18 @@ var trustedRootPublicGoodJSON []byte
 var trustedRootGitHubStagingJSON []byte
 
 // GetDefaultTrustedRoot returns the public good Sigstore trusted root.
-func GetDefaultTrustedRoot() (*TrustedRoot, error) {
+func GetDefaultTrustedRoot() (*ProtobufTrustedRoot, error) {
 	return NewTrustedRootFromJSON(trustedRootPublicGoodJSON)
 }
 
 // GetGitHubStagingTrustedRoot returns the GitHub staging trusted root. This
 // is temporary until we can distribute the trusted root via TUF.
-func GetGitHubStagingTrustedRoot() (*TrustedRoot, error) {
+func GetGitHubStagingTrustedRoot() (*ProtobufTrustedRoot, error) {
 	return NewTrustedRootFromJSON(trustedRootGitHubStagingJSON)
 }
 
 // NewTrustedRootFromJSON returns the Sigstore trusted root.
-func NewTrustedRootFromJSON(rootJSON []byte) (*TrustedRoot, error) {
+func NewTrustedRootFromJSON(rootJSON []byte) (*ProtobufTrustedRoot, error) {
 	pbTrustedRoot, err := NewTrustedRootProtobuf(rootJSON)
 	if err != nil {
 		return nil, err

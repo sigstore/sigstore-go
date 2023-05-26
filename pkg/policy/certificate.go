@@ -14,7 +14,7 @@ import (
 )
 
 type CertificateSignaturePolicy struct {
-	trustedRoot *root.TrustedRoot
+	trustedRoot root.TrustedRoot
 }
 
 func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
@@ -92,7 +92,7 @@ func verifyEnvelope(envelope *dsse.Envelope, verifier signature.Verifier) error 
 	return nil
 }
 
-func NewCertificateSignaturePolicy(trustedRoot *root.TrustedRoot) *CertificateSignaturePolicy {
+func NewCertificateSignaturePolicy(trustedRoot root.TrustedRoot) *CertificateSignaturePolicy {
 	return &CertificateSignaturePolicy{
 		trustedRoot: trustedRoot,
 	}
