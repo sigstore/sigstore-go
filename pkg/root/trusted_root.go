@@ -23,7 +23,7 @@ type TrustedRoot interface {
 	FulcioCertificateAuthorities() []CertificateAuthority
 }
 
-type ProtobufTrustedRoot struct {
+type ParsedTrustedRoot struct {
 	trustedRoot           *prototrustroot.TrustedRoot
 	tlogVerifiers         map[string]signature.Verifier
 	fulcioCertAuthorities []CertificateAuthority
@@ -38,20 +38,20 @@ type CertificateAuthority struct {
 	ValidityPeriodEnd   time.Time
 }
 
-func (tr *ProtobufTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
+func (tr *ParsedTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
 	return tr.tsaCertAuthorities
 }
 
-func (tr *ProtobufTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
+func (tr *ParsedTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 	return tr.fulcioCertAuthorities
 }
 
-func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *ProtobufTrustedRoot, err error) {
+func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *ParsedTrustedRoot, err error) {
 	if trustedRoot.GetMediaType() != TrustedRootMediaType01 {
 		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", trustedRoot.GetMediaType())
 	}
 
-	parsedTrustedRoot = &ProtobufTrustedRoot{trustedRoot: trustedRoot}
+	parsedTrustedRoot = &ParsedTrustedRoot{trustedRoot: trustedRoot}
 	parsedTrustedRoot.tlogVerifiers, err = ParseTlogVerifiers(trustedRoot)
 	if err != nil {
 		return nil, err
@@ -180,18 +180,18 @@ var trustedRootPublicGoodJSON []byte
 var trustedRootGitHubStagingJSON []byte
 
 // GetDefaultTrustedRoot returns the public good Sigstore trusted root.
-func GetDefaultTrustedRoot() (*ProtobufTrustedRoot, error) {
+func GetDefaultTrustedRoot() (*ParsedTrustedRoot, error) {
 	return NewTrustedRootFromJSON(trustedRootPublicGoodJSON)
 }
 
 // GetGitHubStagingTrustedRoot returns the GitHub staging trusted root. This
 // is temporary until we can distribute the trusted root via TUF.
-func GetGitHubStagingTrustedRoot() (*ProtobufTrustedRoot, error) {
+func GetGitHubStagingTrustedRoot() (*ParsedTrustedRoot, error) {
 	return NewTrustedRootFromJSON(trustedRootGitHubStagingJSON)
 }
 
 // NewTrustedRootFromJSON returns the Sigstore trusted root.
-func NewTrustedRootFromJSON(rootJSON []byte) (*ProtobufTrustedRoot, error) {
+func NewTrustedRootFromJSON(rootJSON []byte) (*ParsedTrustedRoot, error) {
 	pbTrustedRoot, err := NewTrustedRootProtobuf(rootJSON)
 	if err != nil {
 		return nil, err

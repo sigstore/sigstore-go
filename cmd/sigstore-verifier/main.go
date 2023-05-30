@@ -41,7 +41,7 @@ func main() {
 	opts.TsaOptions.Disable = !*requireTSA
 	opts.TlogOptions.Disable = !*requireTlog
 
-	var tr *root.ProtobufTrustedRoot
+	var tr *root.ParsedTrustedRoot
 	if *trustedrootJSONpath != "" {
 		trustedrootJSON, err := os.ReadFile(*trustedrootJSONpath)
 		if err != nil {
