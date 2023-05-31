@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -9,14 +10,17 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/base64"
 	"math/big"
 	"time"
 
+	"github.com/digitorus/timestamp"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
+	tsx509 "github.com/sigstore/timestamp-authority/pkg/x509"
 )
 
 type VirtualSigstore struct {
@@ -49,7 +53,7 @@ func NewVirtualSigstore() (*VirtualSigstore, error) {
 	if err != nil {
 		return nil, err
 	}
-	tsaLeafCert, err := GenerateTSALeafCert(time.Now().Add(5*time.Minute), tsaLeafKey, tsaIntermediateCert, tsaIntermediateKey)
+	tsaLeafCert, err := GenerateTSALeafCert(time.Now().Add(-5*time.Minute), tsaLeafKey, tsaIntermediateCert, tsaIntermediateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +104,47 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 		return nil, err
 	}
 
+	sig, err := base64.StdEncoding.DecodeString(envelope.Signatures[0].Sig)
+	if err != nil {
+		return nil, err
+	}
+
+	tsr, err := generateTimestampingResponse(sig, ca.tsaCA.Leaf, ca.tsaLeafKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TestEntity{
-		certChain: []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
-		envelope:  envelope,
+		certChain:  []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
+		timestamps: [][]byte{tsr},
+		envelope:   envelope,
 	}, nil
+}
+
+func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey *ecdsa.PrivateKey) ([]byte, error) {
+	tsq, err := timestamp.CreateRequest(bytes.NewReader(sig), &timestamp.RequestOptions{
+		Hash: crypto.SHA256,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := timestamp.ParseRequest([]byte(tsq))
+	if err != nil {
+		return nil, err
+	}
+
+	tsTemplate := timestamp.Timestamp{
+		HashAlgorithm:   req.HashAlgorithm,
+		HashedMessage:   req.HashedMessage,
+		Time:            time.Now(),
+		Policy:          asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 57264, 2},
+		Ordering:        false,
+		Qualified:       false,
+		ExtraExtensions: req.Extensions,
+	}
+
+	return tsTemplate.CreateResponse(tsaCert, tsaKey)
 }
 
 func (ca *VirtualSigstore) TSACertificateAuthorities() []root.CertificateAuthority {
@@ -268,6 +309,11 @@ func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, p
 }
 
 func GenerateTSALeafCert(expiration time.Time, priv *ecdsa.PrivateKey, parentTemplate *x509.Certificate, parentPriv crypto.Signer) (*x509.Certificate, error) {
+	timestampExt, err := asn1.Marshal([]asn1.ObjectIdentifier{tsx509.EKUTimestampingOID})
+	if err != nil {
+		return nil, err
+	}
+
 	certTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		NotBefore:    expiration,
@@ -275,6 +321,14 @@ func GenerateTSALeafCert(expiration time.Time, priv *ecdsa.PrivateKey, parentTem
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
 		IsCA:         false,
+		// set EKU to x509.ExtKeyUsageTimeStamping but with a critical bit
+		ExtraExtensions: []pkix.Extension{
+			{
+				Id:       asn1.ObjectIdentifier{2, 5, 29, 37},
+				Critical: true,
+				Value:    timestampExt,
+			},
+		},
 	}
 
 	cert, err := createCertificate(certTemplate, parentTemplate, &priv.PublicKey, parentPriv)
