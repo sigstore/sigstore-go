@@ -122,8 +122,17 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 }
 
 func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey *ecdsa.PrivateKey) ([]byte, error) {
+	var hash crypto.Hash
+	switch tsaKey.Curve {
+	case elliptic.P256():
+		hash = crypto.SHA256
+	case elliptic.P384():
+		hash = crypto.SHA384
+	case elliptic.P521():
+		hash = crypto.SHA512
+	}
 	tsq, err := timestamp.CreateRequest(bytes.NewReader(sig), &timestamp.RequestOptions{
-		Hash: crypto.SHA256,
+		Hash: hash,
 	})
 	if err != nil {
 		return nil, err
