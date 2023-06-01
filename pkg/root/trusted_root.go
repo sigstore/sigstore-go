@@ -4,14 +4,12 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/x509"
-	_ "embed"
 	"encoding/hex"
 	"fmt"
 	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
-	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -173,23 +171,6 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 	return certificateAuthority, nil
 }
 
-//go:embed trusted-root-public-good.json
-var trustedRootPublicGoodJSON []byte
-
-//go:embed trusted-root-github-staging.json
-var trustedRootGitHubStagingJSON []byte
-
-// GetDefaultTrustedRoot returns the public good Sigstore trusted root.
-func GetDefaultTrustedRoot() (*ParsedTrustedRoot, error) {
-	return NewTrustedRootFromJSON(trustedRootPublicGoodJSON)
-}
-
-// GetGitHubStagingTrustedRoot returns the GitHub staging trusted root. This
-// is temporary until we can distribute the trusted root via TUF.
-func GetGitHubStagingTrustedRoot() (*ParsedTrustedRoot, error) {
-	return NewTrustedRootFromJSON(trustedRootGitHubStagingJSON)
-}
-
 // NewTrustedRootFromJSON returns the Sigstore trusted root.
 func NewTrustedRootFromJSON(rootJSON []byte) (*ParsedTrustedRoot, error) {
 	pbTrustedRoot, err := NewTrustedRootProtobuf(rootJSON)
@@ -208,24 +189,4 @@ func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error
 		return nil, err
 	}
 	return pbTrustedRoot, nil
-}
-
-func GetDefaultOptions() *protoverification.ArtifactVerificationOptions {
-	return &protoverification.ArtifactVerificationOptions{
-		Signers: nil,
-		TlogOptions: &protoverification.ArtifactVerificationOptions_TlogOptions{
-			Threshold:                 1,
-			PerformOnlineVerification: false,
-			Disable:                   false,
-		},
-		CtlogOptions: &protoverification.ArtifactVerificationOptions_CtlogOptions{
-			Threshold:   1,
-			DetachedSct: false,
-			Disable:     false,
-		},
-		TsaOptions: &protoverification.ArtifactVerificationOptions_TimestampAuthorityOptions{
-			Threshold: 1,
-			Disable:   true,
-		},
-	}
 }

@@ -13,6 +13,26 @@ func (p *TrustedRootPolicy) VerifyPolicy(entity SignedEntity) error {
 	return Verify(entity, p.subPolicies...)
 }
 
+func GetDefaultOptions() *protoverification.ArtifactVerificationOptions {
+	return &protoverification.ArtifactVerificationOptions{
+		Signers: nil,
+		TlogOptions: &protoverification.ArtifactVerificationOptions_TlogOptions{
+			Threshold:                 1,
+			PerformOnlineVerification: false,
+			Disable:                   false,
+		},
+		CtlogOptions: &protoverification.ArtifactVerificationOptions_CtlogOptions{
+			Threshold:   1,
+			DetachedSct: false,
+			Disable:     false,
+		},
+		TsaOptions: &protoverification.ArtifactVerificationOptions_TimestampAuthorityOptions{
+			Threshold: 1,
+			Disable:   true,
+		},
+	}
+}
+
 func NewTrustedRootPolicy(trustedRoot root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *TrustedRootPolicy {
 	subPolicies := []Policy{NewCertificateSignaturePolicy(trustedRoot)}
 
