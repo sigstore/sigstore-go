@@ -164,6 +164,10 @@ func (ca *VirtualSigstore) FulcioCertificateAuthorities() []root.CertificateAuth
 	return []root.CertificateAuthority{ca.fulcioCA}
 }
 
+func (ca *VirtualSigstore) TlogVerifiers() map[string]*root.TlogVerifier {
+	return make(map[string]*root.TlogVerifier)
+}
+
 type TestEntity struct {
 	certChain   []*x509.Certificate
 	envelope    *dsse.Envelope

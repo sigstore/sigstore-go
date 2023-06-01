@@ -25,7 +25,7 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 		if err != nil {
 			return err
 		}
-		err = tlog.VerifySET(entry)
+		err = tlog.VerifySET(entry, p.trustedRoot.TlogVerifiers())
 		if err != nil {
 			return err
 		}

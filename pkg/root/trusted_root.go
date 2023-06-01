@@ -11,7 +11,6 @@ import (
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
-	"github.com/sigstore/sigstore/pkg/signature"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -20,11 +19,12 @@ const TrustedRootMediaType01 = "application/vnd.dev.sigstore.trustedroot+json;ve
 type TrustedRoot interface {
 	TSACertificateAuthorities() []CertificateAuthority
 	FulcioCertificateAuthorities() []CertificateAuthority
+	TlogVerifiers() map[string]*TlogVerifier
 }
 
 type ParsedTrustedRoot struct {
 	trustedRoot           *prototrustroot.TrustedRoot
-	tlogVerifiers         map[string]signature.Verifier
+	tlogVerifiers         map[string]*TlogVerifier
 	fulcioCertAuthorities []CertificateAuthority
 	tsaCertAuthorities    []CertificateAuthority
 }
@@ -37,12 +37,25 @@ type CertificateAuthority struct {
 	ValidityPeriodEnd   time.Time
 }
 
+type TlogVerifier struct {
+	BaseURL             string
+	ID                  []byte
+	ValidityPeriodStart time.Time
+	ValidityPeriodEnd   time.Time
+	HashFunc            crypto.Hash
+	PublicKey           crypto.PublicKey
+}
+
 func (tr *ParsedTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
 	return tr.tsaCertAuthorities
 }
 
 func (tr *ParsedTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 	return tr.fulcioCertAuthorities
+}
+
+func (tr *ParsedTrustedRoot) TlogVerifiers() map[string]*TlogVerifier {
+	return tr.tlogVerifiers
 }
 
 func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *ParsedTrustedRoot, err error) {
@@ -70,8 +83,8 @@ func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsed
 	return parsedTrustedRoot, nil
 }
 
-func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers map[string]signature.Verifier, err error) {
-	tlogVerifiers = make(map[string]signature.Verifier)
+func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers map[string]*TlogVerifier, err error) {
+	tlogVerifiers = make(map[string]*TlogVerifier)
 	for _, tlog := range trustedRoot.GetTlogs() {
 		if tlog.GetHashAlgorithm() != protocommon.HashAlgorithm_SHA2_256 {
 			return nil, fmt.Errorf("unsupported tlog hash algorithm: %s", tlog.GetHashAlgorithm())
@@ -102,14 +115,24 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
 				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
 			}
-			tlogVerifiers[encodedKeyID], err = signature.LoadECDSAVerifier(ecKey, crypto.SHA256)
-			if err != nil {
-				return nil, err
+			tlogVerifier := &TlogVerifier{
+				BaseURL:   tlog.GetBaseUrl(),
+				ID:        tlog.GetLogId().GetKeyId(),
+				HashFunc:  crypto.SHA256,
+				PublicKey: ecKey,
 			}
+			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
+				if validFor.GetStart() != nil {
+					tlogVerifiers[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
+				}
+				if validFor.GetEnd() != nil {
+					tlogVerifiers[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
+				}
+			}
+			tlogVerifiers[encodedKeyID] = tlogVerifier
 		default:
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
-		// TODO: Handle validity period (tlog.GetPublicKey().GetValidFor())
 	}
 	return tlogVerifiers, nil
 }

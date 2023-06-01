@@ -2,7 +2,6 @@ package tlog
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/hex"
@@ -10,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/swag"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
@@ -22,6 +22,7 @@ import (
 
 type Entry struct {
 	RekorEntry           types.EntryImpl
+	LogID                []byte
 	logEntryAnon         models.LogEntryAnon
 	signedEntryTimestamp []byte
 }
@@ -99,7 +100,7 @@ func (entry *Entry) IntegratedTime() time.Time {
 	return time.Unix(*entry.logEntryAnon.IntegratedTime, 0)
 }
 
-func VerifySET(entry *Entry) error {
+func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {
 	rekorPayload := cbundle.RekorPayload{
 		Body:           entry.logEntryAnon.Body,
 		IntegratedTime: *entry.logEntryAnon.IntegratedTime,
@@ -107,17 +108,16 @@ func VerifySET(entry *Entry) error {
 		LogID:          hex.EncodeToString([]byte(*entry.logEntryAnon.LogID)),
 	}
 
-	// TODO: pass in rekor keys out of band
-	publicKeys, err := cosign.GetRekorPubs(context.TODO())
-	if err != nil {
-		return fmt.Errorf("retrieving rekor public key: %w", err)
-	}
-
-	pubKey, ok := publicKeys.Keys[hex.EncodeToString([]byte(*entry.logEntryAnon.LogID))]
+	verifier, ok := verifiers[hex.EncodeToString([]byte(*entry.logEntryAnon.LogID))]
 	if !ok {
 		return errors.New("rekor log public key not found for payload")
 	}
 
-	ecdsaKey := pubKey.PubKey.(*ecdsa.PublicKey)
+	if (!verifier.ValidityPeriodStart.IsZero() && verifier.ValidityPeriodStart.After(entry.IntegratedTime())) ||
+		(!verifier.ValidityPeriodEnd.IsZero() && verifier.ValidityPeriodEnd.Before(entry.IntegratedTime())) {
+		return errors.New("rekor log public key not valid at payload integrated time")
+	}
+
+	ecdsaKey := verifier.PublicKey.(*ecdsa.PublicKey)
 	return cosign.VerifySET(rekorPayload, entry.signedEntryTimestamp, ecdsaKey)
 }
