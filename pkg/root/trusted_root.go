@@ -115,7 +115,7 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
 				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
 			}
-			tlogVerifier := &TlogVerifier{
+			tlogVerifiers[encodedKeyID] = &TlogVerifier{
 				BaseURL:   tlog.GetBaseUrl(),
 				ID:        tlog.GetLogId().GetKeyId(),
 				HashFunc:  crypto.SHA256,
@@ -129,7 +129,6 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 					tlogVerifiers[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
 				}
 			}
-			tlogVerifiers[encodedKeyID] = tlogVerifier
 		default:
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
