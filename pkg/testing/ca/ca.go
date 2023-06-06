@@ -165,6 +165,20 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 		return nil, err
 	}
 
+	entry, err := ca.generateTlogEntry(leafCert, envelope, sig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TestEntity{
+		certChain:   []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
+		timestamps:  [][]byte{tsr},
+		envelope:    envelope,
+		tlogEntries: []*tlog.Entry{entry},
+	}, nil
+}
+
+func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
 		return nil, err
@@ -204,17 +218,7 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 		return nil, err
 	}
 
-	entry, err := tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set)
-	if err != nil {
-		return nil, err
-	}
-
-	return &TestEntity{
-		certChain:   []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
-		timestamps:  [][]byte{tsr},
-		envelope:    envelope,
-		tlogEntries: []*tlog.Entry{entry},
-	}, nil
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set)
 }
 
 func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte) (string, error) {

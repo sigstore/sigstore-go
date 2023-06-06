@@ -15,6 +15,7 @@ require (
 	github.com/sigstore/sigstore v1.6.2
 	github.com/sigstore/timestamp-authority v1.0.0
 	github.com/stretchr/testify v1.8.2
+	github.com/theupdateframework/go-tuf v0.5.2
 	google.golang.org/protobuf v1.30.0
 )
 
@@ -78,7 +79,6 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tent/canonical-json-go v0.0.0-20130607151641-96e4ba3a7613 // indirect
-	github.com/theupdateframework/go-tuf v0.5.2 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/transparency-dev/merkle v0.0.1 // indirect
 	github.com/vbatts/tar-split v0.11.2 // indirect
