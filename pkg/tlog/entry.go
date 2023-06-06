@@ -21,55 +21,65 @@ import (
 )
 
 type Entry struct {
-	RekorEntry           types.EntryImpl
-	LogID                []byte
+	kind                 string
+	version              string
+	rekorEntry           types.EntryImpl
 	logEntryAnon         models.LogEntryAnon
 	signedEntryTimestamp []byte
 }
 
 var ErrNilValue = errors.New("validation error: nil value in transaction log entry")
 
+func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, signedEntryTimestamp []byte) (*Entry, error) {
+	pe, err := models.UnmarshalProposedEntry(bytes.NewReader(body), runtime.JSONConsumer())
+	if err != nil {
+		return nil, err
+	}
+	rekorEntry, err := types.UnmarshalEntry(pe)
+	if err != nil {
+		return nil, err
+	}
+	return &Entry{
+		rekorEntry: rekorEntry,
+		logEntryAnon: models.LogEntryAnon{
+			Body:           base64.StdEncoding.EncodeToString(body),
+			IntegratedTime: swag.Int64(integratedTime),
+			LogIndex:       swag.Int64(logIndex),
+			LogID:          swag.String(string(logID)),
+		},
+		signedEntryTimestamp: signedEntryTimestamp,
+		kind:                 pe.Kind(),
+		version:              rekorEntry.APIVersion(),
+	}, nil
+}
+
 // ParseEntry decodes the entry bytes to a specific entry type (types.EntryImpl).
-func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, kind string, version string, err error) {
+func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 	if protoEntry == nil ||
 		protoEntry.CanonicalizedBody == nil ||
 		protoEntry.IntegratedTime == 0 ||
 		protoEntry.LogIndex == 0 ||
 		protoEntry.LogId == nil ||
 		protoEntry.LogId.KeyId == nil ||
-		protoEntry.KindVersion == nil {
-		return nil, "", "", ErrNilValue
+		protoEntry.KindVersion == nil ||
+		protoEntry.InclusionPromise == nil ||
+		protoEntry.InclusionPromise.SignedEntryTimestamp == nil {
+		return nil, ErrNilValue
 	}
-	entry = &Entry{
-		logEntryAnon: models.LogEntryAnon{
-			Body:           base64.StdEncoding.EncodeToString(protoEntry.CanonicalizedBody),
-			IntegratedTime: swag.Int64(protoEntry.IntegratedTime),
-			LogIndex:       swag.Int64(protoEntry.LogIndex),
-			LogID:          swag.String(string(protoEntry.LogId.KeyId)),
-		},
-	}
-	pe, err := models.UnmarshalProposedEntry(bytes.NewReader(protoEntry.CanonicalizedBody), runtime.JSONConsumer())
+	entry, err = NewEntry(protoEntry.CanonicalizedBody, protoEntry.IntegratedTime, protoEntry.LogIndex, protoEntry.LogId.KeyId, protoEntry.InclusionPromise.SignedEntryTimestamp)
 	if err != nil {
-		return nil, "", "", err
+		return nil, err
 	}
 
-	entry.RekorEntry, err = types.UnmarshalEntry(pe)
-	if err != nil {
-		return nil, "", "", err
-	}
-	entry.signedEntryTimestamp = protoEntry.InclusionPromise.SignedEntryTimestamp
-
-	kind = pe.Kind()
-	version = entry.RekorEntry.APIVersion()
-	if kind != protoEntry.KindVersion.Kind || version != protoEntry.KindVersion.Version {
-		return nil, "", "", fmt.Errorf("kind and version mismatch: %s/%s != %s/%s", kind, version, protoEntry.KindVersion.Kind, protoEntry.KindVersion.Version)
+	if entry.kind != protoEntry.KindVersion.Kind || entry.version != protoEntry.KindVersion.Version {
+		return nil, fmt.Errorf("kind and version mismatch: %s/%s != %s/%s", entry.kind, entry.version, protoEntry.KindVersion.Kind, protoEntry.KindVersion.Version)
 	}
 
-	return entry, kind, version, nil
+	return entry, nil
 }
 
 func ValidateEntry(entry *Entry) error {
-	switch e := entry.RekorEntry.(type) {
+	switch e := entry.rekorEntry.(type) {
 	case *intoto_v002.V002Entry:
 		if e.IntotoObj.Content == nil {
 			return fmt.Errorf("intoto entry has no content")

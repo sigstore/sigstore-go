@@ -7,17 +7,32 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
+	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/digitorus/timestamp"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tlog"
+	"github.com/go-openapi/runtime"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	cbundle "github.com/sigstore/cosign/v2/pkg/cosign/bundle"
+	"github.com/sigstore/rekor/pkg/generated/models"
+	"github.com/sigstore/rekor/pkg/pki"
+	"github.com/sigstore/rekor/pkg/types"
+	"github.com/sigstore/rekor/pkg/types/hashedrekord"
+	"github.com/sigstore/rekor/pkg/types/intoto"
+	"github.com/sigstore/rekor/pkg/types/rekord"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
 	tsx509 "github.com/sigstore/timestamp-authority/pkg/x509"
@@ -28,6 +43,7 @@ type VirtualSigstore struct {
 	fulcioIntermediateKey *ecdsa.PrivateKey
 	tsaCA                 root.CertificateAuthority
 	tsaLeafKey            *ecdsa.PrivateKey
+	rekorKey              *ecdsa.PrivateKey
 }
 
 func NewVirtualSigstore() (*VirtualSigstore, error) {
@@ -65,7 +81,42 @@ func NewVirtualSigstore() (*VirtualSigstore, error) {
 	ss.tsaCA.ValidityPeriodStart = time.Now().Add(-5 * time.Hour)
 	ss.tsaCA.ValidityPeriodEnd = time.Now().Add(time.Hour)
 
+	ss.rekorKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
 	return ss, nil
+}
+
+// getLogID calculates the digest of a PKIX-encoded public key
+func getLogID(pub crypto.PublicKey) (string, error) {
+	pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(pubBytes)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func (ca *VirtualSigstore) rekorSignPayload(payload cbundle.RekorPayload) ([]byte, error) {
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	canonicalized, err := jsoncanonicalizer.Transform(jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+	signer, err := signature.LoadECDSASignerVerifier(ca.rekorKey, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	bundleSig, err := signer.SignMessage(bytes.NewReader(canonicalized))
+	if err != nil {
+		return nil, err
+	}
+	return bundleSig, nil
 }
 
 func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
@@ -114,11 +165,115 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 		return nil, err
 	}
 
+	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
+	if err != nil {
+		return nil, err
+	}
+
+	envelopeBytes, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, err
+	}
+
+	rekorBody, err := generateRekorEntry(intoto.KIND, intoto.New().DefaultVersion(), envelopeBytes, leafCertPem, sig)
+	if err != nil {
+		return nil, err
+	}
+
+	rekorLogID, err := getLogID(ca.rekorKey.Public())
+	if err != nil {
+		return nil, err
+	}
+
+	rekorLogIDRaw, err := hex.DecodeString(rekorLogID)
+	if err != nil {
+		return nil, err
+	}
+
+	integratedTime := leafCert.NotBefore.Unix() + 1
+	logIndex := int64(1000)
+
+	b := createRekorBundle(rekorLogID, integratedTime, logIndex, rekorBody)
+	set, err := ca.rekorSignPayload(*b)
+	if err != nil {
+		return nil, err
+	}
+
+	rekorBodyRaw, err := base64.StdEncoding.DecodeString(rekorBody)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TestEntity{
-		certChain:  []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
-		timestamps: [][]byte{tsr},
-		envelope:   envelope,
+		certChain:   []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
+		timestamps:  [][]byte{tsr},
+		envelope:    envelope,
+		tlogEntries: []*tlog.Entry{entry},
 	}, nil
+}
+
+func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte) (string, error) {
+	// Generate the Rekor Entry
+	entryImpl, err := createEntry(context.Background(), kind, version, artifact, cert, sig)
+	if err != nil {
+		return "", err
+	}
+	entryBytes, err := entryImpl.Canonicalize(context.Background())
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(entryBytes), nil
+}
+
+func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBytes, sigBytes []byte) (types.EntryImpl, error) {
+	props := types.ArtifactProperties{
+		PublicKeyBytes: [][]byte{certBytes},
+		PKIFormat:      string(pki.X509),
+	}
+	switch kind {
+	case rekord.KIND, intoto.KIND:
+		props.ArtifactBytes = blobBytes
+		props.SignatureBytes = sigBytes
+	case hashedrekord.KIND:
+		blobHash := sha256.Sum256(blobBytes)
+		props.ArtifactHash = strings.ToLower(hex.EncodeToString(blobHash[:]))
+		props.SignatureBytes = sigBytes
+	default:
+		return nil, fmt.Errorf("unexpected entry kind: %s", kind)
+	}
+	proposedEntry, err := types.NewProposedEntry(ctx, kind, apiVersion, props)
+	if err != nil {
+		return nil, err
+	}
+	eimpl, err := types.CreateVersionedEntry(proposedEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	can, err := types.CanonicalizeEntry(ctx, eimpl)
+	if err != nil {
+		return nil, err
+	}
+	proposedEntryCan, err := models.UnmarshalProposedEntry(bytes.NewReader(can), runtime.JSONConsumer())
+	if err != nil {
+		return nil, err
+	}
+
+	return types.UnmarshalEntry(proposedEntryCan)
+}
+
+func createRekorBundle(logID string, integratedTime int64, logIndex int64, rekorEntry string) *cbundle.RekorPayload {
+	return &cbundle.RekorPayload{
+		LogID:          logID,
+		IntegratedTime: integratedTime,
+		LogIndex:       logIndex,
+		Body:           rekorEntry,
+	}
 }
 
 func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey *ecdsa.PrivateKey) ([]byte, error) {
@@ -165,7 +320,20 @@ func (ca *VirtualSigstore) FulcioCertificateAuthorities() []root.CertificateAuth
 }
 
 func (ca *VirtualSigstore) TlogVerifiers() map[string]*root.TlogVerifier {
-	return make(map[string]*root.TlogVerifier)
+	verifiers := make(map[string]*root.TlogVerifier)
+	logID, err := getLogID(ca.rekorKey.Public())
+	if err != nil {
+		panic(err)
+	}
+	verifiers[logID] = &root.TlogVerifier{
+		BaseURL:             "test",
+		ID:                  []byte(logID),
+		ValidityPeriodStart: time.Now().Add(-time.Hour),
+		ValidityPeriodEnd:   time.Now().Add(time.Hour),
+		HashFunc:            crypto.SHA256,
+		PublicKey:           ca.rekorKey.Public(),
+	}
+	return verifiers
 }
 
 type TestEntity struct {
