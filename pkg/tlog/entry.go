@@ -122,8 +122,10 @@ func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {
 	if !ok {
 		return errors.New("rekor log public key not found for payload")
 	}
-
-	if (!verifier.ValidityPeriodStart.IsZero() && verifier.ValidityPeriodStart.After(entry.IntegratedTime())) ||
+	if verifier.ValidityPeriodStart.IsZero() {
+		return errors.New("rekor validity period start time not set")
+	}
+	if (verifier.ValidityPeriodStart.After(entry.IntegratedTime())) ||
 		(!verifier.ValidityPeriodEnd.IsZero() && verifier.ValidityPeriodEnd.Before(entry.IntegratedTime())) {
 		return errors.New("rekor log public key not valid at payload integrated time")
 	}

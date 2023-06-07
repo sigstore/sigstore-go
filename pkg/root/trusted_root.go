@@ -124,10 +124,14 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 				if validFor.GetStart() != nil {
 					tlogVerifiers[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
+				} else {
+					return nil, fmt.Errorf("tlog missing public key validity period start time")
 				}
 				if validFor.GetEnd() != nil {
 					tlogVerifiers[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
 				}
+			} else {
+				return nil, fmt.Errorf("tlog missing public key validity period")
 			}
 		default:
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
