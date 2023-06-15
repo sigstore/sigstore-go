@@ -11,12 +11,16 @@ import (
 	"github.com/github/sigstore-verifier/pkg/tuf"
 )
 
+var expectedOIDC *string
+var expectedSAN *string
 var requireTSA *bool
 var requireTlog *bool
 var trustedrootJSONpath *string
 var tufRootURL *string
 
 func init() {
+	expectedOIDC = flag.String("expectedOIDC", "", "The expected OIDC issuer for the signing certificate")
+	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	requireTSA = flag.Bool("requireTSA", false, "Require RFC 3161 signed timestamp")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
@@ -43,6 +47,12 @@ func main() {
 	opts := policy.GetDefaultOptions()
 	opts.TsaOptions.Disable = !*requireTSA
 	opts.TlogOptions.Disable = !*requireTlog
+	if *expectedOIDC != "" {
+		policy.SetExpectedOIDC(opts, *expectedOIDC)
+	}
+	if *expectedSAN != "" {
+		policy.SetExpectedSAN(opts, *expectedSAN)
+	}
 
 	var tr *root.ParsedTrustedRoot
 	var trustedrootJSON []byte

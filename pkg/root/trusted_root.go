@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -169,6 +170,15 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 	// TODO: Handle validity period (ca.ValidFor)
 
 	return certificateAuthority, nil
+}
+
+func NewTrustedRootFromPath(path string) (*ParsedTrustedRoot, error) {
+	trustedrootJSON, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTrustedRootFromJSON(trustedrootJSON)
 }
 
 // NewTrustedRootFromJSON returns the Sigstore trusted root.

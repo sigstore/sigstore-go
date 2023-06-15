@@ -23,6 +23,7 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
 		return errors.New("artifact does not provide a certificate")
 	}
 	leafCert := certs[0]
+
 	verifier, err := signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
 	if err != nil {
 		return fmt.Errorf("invalid certificate: %w", err)
@@ -95,5 +96,58 @@ func verifyEnvelope(envelope *dsse.Envelope, verifier signature.Verifier) error 
 func NewCertificateSignaturePolicy(trustedRoot root.TrustedRoot) *CertificateSignaturePolicy {
 	return &CertificateSignaturePolicy{
 		trustedRoot: trustedRoot,
+	}
+}
+
+type CertificateOIDCPolicy struct {
+	expectedOIDC string
+}
+
+func (p *CertificateOIDCPolicy) VerifyPolicy(entity SignedEntity) error {
+	certs, err := entity.CertificateChain()
+	if err != nil || len(certs) == 0 {
+		return errors.New("artifact does not provide a certificate")
+	}
+	leafCert := certs[0]
+
+	for _, extension := range leafCert.Extensions {
+		if extension.Id.String() == "1.3.6.1.4.1.57264.1.1" {
+			if string(extension.Value) == p.expectedOIDC {
+				return nil
+			}
+			return fmt.Errorf("Signing certificate Issuer OID %s does not match expected OIDC issuer %s", string(extension.Value), p.expectedOIDC)
+		}
+	}
+
+	return errors.New("Certificate does not contain Issuer OID")
+}
+
+func NewCertificateOIDCPolicy(expectedOIDC string) *CertificateOIDCPolicy {
+	return &CertificateOIDCPolicy{
+		expectedOIDC: expectedOIDC,
+	}
+}
+
+type CertificateSANPolicy struct {
+	expectedSAN string
+}
+
+func (p *CertificateSANPolicy) VerifyPolicy(entity SignedEntity) error {
+	certs, err := entity.CertificateChain()
+	if err != nil || len(certs) == 0 {
+		return errors.New("artifact does not provide a certificate")
+	}
+	leafCert := certs[0]
+
+	if len(leafCert.URIs) > 0 && leafCert.URIs[0].String() != p.expectedSAN {
+		return fmt.Errorf("Signing certificate subject %s does not match expected subject %s", leafCert.URIs[0].String(), p.expectedSAN)
+	}
+
+	return nil
+}
+
+func NewCertificateSANPolicy(expectedSAN string) *CertificateSANPolicy {
+	return &CertificateSANPolicy{
+		expectedSAN: expectedSAN,
 	}
 }

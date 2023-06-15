@@ -14,12 +14,12 @@ jobs:
 
       - uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753 # v4.0.1
         with:
-          go-version: '>=1.20.4'
+          go-version-file: go.mod
 
       - run: go mod download
 
       - run: go build -o conformance cmd/conformance/main.go
 
-      - uses: sigstore/sigstore-conformance@064fb32a890c30235f305281f3509c5e65e6f9e5 # v0.0.4
+      - uses: sigstore/sigstore-conformance@main # so we can get `test_bundle.py`
         with:
-          entrypoint: conformance
+          entrypoint: ${{ github.workspace }}/conformance
