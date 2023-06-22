@@ -33,7 +33,7 @@ type RekorPayload struct {
 	Body           interface{} `json:"body"`
 	IntegratedTime int64       `json:"integratedTime"`
 	LogIndex       int64       `json:"logIndex"`
-	LogID          string      `json:"logID"`
+	LogID          string      `json:"logID"` //nolint:tagliatelle
 }
 
 var ErrNilValue = errors.New("validation error: nil value in transaction log entry")
