@@ -25,7 +25,6 @@ import (
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/go-openapi/runtime"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	cbundle "github.com/sigstore/cosign/v2/pkg/cosign/bundle"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
 	"github.com/sigstore/rekor/pkg/types"
@@ -99,7 +98,7 @@ func getLogID(pub crypto.PublicKey) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
-func (ca *VirtualSigstore) rekorSignPayload(payload cbundle.RekorPayload) ([]byte, error) {
+func (ca *VirtualSigstore) rekorSignPayload(payload tlog.RekorPayload) ([]byte, error) {
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -276,8 +275,8 @@ func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBy
 	return types.UnmarshalEntry(proposedEntryCan)
 }
 
-func createRekorBundle(logID string, integratedTime int64, logIndex int64, rekorEntry string) *cbundle.RekorPayload {
-	return &cbundle.RekorPayload{
+func createRekorBundle(logID string, integratedTime int64, logIndex int64, rekorEntry string) *tlog.RekorPayload {
+	return &tlog.RekorPayload{
 		LogID:          logID,
 		IntegratedTime: integratedTime,
 		LogIndex:       logIndex,

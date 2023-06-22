@@ -3,17 +3,18 @@ package tlog
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/swag"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
-	cbundle "github.com/sigstore/cosign/v2/pkg/cosign/bundle"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/types"
@@ -26,6 +27,13 @@ type Entry struct {
 	rekorEntry           types.EntryImpl
 	logEntryAnon         models.LogEntryAnon
 	signedEntryTimestamp []byte
+}
+
+type RekorPayload struct {
+	Body           interface{} `json:"body"`
+	IntegratedTime int64       `json:"integratedTime"`
+	LogIndex       int64       `json:"logIndex"`
+	LogID          string      `json:"logID"`
 }
 
 var ErrNilValue = errors.New("validation error: nil value in transaction log entry")
@@ -111,7 +119,7 @@ func (entry *Entry) IntegratedTime() time.Time {
 }
 
 func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {
-	rekorPayload := cbundle.RekorPayload{
+	rekorPayload := RekorPayload{
 		Body:           entry.logEntryAnon.Body,
 		IntegratedTime: *entry.logEntryAnon.IntegratedTime,
 		LogIndex:       *entry.logEntryAnon.LogIndex,
@@ -130,6 +138,18 @@ func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {
 		return errors.New("rekor log public key not valid at payload integrated time")
 	}
 
-	ecdsaKey := verifier.PublicKey.(*ecdsa.PublicKey)
-	return cosign.VerifySET(rekorPayload, entry.signedEntryTimestamp, ecdsaKey)
+	contents, err := json.Marshal(rekorPayload)
+	if err != nil {
+		return fmt.Errorf("marshaling: %w", err)
+	}
+	canonicalized, err := jsoncanonicalizer.Transform(contents)
+	if err != nil {
+		return fmt.Errorf("canonicalizing: %w", err)
+	}
+
+	hash := sha256.Sum256(canonicalized)
+	if !ecdsa.VerifyASN1(verifier.PublicKey.(*ecdsa.PublicKey), hash[:], entry.signedEntryTimestamp) {
+		return errors.New("unable to verify SET")
+	}
+	return nil
 }
