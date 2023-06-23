@@ -148,7 +148,9 @@ func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {
 	}
 
 	hash := sha256.Sum256(canonicalized)
-	if !ecdsa.VerifyASN1(verifier.PublicKey.(*ecdsa.PublicKey), hash[:], entry.signedEntryTimestamp) {
+	if ecdsaPublicKey, ok := verifier.PublicKey.(*ecdsa.PublicKey); !ok {
+		return fmt.Errorf("unsupported public key type: %T", verifier.PublicKey)
+	} else if !ecdsa.VerifyASN1(ecdsaPublicKey, hash[:], entry.signedEntryTimestamp) {
 		return errors.New("unable to verify SET")
 	}
 	return nil
