@@ -4,8 +4,10 @@ import (
 	"crypto/x509"
 	"errors"
 
+	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 )
 
 var errNotImplemented = errors.New("not implemented")
@@ -22,8 +24,8 @@ type CertificateProvider interface {
 	CertificateChain() ([]*x509.Certificate, error)
 }
 
-type EnvelopeProvider interface {
-	Envelope() (*dsse.Envelope, error)
+type ContentProvider interface {
+	Content() (bundle.Content, error)
 }
 
 type SignedTimestampProvider interface {
@@ -40,7 +42,7 @@ type Policy interface {
 
 type SignedEntity interface {
 	CertificateProvider
-	EnvelopeProvider
+	ContentProvider
 	KeyIDProvider
 	SignedTimestampProvider
 	TlogEntryProvider
@@ -66,6 +68,10 @@ func (b *BaseSignedEntity) CertificateChain() ([]*x509.Certificate, error) {
 }
 
 func (b *BaseSignedEntity) Envelope() (*dsse.Envelope, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) MessageSignature() (*protocommon.MessageSignature, error) {
 	return nil, errNotImplemented
 }
 

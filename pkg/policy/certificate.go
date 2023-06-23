@@ -1,16 +1,13 @@
 package policy
 
 import (
-	"context"
 	"crypto"
 	"crypto/x509"
 	"errors"
 	"fmt"
 
 	"github.com/github/sigstore-verifier/pkg/root"
-	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore/pkg/signature"
-	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
 )
 
 type CertificateSignaturePolicy struct {
@@ -29,13 +26,14 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
 		return fmt.Errorf("invalid certificate: %w", err)
 	}
 
-	envelope, err := entity.Envelope()
+	content, err := entity.Content()
 	if err != nil {
-		return errors.New("artifact does not provide an envelope")
+		return err
 	}
-	err = verifyEnvelope(envelope, verifier)
+
+	err = content.CheckSignature(verifier)
 	if err != nil {
-		return fmt.Errorf("envelope verification failed: %w", err)
+		return err
 	}
 
 	for _, ca := range p.trustedRoot.FulcioCertificateAuthorities() {
@@ -72,25 +70,6 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
 	}
 
 	return errors.New("certificate verification failed")
-}
-
-func verifyEnvelope(envelope *dsse.Envelope, verifier signature.Verifier) error {
-	pub, err := verifier.PublicKey()
-	if err != nil {
-		return err
-	}
-	envVerifier, err := dsse.NewEnvelopeVerifier(&sigdsse.VerifierAdapter{
-		SignatureVerifier: verifier,
-		Pub:               pub,
-	})
-	if err != nil {
-		return err
-	}
-	_, err = envVerifier.Verify(context.TODO(), envelope)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func NewCertificateSignaturePolicy(trustedRoot root.TrustedRoot) *CertificateSignaturePolicy {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/digitorus/timestamp"
+	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/go-openapi/runtime"
@@ -356,8 +357,8 @@ func (e *TestEntity) CertificateChain() ([]*x509.Certificate, error) {
 	return e.certChain, nil
 }
 
-func (e *TestEntity) Envelope() (*dsse.Envelope, error) {
-	return e.envelope, nil
+func (e *TestEntity) Content() (bundle.Content, error) {
+	return &bundle.Envelope{Envelope: e.envelope}, nil
 }
 
 func (e *TestEntity) Timestamps() ([][]byte, error) {

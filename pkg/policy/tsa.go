@@ -3,7 +3,6 @@ package policy
 import (
 	"bytes"
 	"crypto/x509"
-	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -23,25 +22,17 @@ func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
 		return fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
 	}
 
-	// TODO - bundles have one of a DSSE Envelope or a MessageSignature here; we should support the MessageSignature case in the future
-	envelope, err := entity.Envelope()
+	content, err := entity.Content()
 	if err != nil {
 		return err
 	}
 
-	if len(envelope.Signatures) != 1 {
-		return errors.New("Envelope should only have 1 signature")
-	}
-
-	dsseSignatureBytes, err := base64.StdEncoding.DecodeString(envelope.Signatures[0].Sig)
-	if err != nil {
-		return err
-	}
+	signatureBytes := content.GetSignature()
 
 	certAuthorities := p.trustedRoot.TSACertificateAuthorities()
 
 	for _, timestamp := range signedTimestamps {
-		err = verifySignedTimestamp(timestamp, dsseSignatureBytes, certAuthorities)
+		err = verifySignedTimestamp(timestamp, signatureBytes, certAuthorities)
 		if err != nil {
 			return errors.New("unable to verify timestamp")
 		}

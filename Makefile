@@ -6,6 +6,7 @@ export GONOSUMDB = github.com/github/*
 .PHONY: build
 build:
 	go build ./cmd/sigstore-verifier
+	go build -o conformance ./cmd/conformance
 
 .PHONY: test
 test:

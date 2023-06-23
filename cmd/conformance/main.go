@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -66,18 +65,18 @@ func main() {
 			log.Fatal(err)
 		}
 
-		// Check file against bundle envelope
+		// Check file against bundle
 		fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
 		if err != nil {
 			log.Fatal(err)
 		}
-		envelope, err := b.Envelope()
+
+		content, err := b.Content()
 		if err != nil {
 			log.Fatal(err)
 		}
-		if envelope.Payload != base64.StdEncoding.EncodeToString(fileBytes) {
-			log.Fatal("Envelope payload does not match supplied file")
-		}
+
+		content.EnsureFileMatchesDigest(fileBytes)
 	} else {
 		log.Fatalf("Unsupported command %s", os.Args[1])
 	}

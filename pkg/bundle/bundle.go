@@ -11,10 +11,10 @@ import (
 	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"google.golang.org/protobuf/encoding/protojson"
-
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
@@ -122,10 +122,33 @@ func (b *ProtobufBundle) KeyID() (string, error) {
 	return "", nil
 }
 
-func (b *ProtobufBundle) Envelope() (*dsse.Envelope, error) {
-	switch content := b.Content.(type) { //nolint:gocritic
+func (b *ProtobufBundle) Content() (Content, error) {
+	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
-		return parseEnvelope(content.DsseEnvelope)
+		envelope, err := parseEnvelope(content.DsseEnvelope)
+		if err != nil {
+			return nil, err
+		}
+		return envelope, nil
+	case *protobundle.Bundle_MessageSignature:
+		messageSignature := MessageSignature{
+			Digest:          content.MessageSignature.MessageDigest.Digest,
+			DigestAlgorithm: protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
+			Signature:       content.MessageSignature.Signature,
+		}
+		return &messageSignature, nil
+	}
+	return nil, ErrMissingVerificationMaterial
+}
+
+func (b *ProtobufBundle) dsseEnvelope() (*dsse.Envelope, error) {
+	switch content := b.Bundle.Content.(type) { //nolint:gocritic
+	case *protobundle.Bundle_DsseEnvelope:
+		envelope, err := parseEnvelope(content.DsseEnvelope)
+		if err != nil {
+			return nil, err
+		}
+		return envelope.Envelope, nil
 	}
 	return nil, ErrMissingVerificationMaterial
 }
@@ -149,7 +172,7 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 }
 
 func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
-	envelope, err := b.Envelope()
+	envelope, err := b.dsseEnvelope()
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +222,7 @@ func ErrValidationError(err error) error {
 	return fmt.Errorf("%w: %w", ErrValidation, err)
 }
 
-func parseEnvelope(input *protodsse.Envelope) (*dsse.Envelope, error) {
+func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {
 	output := &dsse.Envelope{}
 	output.Payload = base64.StdEncoding.EncodeToString([]byte(input.GetPayload()))
 	output.PayloadType = string(input.GetPayloadType())
@@ -208,5 +231,5 @@ func parseEnvelope(input *protodsse.Envelope) (*dsse.Envelope, error) {
 		output.Signatures[i].KeyID = sig.GetKeyid()
 		output.Signatures[i].Sig = base64.StdEncoding.EncodeToString(sig.GetSig())
 	}
-	return output, nil
+	return &Envelope{Envelope: output}, nil
 }

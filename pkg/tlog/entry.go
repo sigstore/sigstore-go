@@ -18,6 +18,7 @@ import (
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/types"
+	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
 )
 
@@ -88,6 +89,28 @@ func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 
 func ValidateEntry(entry *Entry) error {
 	switch e := entry.rekorEntry.(type) {
+	case *hashedrekord_v001.V001Entry:
+		if e.HashedRekordObj.Data == nil {
+			return fmt.Errorf("hashrekord entry has no data")
+		}
+		if e.HashedRekordObj.Data.Hash == nil {
+			return fmt.Errorf("hashrekord entry has no hash")
+		}
+		if e.HashedRekordObj.Data.Hash.Algorithm == nil {
+			return fmt.Errorf("hashrekord entry has no hash algorithm")
+		}
+		if e.HashedRekordObj.Data.Hash.Value == nil {
+			return fmt.Errorf("hashrekord entry has no hash value")
+		}
+		if e.HashedRekordObj.Signature == nil {
+			return fmt.Errorf("hashrekord entry has no signature")
+		}
+		if e.HashedRekordObj.Signature.Content == nil {
+			return fmt.Errorf("hashrekord entry has no signature content")
+		}
+		if e.HashedRekordObj.Signature.PublicKey.Content == nil {
+			return fmt.Errorf("hashrekord entry has no signature public key")
+		}
 	case *intoto_v002.V002Entry:
 		if e.IntotoObj.Content == nil {
 			return fmt.Errorf("intoto entry has no content")
