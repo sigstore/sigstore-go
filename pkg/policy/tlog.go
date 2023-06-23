@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/github/sigstore-verifier/pkg/root"
@@ -20,6 +21,17 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 	if len(entries) < p.threshold {
 		return fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
 	}
+
+	certs, err := entity.CertificateChain()
+	if err != nil {
+		return err
+	}
+	if len(certs) == 0 {
+		return errors.New("missing certificate chain")
+	}
+
+	leafCert := certs[0]
+
 	for _, entry := range entries {
 		err := tlog.ValidateEntry(entry)
 		if err != nil {
@@ -29,8 +41,13 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 		if err != nil {
 			return err
 		}
+
 		// TODO: check if bundle matches entry
-		// TODO: check certificate timestamps
+
+		// Check tlog entry time against bundle certificates
+		if leafCert.NotBefore.After(entry.IntegratedTime()) || leafCert.NotAfter.Before(entry.IntegratedTime()) {
+			return errors.New("Integrated time outside certificate validity")
+		}
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package policy
 
 import (
 	"testing"
+	"time"
 
 	"github.com/github/sigstore-verifier/pkg/testing/ca"
 	"github.com/stretchr/testify/assert"
@@ -25,4 +26,14 @@ func TestTlogPolicy(t *testing.T) {
 	policy2 := NewArtifactTransparencyLogPolicy(virtualSigstore2, 1)
 	err = policy2.VerifyPolicy(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
+
+	// Attempt to use tlog with integrated time outside certificate validity.
+	//
+	// This time was chosen assuming the Fulcio signing certificate expires
+	// after 5 minutes, but while the TSA intermediate is still valid (2 hours).
+	entity, err = virtualSigstore.AttestAtTime("foo@fighters.com", "issuer", statement, time.Now().Add(30*time.Minute))
+	assert.NoError(t, err)
+
+	err = policy.VerifyPolicy(entity)
+	assert.Error(t, err)
 }

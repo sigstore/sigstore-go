@@ -132,6 +132,12 @@ func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Cert
 }
 
 func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) (*TestEntity, error) {
+	// The timing here is important. We need to attest at a time when the leaf
+	// certificate is valid, so we match what GenerateLeafCert() does, above
+	return ca.AttestAtTime(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute))
+}
+
+func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []byte, integratedTime time.Time) (*TestEntity, error) {
 	leafCert, leafPrivKey, err := ca.GenerateLeafCert(identity, issuer)
 	if err != nil {
 		return nil, err
@@ -165,7 +171,7 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 		return nil, err
 	}
 
-	entry, err := ca.generateTlogEntry(leafCert, envelope, sig)
+	entry, err := ca.generateTlogEntry(leafCert, envelope, sig, integratedTime.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +184,7 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 	}, nil
 }
 
-func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte) (*tlog.Entry, error) {
+func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
 		return nil, err
@@ -204,7 +210,6 @@ func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	integratedTime := leafCert.NotBefore.Unix() + 1
 	logIndex := int64(1000)
 
 	b := createRekorBundle(rekorLogID, integratedTime, logIndex, rekorBody)
