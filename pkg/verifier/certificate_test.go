@@ -1,4 +1,4 @@
-package policy
+package verifier
 
 import (
 	"testing"
@@ -7,22 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCertificateSignaturePolicy(t *testing.T) {
+func TestCertificateSignatureVerifier(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	policy := NewCertificateSignaturePolicy(virtualSigstore)
+	verifier := NewCertificateSignatureVerifier(virtualSigstore)
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	err = policy.VerifyPolicy(entity)
+	err = verifier.Verify(entity)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	policy2 := NewCertificateSignaturePolicy(virtualSigstore2)
-	err = policy2.VerifyPolicy(entity)
+	verifier2 := NewCertificateSignatureVerifier(virtualSigstore2)
+	err = verifier2.Verify(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 }

@@ -1,4 +1,4 @@
-package policy
+package verifier
 
 import (
 	"bytes"
@@ -11,12 +11,12 @@ import (
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
-type TimestampAuthorityPolicy struct {
+type TimestampAuthorityVerifier struct {
 	trustedRoot root.TrustedRoot
 	threshold   int
 }
 
-func (p *TimestampAuthorityPolicy) VerifyPolicy(entity SignedEntity) error {
+func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
 	signedTimestamps, err := entity.Timestamps()
 	if err != nil || (len(signedTimestamps) < p.threshold) {
 		return fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
@@ -91,8 +91,8 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, ce
 	return errors.New("Unable to verify signed timestamps")
 }
 
-func NewTimestampAuthorityPolicy(trustedRoot root.TrustedRoot, threshold int) *TimestampAuthorityPolicy {
-	return &TimestampAuthorityPolicy{
+func NewTimestampAuthorityVerifier(trustedRoot root.TrustedRoot, threshold int) *TimestampAuthorityVerifier {
+	return &TimestampAuthorityVerifier{
 		trustedRoot: trustedRoot,
 		threshold:   threshold,
 	}

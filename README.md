@@ -10,28 +10,7 @@ This library is primarily intended to be used a dependency for Go applications t
 
 ### Library
 
-To use as a library, you need to create a type that implements the signed entity interface, and then apply a policy to it.
-
-The type `bundle.ProtobufBundle` is included and implements the signed entity interface, and can be used to load Sigstore Bundles from JSON.
-
-The standard Sigstore policy is composed of all the checks that are used to verify a Sigstore Bundle signed by Sigstore public infrastructure. It is wrapped in a helper function called `VerifyKeyless`.
-
-This example includes the standard flow of loading a Sigstore Bundle from its JSON representation (stored in a byte slice), and verifying it with the standard Sigstore policy:
-
-```go
-	var b bundle.ProtobufBundle
-	err = b.UnmarshalJSON(bundleBytes)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	err = policy.VerifyKeyless(&b)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-```
+TODO: Library usage example code. For now, see the code in [the CLI command](./cmd/sigstore-verifier/main.go) for a library usage example.
 
 ### CLI
 

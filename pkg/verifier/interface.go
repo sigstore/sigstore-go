@@ -1,4 +1,4 @@
-package policy
+package verifier
 
 import (
 	"crypto/x509"
@@ -36,8 +36,8 @@ type TlogEntryProvider interface {
 	TlogEntries() ([]*tlog.Entry, error)
 }
 
-type Policy interface {
-	VerifyPolicy(SignedEntity) error
+type Verifier interface {
+	Verify(SignedEntity) error
 }
 
 type SignedEntity interface {
@@ -48,9 +48,9 @@ type SignedEntity interface {
 	TlogEntryProvider
 }
 
-func Verify(entity SignedEntity, policies ...Policy) error {
-	for _, policy := range policies {
-		if err := policy.VerifyPolicy(entity); err != nil {
+func Verify(entity SignedEntity, verifiers ...Verifier) error {
+	for _, verifier := range verifiers {
+		if err := verifier.Verify(entity); err != nil {
 			return NewVerificationError(err)
 		}
 	}

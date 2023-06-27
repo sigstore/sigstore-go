@@ -1,4 +1,4 @@
-package policy
+package verifier
 
 import (
 	"bytes"
@@ -9,12 +9,12 @@ import (
 	"github.com/github/sigstore-verifier/pkg/tlog"
 )
 
-type ArtifactTransparencyLogPolicy struct {
+type ArtifactTransparencyLogVerifier struct {
 	trustedRoot root.TrustedRoot
 	threshold   int
 }
 
-func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error {
+func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return err
@@ -71,8 +71,8 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 	return nil
 }
 
-func NewArtifactTransparencyLogPolicy(trustedRoot root.TrustedRoot, threshold int) *ArtifactTransparencyLogPolicy {
-	return &ArtifactTransparencyLogPolicy{
+func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedRoot, threshold int) *ArtifactTransparencyLogVerifier {
+	return &ArtifactTransparencyLogVerifier{
 		trustedRoot: trustedRoot,
 		threshold:   threshold,
 	}

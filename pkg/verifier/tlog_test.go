@@ -1,4 +1,4 @@
-package policy
+package verifier
 
 import (
 	"testing"
@@ -8,23 +8,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTlogPolicy(t *testing.T) {
+func TestTlogVerifier(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	policy := NewArtifactTransparencyLogPolicy(virtualSigstore, 1)
+	verifier := NewArtifactTransparencyLogVerifier(virtualSigstore, 1)
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	err = policy.VerifyPolicy(entity)
+	err = verifier.Verify(entity)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	policy2 := NewArtifactTransparencyLogPolicy(virtualSigstore2, 1)
-	err = policy2.VerifyPolicy(entity)
+	verifier2 := NewArtifactTransparencyLogVerifier(virtualSigstore2, 1)
+	err = verifier2.Verify(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 
 	// Attempt to use tlog with integrated time outside certificate validity.
@@ -34,6 +34,6 @@ func TestTlogPolicy(t *testing.T) {
 	entity, err = virtualSigstore.AttestAtTime("foo@fighters.com", "issuer", statement, time.Now().Add(30*time.Minute))
 	assert.NoError(t, err)
 
-	err = policy.VerifyPolicy(entity)
+	err = verifier.Verify(entity)
 	assert.Error(t, err)
 }

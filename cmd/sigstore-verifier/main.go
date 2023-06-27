@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
-	"github.com/github/sigstore-verifier/pkg/policy"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tuf"
+	"github.com/github/sigstore-verifier/pkg/verifier"
 )
 
 var expectedOIDC *string
@@ -44,14 +44,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	opts := policy.GetDefaultOptions()
+	opts := verifier.GetDefaultOptions()
 	opts.TsaOptions.Disable = !*requireTSA
 	opts.TlogOptions.Disable = !*requireTlog
 	if *expectedOIDC != "" {
-		policy.SetExpectedOIDC(opts, *expectedOIDC)
+		verifier.SetExpectedOIDC(opts, *expectedOIDC)
 	}
 	if *expectedSAN != "" {
-		policy.SetExpectedSAN(opts, *expectedSAN)
+		verifier.SetExpectedSAN(opts, *expectedSAN)
 	}
 
 	var tr *root.ParsedTrustedRoot
@@ -77,8 +77,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	p := policy.NewTrustedRootPolicy(tr, opts)
-	err = p.VerifyPolicy(b)
+	p := verifier.NewTrustedRootVerifier(tr, opts)
+	err = p.Verify(b)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

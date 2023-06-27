@@ -12,8 +12,8 @@ import (
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
-	"github.com/github/sigstore-verifier/pkg/policy"
 	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/github/sigstore-verifier/pkg/verifier"
 )
 
 var bundlePath *string
@@ -103,16 +103,16 @@ func main() {
 		}
 
 		// Configure verification options
-		opts := policy.GetDefaultOptions()
+		opts := verifier.GetDefaultOptions()
 		opts.TlogOptions.Disable = true
 		opts.CtlogOptions.Disable = true
 		opts.TsaOptions.Disable = true
 
 		if *certOIDC != "" {
-			policy.SetExpectedOIDC(opts, *certOIDC)
+			verifier.SetExpectedOIDC(opts, *certOIDC)
 		}
 		if *certSAN != "" {
-			policy.SetExpectedSAN(opts, *certSAN)
+			verifier.SetExpectedSAN(opts, *certSAN)
 		}
 
 		// Load trust root
@@ -122,8 +122,8 @@ func main() {
 		}
 
 		// Verify bundle
-		p := policy.NewTrustedRootPolicy(tr, opts)
-		err = p.VerifyPolicy(bundle.NewProtobufBundle(&pb))
+		p := verifier.NewTrustedRootVerifier(tr, opts)
+		err = p.Verify(bundle.NewProtobufBundle(&pb))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -146,12 +146,12 @@ func main() {
 		}
 
 		// Configure verification options
-		opts := policy.GetDefaultOptions()
+		opts := verifier.GetDefaultOptions()
 		if *certOIDC != "" {
-			policy.SetExpectedOIDC(opts, *certOIDC)
+			verifier.SetExpectedOIDC(opts, *certOIDC)
 		}
 		if *certSAN != "" {
-			policy.SetExpectedSAN(opts, *certSAN)
+			verifier.SetExpectedSAN(opts, *certSAN)
 		}
 
 		// Load trust root
@@ -161,8 +161,8 @@ func main() {
 		}
 
 		// Verify bundle
-		p := policy.NewTrustedRootPolicy(tr, opts)
-		err = p.VerifyPolicy(b)
+		p := verifier.NewTrustedRootVerifier(tr, opts)
+		err = p.Verify(b)
 		if err != nil {
 			log.Fatal(err)
 		}

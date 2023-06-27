@@ -1,4 +1,4 @@
-package policy
+package verifier
 
 import (
 	"crypto"
@@ -10,11 +10,11 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
-type CertificateSignaturePolicy struct {
+type CertificateSignatureVerifier struct {
 	trustedRoot root.TrustedRoot
 }
 
-func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
+func (p *CertificateSignatureVerifier) Verify(entity SignedEntity) error {
 	certs, err := entity.CertificateChain()
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
@@ -72,17 +72,17 @@ func (p *CertificateSignaturePolicy) VerifyPolicy(entity SignedEntity) error {
 	return errors.New("certificate verification failed")
 }
 
-func NewCertificateSignaturePolicy(trustedRoot root.TrustedRoot) *CertificateSignaturePolicy {
-	return &CertificateSignaturePolicy{
+func NewCertificateSignatureVerifier(trustedRoot root.TrustedRoot) *CertificateSignatureVerifier {
+	return &CertificateSignatureVerifier{
 		trustedRoot: trustedRoot,
 	}
 }
 
-type CertificateOIDCPolicy struct {
+type CertificateOIDCVerifier struct {
 	expectedOIDC string
 }
 
-func (p *CertificateOIDCPolicy) VerifyPolicy(entity SignedEntity) error {
+func (p *CertificateOIDCVerifier) Verify(entity SignedEntity) error {
 	certs, err := entity.CertificateChain()
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
@@ -101,17 +101,17 @@ func (p *CertificateOIDCPolicy) VerifyPolicy(entity SignedEntity) error {
 	return errors.New("Certificate does not contain Issuer OID")
 }
 
-func NewCertificateOIDCPolicy(expectedOIDC string) *CertificateOIDCPolicy {
-	return &CertificateOIDCPolicy{
+func NewCertificateOIDCVerifier(expectedOIDC string) *CertificateOIDCVerifier {
+	return &CertificateOIDCVerifier{
 		expectedOIDC: expectedOIDC,
 	}
 }
 
-type CertificateSANPolicy struct {
+type CertificateSANVerifier struct {
 	expectedSAN string
 }
 
-func (p *CertificateSANPolicy) VerifyPolicy(entity SignedEntity) error {
+func (p *CertificateSANVerifier) Verify(entity SignedEntity) error {
 	certs, err := entity.CertificateChain()
 	if err != nil || len(certs) == 0 {
 		return errors.New("artifact does not provide a certificate")
@@ -125,8 +125,8 @@ func (p *CertificateSANPolicy) VerifyPolicy(entity SignedEntity) error {
 	return nil
 }
 
-func NewCertificateSANPolicy(expectedSAN string) *CertificateSANPolicy {
-	return &CertificateSANPolicy{
+func NewCertificateSANVerifier(expectedSAN string) *CertificateSANVerifier {
+	return &CertificateSANVerifier{
 		expectedSAN: expectedSAN,
 	}
 }
