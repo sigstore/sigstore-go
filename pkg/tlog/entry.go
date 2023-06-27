@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"time"
@@ -115,6 +117,12 @@ func ValidateEntry(entry *Entry) error {
 		if e.IntotoObj.Content == nil {
 			return fmt.Errorf("intoto entry has no content")
 		}
+		if e.IntotoObj.Content.Envelope == nil {
+			return fmt.Errorf("intoto entry has no envelope")
+		}
+		if e.IntotoObj.Content.Envelope.Signatures == nil {
+			return fmt.Errorf("intoto entry has no signatures")
+		}
 		if e.IntotoObj.Content.Hash == nil {
 			return fmt.Errorf("intoto entry has no hash")
 		}
@@ -139,6 +147,40 @@ func ValidateEntry(entry *Entry) error {
 
 func (entry *Entry) IntegratedTime() time.Time {
 	return time.Unix(*entry.logEntryAnon.IntegratedTime, 0)
+}
+
+func (entry *Entry) Signature() []byte {
+	switch e := entry.rekorEntry.(type) {
+	case *hashedrekord_v001.V001Entry:
+		return e.HashedRekordObj.Signature.Content
+	case *intoto_v002.V002Entry:
+		sigBytes, err := base64.StdEncoding.DecodeString(string(e.IntotoObj.Content.Envelope.Signatures[0].Sig))
+		if err != nil {
+			return []byte{}
+		}
+		return sigBytes
+	}
+
+	return []byte{}
+}
+
+func (entry *Entry) Certificate() *x509.Certificate {
+	var certPemString []byte
+
+	switch e := entry.rekorEntry.(type) {
+	case *hashedrekord_v001.V001Entry:
+		certPemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
+	case *intoto_v002.V002Entry:
+		certPemString = []byte(e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
+	}
+
+	certBlock, _ := pem.Decode(certPemString)
+	cert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return nil
+	}
+
+	return cert
 }
 
 func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {

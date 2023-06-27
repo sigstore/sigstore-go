@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -22,6 +23,13 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 		return fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
 	}
 
+	content, err := entity.Content()
+	if err != nil {
+		return err
+	}
+
+	entitySignature := content.GetSignature()
+
 	certs, err := entity.CertificateChain()
 	if err != nil {
 		return err
@@ -42,7 +50,17 @@ func (p *ArtifactTransparencyLogPolicy) VerifyPolicy(entity SignedEntity) error 
 			return err
 		}
 
-		// TODO: check if bundle matches entry
+		// Ensure entry signature matches signature from bundle
+		if !bytes.Equal(entry.Signature(), entitySignature) {
+			return errors.New("transparency log signature does not match")
+		}
+
+		// Ensure entry certificate matches bundle certificate
+		if !leafCert.Equal(entry.Certificate()) {
+			return errors.New("transparency log certificate does not match")
+		}
+
+		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
 		if leafCert.NotBefore.After(entry.IntegratedTime()) || leafCert.NotAfter.Before(entry.IntegratedTime()) {
