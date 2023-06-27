@@ -6,12 +6,18 @@ import (
 	protoverification "github.com/sigstore/protobuf-specs/gen/pb-go/verification/v1"
 )
 
-type TrustedRootVerifier struct {
-	subPolicies []Verifier
+// MultiVerifier is a Verifier that combines one or more other Verifiers.
+type MultiVerifier struct {
+	subVerifiers []Verifier
 }
 
-func (p *TrustedRootVerifier) Verify(entity SignedEntity) error {
-	return Verify(entity, p.subPolicies...)
+func (p *MultiVerifier) Verify(entity SignedEntity) error {
+	for _, verifier := range p.subVerifiers {
+		if err := verifier.Verify(entity); err != nil {
+			return NewVerificationError(err)
+		}
+	}
+	return nil
 }
 
 func SetExpectedOIDC(opts *protoverification.ArtifactVerificationOptions, expectedOIDC string) {
@@ -59,39 +65,39 @@ func GetDefaultOptions() *protoverification.ArtifactVerificationOptions {
 	}
 }
 
-func NewTrustedRootVerifier(trustedRoot root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *TrustedRootVerifier {
-	subPolicies := []Verifier{NewCertificateSignatureVerifier(trustedRoot)}
+func NewVerifierForTrustedRoot(trustedRoot root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *MultiVerifier {
+	verifiers := []Verifier{NewCertificateSignatureVerifier(trustedRoot)}
 
 	signers := opts.GetCertificateIdentities()
 	if signers != nil && len(signers.Identities) > 0 {
 		expectedOIDC := signers.Identities[0].Issuer
 		if expectedOIDC != "" {
-			subPolicies = append(subPolicies, NewCertificateOIDCVerifier(expectedOIDC))
+			verifiers = append(verifiers, NewCertificateOIDCVerifier(expectedOIDC))
 		}
 
 		if signers.Identities[0].San != nil {
 			expectedSAN := signers.Identities[0].San.GetValue()
 			if expectedSAN != "" {
-				subPolicies = append(subPolicies, NewCertificateSANVerifier(expectedSAN))
+				verifiers = append(verifiers, NewCertificateSANVerifier(expectedSAN))
 			}
 		}
 	}
 
 	if tsaOpts := opts.GetTsaOptions(); tsaOpts != nil {
 		if !tsaOpts.GetDisable() {
-			subPolicies = append(subPolicies, NewTimestampAuthorityVerifier(trustedRoot, int(tsaOpts.GetThreshold())))
+			verifiers = append(verifiers, NewTimestampAuthorityVerifier(trustedRoot, int(tsaOpts.GetThreshold())))
 		}
 	}
 	if tlogOptions := opts.GetTlogOptions(); tlogOptions != nil {
 		if !tlogOptions.GetDisable() {
-			subPolicies = append(subPolicies, NewArtifactTransparencyLogVerifier(trustedRoot, int(tlogOptions.GetThreshold())))
+			verifiers = append(verifiers, NewArtifactTransparencyLogVerifier(trustedRoot, int(tlogOptions.GetThreshold())))
 		}
 	}
 	if ctlogOptions := opts.GetCtlogOptions(); ctlogOptions != nil {
 		if !ctlogOptions.GetDisable() {
-			subPolicies = append(subPolicies, NewCertificateTransparencyLogVerifier(trustedRoot, int(ctlogOptions.GetThreshold())))
+			verifiers = append(verifiers, NewCertificateTransparencyLogVerifier(trustedRoot, int(ctlogOptions.GetThreshold())))
 		}
 	}
 
-	return &TrustedRootVerifier{subPolicies}
+	return &MultiVerifier{verifiers}
 }

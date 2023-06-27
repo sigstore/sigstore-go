@@ -48,15 +48,6 @@ type SignedEntity interface {
 	TlogEntryProvider
 }
 
-func Verify(entity SignedEntity, verifiers ...Verifier) error {
-	for _, verifier := range verifiers {
-		if err := verifier.Verify(entity); err != nil {
-			return NewVerificationError(err)
-		}
-	}
-	return nil
-}
-
 // BaseSignedEntity is a helper struct that implements all the interfaces
 // of SignedEntity. It can be embedded in a struct to implement the SignedEntity
 // interface. This may be useful for testing, or for implementing a SignedEntity

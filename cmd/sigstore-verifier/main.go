@@ -77,7 +77,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	p := verifier.NewTrustedRootVerifier(tr, opts)
+	p := verifier.NewVerifierForTrustedRoot(tr, opts)
 	err = p.Verify(b)
 	if err != nil {
 		fmt.Println(err)
