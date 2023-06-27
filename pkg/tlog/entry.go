@@ -16,6 +16,7 @@ import (
 	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/go-openapi/runtime"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
@@ -92,51 +93,14 @@ func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 func ValidateEntry(entry *Entry) error {
 	switch e := entry.rekorEntry.(type) {
 	case *hashedrekord_v001.V001Entry:
-		if e.HashedRekordObj.Data == nil {
-			return fmt.Errorf("hashrekord entry has no data")
-		}
-		if e.HashedRekordObj.Data.Hash == nil {
-			return fmt.Errorf("hashrekord entry has no hash")
-		}
-		if e.HashedRekordObj.Data.Hash.Algorithm == nil {
-			return fmt.Errorf("hashrekord entry has no hash algorithm")
-		}
-		if e.HashedRekordObj.Data.Hash.Value == nil {
-			return fmt.Errorf("hashrekord entry has no hash value")
-		}
-		if e.HashedRekordObj.Signature == nil {
-			return fmt.Errorf("hashrekord entry has no signature")
-		}
-		if e.HashedRekordObj.Signature.Content == nil {
-			return fmt.Errorf("hashrekord entry has no signature content")
-		}
-		if e.HashedRekordObj.Signature.PublicKey.Content == nil {
-			return fmt.Errorf("hashrekord entry has no signature public key")
+		err := e.HashedRekordObj.Validate(strfmt.Default)
+		if err != nil {
+			return err
 		}
 	case *intoto_v002.V002Entry:
-		if e.IntotoObj.Content == nil {
-			return fmt.Errorf("intoto entry has no content")
-		}
-		if e.IntotoObj.Content.Envelope == nil {
-			return fmt.Errorf("intoto entry has no envelope")
-		}
-		if e.IntotoObj.Content.Envelope.Signatures == nil {
-			return fmt.Errorf("intoto entry has no signatures")
-		}
-		if e.IntotoObj.Content.Hash == nil {
-			return fmt.Errorf("intoto entry has no hash")
-		}
-		if e.IntotoObj.Content.Hash.Algorithm == nil {
-			return fmt.Errorf("intoto entry has no hash algorithm")
-		}
-		if e.IntotoObj.Content.Hash.Value == nil {
-			return fmt.Errorf("intoto entry has no hash value")
-		}
-		if e.IntotoObj.Content.PayloadHash.Algorithm == nil {
-			return fmt.Errorf("intoto entry has no payload hash algorithm")
-		}
-		if e.IntotoObj.Content.PayloadHash.Value == nil {
-			return fmt.Errorf("intoto entry has no payload hash value")
+		err := e.IntotoObj.Validate(strfmt.Default)
+		if err != nil {
+			return err
 		}
 	default:
 		return fmt.Errorf("unsupported entry type: %T", e)
