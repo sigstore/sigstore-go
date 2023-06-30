@@ -68,6 +68,45 @@ func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
+	if b.VerificationMaterial == nil {
+		return nil, ErrMissingVerificationMaterial
+	}
+
+	switch content := b.VerificationMaterial.GetContent().(type) {
+	case *protobundle.VerificationMaterial_X509CertificateChain:
+		certs := content.X509CertificateChain.GetCertificates()
+		certificates := make([]*x509.Certificate, len(certs))
+		var err error
+		for i, cert := range content.X509CertificateChain.GetCertificates() {
+			certificates[i], err = x509.ParseCertificate(cert.RawBytes)
+			if err != nil {
+				return nil, ErrValidationError(err)
+			}
+		}
+		if len(certificates) == 0 {
+			return nil, ErrMissingVerificationMaterial
+		}
+		certChain := &CertificateChain{
+			Certificates: certificates,
+		}
+		return certChain, nil
+	case *protobundle.VerificationMaterial_PublicKey:
+		// TODO - how do we get public key bytes from identifier?
+		hint := content.PublicKey.Hint
+		_ = hint
+
+		pk := &PublicKey{
+			PublicKey: nil,
+		}
+		return pk, nil
+
+	default:
+		return nil, ErrMissingVerificationMaterial
+	}
+}
+
+// XXX - deprecate
 func (b *ProtobufBundle) CertificateChain() ([]*x509.Certificate, error) {
 	if b.VerificationMaterial == nil {
 		return nil, ErrMissingVerificationMaterial
@@ -85,6 +124,7 @@ func (b *ProtobufBundle) CertificateChain() ([]*x509.Certificate, error) {
 			}
 		}
 		return certificates, nil
+		// TODO: what to do if there's a key here?
 	default:
 		return nil, ErrMissingVerificationMaterial
 	}
@@ -122,7 +162,7 @@ func (b *ProtobufBundle) KeyID() (string, error) {
 	return "", nil
 }
 
-func (b *ProtobufBundle) Content() (Content, error) {
+func (b *ProtobufBundle) SignatureContent() (SignatureContent, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		envelope, err := parseEnvelope(content.DsseEnvelope)

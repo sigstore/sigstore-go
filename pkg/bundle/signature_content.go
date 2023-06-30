@@ -13,7 +13,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
-type Content interface {
+type SignatureContent interface {
 	EnsureFileMatchesDigest([]byte)
 	CheckSignature(signature.Verifier) error
 	GetSignature() []byte

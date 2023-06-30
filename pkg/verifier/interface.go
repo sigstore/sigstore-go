@@ -1,7 +1,6 @@
 package verifier
 
 import (
-	"crypto/x509"
 	"errors"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
@@ -12,20 +11,12 @@ import (
 
 var errNotImplemented = errors.New("not implemented")
 
-type SignatureProvider interface {
-	Signature() ([]byte, error)
-}
-
 type KeyIDProvider interface {
 	KeyID() (string, error)
 }
 
-type CertificateProvider interface {
-	CertificateChain() ([]*x509.Certificate, error)
-}
-
-type ContentProvider interface {
-	Content() (bundle.Content, error)
+type SignatureProvider interface {
+	SignatureContent() (bundle.SignatureContent, error)
 }
 
 type SignedTimestampProvider interface {
@@ -36,16 +27,20 @@ type TlogEntryProvider interface {
 	TlogEntries() ([]*tlog.Entry, error)
 }
 
+type VerificationProvider interface {
+	VerificationContent() (bundle.VerificationContent, error)
+}
+
 type Verifier interface {
 	Verify(SignedEntity) error
 }
 
 type SignedEntity interface {
-	CertificateProvider
-	ContentProvider
 	KeyIDProvider
+	SignatureProvider
 	SignedTimestampProvider
 	TlogEntryProvider
+	VerificationProvider
 }
 
 // BaseSignedEntity is a helper struct that implements all the interfaces
@@ -54,7 +49,7 @@ type SignedEntity interface {
 // that only implements a subset of the interfaces.
 type BaseSignedEntity struct{}
 
-func (b *BaseSignedEntity) CertificateChain() ([]*x509.Certificate, error) {
+func (b *BaseSignedEntity) VerificationProvider() (bundle.VerificationContent, error) {
 	return nil, errNotImplemented
 }
 

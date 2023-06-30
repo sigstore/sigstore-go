@@ -173,12 +173,12 @@ func main() {
 			log.Fatal(err)
 		}
 
-		content, err := b.Content()
+		sigContent, err := b.SignatureContent()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		content.EnsureFileMatchesDigest(fileBytes)
+		sigContent.EnsureFileMatchesDigest(fileBytes)
 	default:
 		log.Fatalf("Unsupported command %s", os.Args[1])
 	}

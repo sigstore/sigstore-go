@@ -353,11 +353,11 @@ type TestEntity struct {
 	keyID       string
 }
 
-func (e *TestEntity) CertificateChain() ([]*x509.Certificate, error) {
-	return e.certChain, nil
+func (e *TestEntity) VerificationContent() (bundle.VerificationContent, error) {
+	return &bundle.CertificateChain{Certificates: e.certChain}, nil
 }
 
-func (e *TestEntity) Content() (bundle.Content, error) {
+func (e *TestEntity) SignatureContent() (bundle.SignatureContent, error) {
 	return &bundle.Envelope{Envelope: e.envelope}, nil
 }
 

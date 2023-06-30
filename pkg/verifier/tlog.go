@@ -23,22 +23,17 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		return fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
 	}
 
-	content, err := entity.Content()
+	sigContent, err := entity.SignatureContent()
 	if err != nil {
 		return err
 	}
 
-	entitySignature := content.GetSignature()
+	entitySignature := sigContent.GetSignature()
 
-	certs, err := entity.CertificateChain()
+	verificationContent, err := entity.VerificationContent()
 	if err != nil {
 		return err
 	}
-	if len(certs) == 0 {
-		return errors.New("missing certificate chain")
-	}
-
-	leafCert := certs[0]
 
 	for _, entry := range entries {
 		err := tlog.ValidateEntry(entry)
@@ -56,14 +51,14 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		}
 
 		// Ensure entry certificate matches bundle certificate
-		if !leafCert.Equal(entry.Certificate()) {
+		if !verificationContent.CompareKey(entry.Certificate()) {
 			return errors.New("transparency log certificate does not match")
 		}
 
 		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
-		if leafCert.NotBefore.After(entry.IntegratedTime()) || leafCert.NotAfter.Before(entry.IntegratedTime()) {
+		if !verificationContent.ValidAtTime(entry.IntegratedTime()) {
 			return errors.New("Integrated time outside certificate validity")
 		}
 	}

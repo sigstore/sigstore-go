@@ -1,13 +1,9 @@
 package verifier
 
 import (
-	"crypto"
-	"crypto/x509"
-	"errors"
 	"fmt"
 
 	"github.com/github/sigstore-verifier/pkg/root"
-	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type CertificateSignatureVerifier struct {
@@ -15,61 +11,18 @@ type CertificateSignatureVerifier struct {
 }
 
 func (p *CertificateSignatureVerifier) Verify(entity SignedEntity) error {
-	certs, err := entity.CertificateChain()
-	if err != nil || len(certs) == 0 {
-		return errors.New("artifact does not provide a certificate")
-	}
-	leafCert := certs[0]
-
-	verifier, err := signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
-	if err != nil {
-		return fmt.Errorf("invalid certificate: %w", err)
-	}
-
-	content, err := entity.Content()
+	verificationConent, err := entity.VerificationContent()
 	if err != nil {
 		return err
 	}
 
-	err = content.CheckSignature(verifier)
+	sigContent, err := entity.SignatureContent()
 	if err != nil {
 		return err
 	}
 
-	for _, ca := range p.trustedRoot.FulcioCertificateAuthorities() {
-		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
-			continue
-		}
-		if !ca.ValidityPeriodEnd.IsZero() && leafCert.NotAfter.After(ca.ValidityPeriodEnd) {
-			continue
-		}
-
-		rootCertPool := x509.NewCertPool()
-		rootCertPool.AddCert(ca.Root)
-		intermediateCertPool := x509.NewCertPool()
-		for _, cert := range ca.Intermediates {
-			intermediateCertPool.AddCert(cert)
-		}
-
-		opts := x509.VerifyOptions{
-			// CurrentTime is intentionally set to the leaf certificate's
-			// NotBefore time to ensure that we can continue to verify
-			// old bundles after they expire.
-			CurrentTime:   certs[0].NotBefore,
-			Roots:         rootCertPool,
-			Intermediates: intermediateCertPool,
-			KeyUsages: []x509.ExtKeyUsage{
-				x509.ExtKeyUsageCodeSigning,
-			},
-		}
-
-		_, err = leafCert.Verify(opts)
-		if err == nil {
-			return nil
-		}
-	}
-
-	return errors.New("certificate verification failed")
+	err = verificationConent.Verify(sigContent, p.trustedRoot.FulcioCertificateAuthorities())
+	return err
 }
 
 func NewCertificateSignatureVerifier(trustedRoot root.TrustedRoot) *CertificateSignatureVerifier {
@@ -83,22 +36,17 @@ type CertificateOIDCVerifier struct {
 }
 
 func (p *CertificateOIDCVerifier) Verify(entity SignedEntity) error {
-	certs, err := entity.CertificateChain()
-	if err != nil || len(certs) == 0 {
-		return errors.New("artifact does not provide a certificate")
-	}
-	leafCert := certs[0]
-
-	for _, extension := range leafCert.Extensions {
-		if extension.Id.String() == "1.3.6.1.4.1.57264.1.1" {
-			if string(extension.Value) == p.expectedOIDC {
-				return nil
-			}
-			return fmt.Errorf("Signing certificate Issuer OID %s does not match expected OIDC issuer %s", string(extension.Value), p.expectedOIDC)
-		}
+	verificationContent, err := entity.VerificationContent()
+	if err != nil {
+		return err
 	}
 
-	return errors.New("Certificate does not contain Issuer OID")
+	issuer := verificationContent.GetIssuer()
+	if issuer != p.expectedOIDC {
+		return fmt.Errorf("Signing certificate Issuer OID %s does not match expected OIDC issuer %s", issuer, p.expectedOIDC)
+	}
+
+	return nil
 }
 
 func NewCertificateOIDCVerifier(expectedOIDC string) *CertificateOIDCVerifier {
@@ -112,14 +60,14 @@ type CertificateSANVerifier struct {
 }
 
 func (p *CertificateSANVerifier) Verify(entity SignedEntity) error {
-	certs, err := entity.CertificateChain()
-	if err != nil || len(certs) == 0 {
-		return errors.New("artifact does not provide a certificate")
+	verificationContent, err := entity.VerificationContent()
+	if err != nil {
+		return err
 	}
-	leafCert := certs[0]
 
-	if len(leafCert.URIs) > 0 && leafCert.URIs[0].String() != p.expectedSAN {
-		return fmt.Errorf("Signing certificate subject %s does not match expected subject %s", leafCert.URIs[0].String(), p.expectedSAN)
+	san := verificationContent.GetSAN()
+	if san != p.expectedSAN {
+		return fmt.Errorf("Signing certificate subject %s does not match expected subject %s", san, p.expectedSAN)
 	}
 
 	return nil

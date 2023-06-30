@@ -22,12 +22,12 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
 		return fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
 	}
 
-	content, err := entity.Content()
+	sigContent, err := entity.SignatureContent()
 	if err != nil {
 		return err
 	}
 
-	signatureBytes := content.GetSignature()
+	signatureBytes := sigContent.GetSignature()
 
 	certAuthorities := p.trustedRoot.TSACertificateAuthorities()
 
