@@ -106,30 +106,6 @@ func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
 	}
 }
 
-// XXX - deprecate
-func (b *ProtobufBundle) CertificateChain() ([]*x509.Certificate, error) {
-	if b.VerificationMaterial == nil {
-		return nil, ErrMissingVerificationMaterial
-	}
-
-	switch content := b.VerificationMaterial.GetContent().(type) {
-	case *protobundle.VerificationMaterial_X509CertificateChain:
-		certs := content.X509CertificateChain.GetCertificates()
-		certificates := make([]*x509.Certificate, len(certs))
-		var err error
-		for i, cert := range content.X509CertificateChain.GetCertificates() {
-			certificates[i], err = x509.ParseCertificate(cert.RawBytes)
-			if err != nil {
-				return nil, ErrValidationError(err)
-			}
-		}
-		return certificates, nil
-		// TODO: what to do if there's a key here?
-	default:
-		return nil, ErrMissingVerificationMaterial
-	}
-}
-
 func (b *ProtobufBundle) TlogEntries() ([]*tlog.Entry, error) {
 	if b.VerificationMaterial == nil {
 		return nil, nil
