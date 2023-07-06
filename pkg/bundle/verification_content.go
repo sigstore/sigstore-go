@@ -3,6 +3,7 @@ package bundle
 import (
 	"crypto"
 	"crypto/x509"
+	"encoding/asn1"
 	"errors"
 	"fmt"
 	"time"
@@ -92,7 +93,7 @@ func (cc *CertificateChain) Verify(sigContent SignatureContent, cas []root.Certi
 
 func (cc *CertificateChain) GetIssuer() string {
 	for _, extension := range cc.Certificates[0].Extensions {
-		if extension.Id.String() == "1.3.6.1.4.1.57264.1.1" {
+		if extension.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 57264, 1, 1}) {
 			return string(extension.Value)
 		}
 	}

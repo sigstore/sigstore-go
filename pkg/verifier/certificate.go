@@ -11,7 +11,7 @@ type CertificateSignatureVerifier struct {
 }
 
 func (p *CertificateSignatureVerifier) Verify(entity SignedEntity) error {
-	verificationConent, err := entity.VerificationContent()
+	verificationContent, err := entity.VerificationContent()
 	if err != nil {
 		return err
 	}
@@ -21,7 +21,7 @@ func (p *CertificateSignatureVerifier) Verify(entity SignedEntity) error {
 		return err
 	}
 
-	err = verificationConent.Verify(sigContent, p.trustedRoot.FulcioCertificateAuthorities())
+	err = verificationContent.Verify(sigContent, p.trustedRoot.FulcioCertificateAuthorities())
 	return err
 }
 
