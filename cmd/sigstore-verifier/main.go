@@ -17,6 +17,7 @@ var requireTSA *bool
 var requireTlog *bool
 var trustedrootJSONpath *string
 var tufRootURL *string
+var tufDirectory *string
 
 func init() {
 	expectedOIDC = flag.String("expectedOIDC", "", "The expected OIDC issuer for the signing certificate")
@@ -25,6 +26,7 @@ func init() {
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
+	tufDirectory = flag.String("tufDirectory", "tufdata", "Directory to store TUF metadata")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		usage()
@@ -58,7 +60,7 @@ func main() {
 	var trustedrootJSON []byte
 
 	if *tufRootURL != "" {
-		trustedrootJSON, err = tuf.GetTrustedrootJSON(*tufRootURL, "tufdata")
+		trustedrootJSON, err = tuf.GetTrustedrootJSON(*tufRootURL, *tufDirectory)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

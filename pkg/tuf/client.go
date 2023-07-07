@@ -2,6 +2,7 @@ package tuf
 
 import (
 	"crypto/sha512"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,9 @@ import (
 
 	tufclient "github.com/theupdateframework/go-tuf/client"
 )
+
+//go:embed repository
+var embeddedRepos embed.FS
 
 const TrustedRootTUFPath = "trusted_root.json"
 
@@ -57,7 +61,11 @@ func GetTrustedrootJSON(tufRootURL, workPath string) (trustedrootJSON []byte, er
 	rootJSONPath := filepath.Join(tufPath, "root.json")
 
 	if _, err := os.Stat(rootJSONPath); errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("No root.json found at %s", tufPath)
+		// Attempt to initialize the TUF repo
+		err := initialize(tufRootURL, workPath)
+		if err != nil {
+			return nil, fmt.Errorf("No root.json found at %s", tufPath)
+		}
 	}
 
 	root, err := os.ReadFile(rootJSONPath)
@@ -146,4 +154,21 @@ func GetTrustedrootJSON(tufRootURL, workPath string) (trustedrootJSON []byte, er
 	}
 
 	return writer.Bytes, nil
+}
+
+func initialize(tufRootURL, workPath string) error {
+	// Initialize the TUF repo by copying the embedded repo to disk
+	_, err := embeddedRepos.ReadDir(filepath.Join("repository", tufRootURL))
+	if err != nil {
+		return err
+	}
+	rootJSON, err := embeddedRepos.ReadFile(filepath.Join("repository", tufRootURL, "root.json"))
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(filepath.Join(workPath, tufRootURL, "root.json"), rootJSON, 0600)
+	if err != nil {
+		return err
+	}
+	return nil
 }
