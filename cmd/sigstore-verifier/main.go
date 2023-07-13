@@ -15,6 +15,7 @@ var expectedOIDC *string
 var expectedSAN *string
 var requireTSA *bool
 var requireTlog *bool
+var onlineTlog *bool
 var trustedrootJSONpath *string
 var tufRootURL *string
 var tufDirectory *string
@@ -24,6 +25,7 @@ func init() {
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	requireTSA = flag.Bool("requireTSA", false, "Require RFC 3161 signed timestamp")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
+	onlineTlog = flag.Bool("onlineTlog", false, "Verify Artifact Transparency log entry online (Rekor)")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
 	tufDirectory = flag.String("tufDirectory", "tufdata", "Directory to store TUF metadata")
@@ -49,6 +51,7 @@ func main() {
 	opts := verifier.GetDefaultOptions()
 	opts.TsaOptions.Disable = !*requireTSA
 	opts.TlogOptions.Disable = !*requireTlog
+	opts.TlogOptions.PerformOnlineVerification = *onlineTlog
 	if *expectedOIDC != "" {
 		verifier.SetExpectedOIDC(opts, *expectedOIDC)
 	}

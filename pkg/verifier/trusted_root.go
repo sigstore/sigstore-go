@@ -90,7 +90,7 @@ func NewVerifierForTrustedRoot(trustedRoot root.TrustedRoot, opts *protoverifica
 	}
 	if tlogOptions := opts.GetTlogOptions(); tlogOptions != nil {
 		if !tlogOptions.GetDisable() {
-			verifiers = append(verifiers, NewArtifactTransparencyLogVerifier(trustedRoot, int(tlogOptions.GetThreshold())))
+			verifiers = append(verifiers, NewArtifactTransparencyLogVerifier(trustedRoot, int(tlogOptions.GetThreshold()), tlogOptions.GetPerformOnlineVerification(), trustedRoot.TlogVerifiers()))
 		}
 	}
 	if ctlogOptions := opts.GetCtlogOptions(); ctlogOptions != nil {

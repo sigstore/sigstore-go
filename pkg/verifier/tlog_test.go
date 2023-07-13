@@ -4,15 +4,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/testing/ca"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTlogVerifier(t *testing.T) {
+	var tlogVerifiers map[string]*root.TlogVerifier
+
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier := NewArtifactTransparencyLogVerifier(virtualSigstore, 1)
+	verifier := NewArtifactTransparencyLogVerifier(virtualSigstore, 1, false, tlogVerifiers)
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
 	assert.NoError(t, err)
@@ -23,7 +26,7 @@ func TestTlogVerifier(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier2 := NewArtifactTransparencyLogVerifier(virtualSigstore2, 1)
+	verifier2 := NewArtifactTransparencyLogVerifier(virtualSigstore2, 1, false, tlogVerifiers)
 	err = verifier2.Verify(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 

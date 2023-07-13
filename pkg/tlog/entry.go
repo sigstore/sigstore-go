@@ -147,6 +147,14 @@ func (entry *Entry) Certificate() *x509.Certificate {
 	return cert
 }
 
+func (entry *Entry) LogKeyID() *string {
+	return entry.logEntryAnon.LogID
+}
+
+func (entry *Entry) LogIndex() *int64 {
+	return entry.logEntryAnon.LogIndex
+}
+
 func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {
 	rekorPayload := RekorPayload{
 		Body:           entry.logEntryAnon.Body,

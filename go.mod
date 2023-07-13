@@ -41,6 +41,8 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-containerregistry v0.14.1-0.20230409045903-ed5c185df419 // indirect
 	github.com/google/trillian v1.5.1 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
@@ -70,6 +72,7 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/tent/canonical-json-go v0.0.0-20130607151641-96e4ba3a7613 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
+	github.com/transparency-dev/merkle v0.0.1 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	go.opentelemetry.io/otel v1.14.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
