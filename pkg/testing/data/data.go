@@ -29,7 +29,11 @@ func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return bundle.NewProtobufBundle(&b)
+	bun, err := bundle.NewProtobufBundle(&b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bun
 }
 
 // SigstoreBundle returns a test *sigstore.Bundle

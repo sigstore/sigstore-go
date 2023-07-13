@@ -118,7 +118,7 @@ func (entry *Entry) Signature() []byte {
 	case *hashedrekord_v001.V001Entry:
 		return e.HashedRekordObj.Signature.Content
 	case *intoto_v002.V002Entry:
-		sigBytes, err := base64.StdEncoding.DecodeString(string(e.IntotoObj.Content.Envelope.Signatures[0].Sig))
+		sigBytes, err := base64.StdEncoding.DecodeString(string(*e.IntotoObj.Content.Envelope.Signatures[0].Sig))
 		if err != nil {
 			return []byte{}
 		}
@@ -135,7 +135,7 @@ func (entry *Entry) Certificate() *x509.Certificate {
 	case *hashedrekord_v001.V001Entry:
 		certPemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
 	case *intoto_v002.V002Entry:
-		certPemString = []byte(e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
+		certPemString = []byte(*e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
 	}
 
 	certBlock, _ := pem.Decode(certPemString)
@@ -147,12 +147,12 @@ func (entry *Entry) Certificate() *x509.Certificate {
 	return cert
 }
 
-func (entry *Entry) LogKeyID() *string {
-	return entry.logEntryAnon.LogID
+func (entry *Entry) LogKeyID() string {
+	return *entry.logEntryAnon.LogID
 }
 
-func (entry *Entry) LogIndex() *int64 {
-	return entry.logEntryAnon.LogIndex
+func (entry *Entry) LogIndex() int64 {
+	return *entry.logEntryAnon.LogIndex
 }
 
 func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {

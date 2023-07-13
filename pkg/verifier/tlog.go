@@ -62,7 +62,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 			}
 		} else {
 			keyID := entry.LogKeyID()
-			hex64Key := hex.EncodeToString([]byte(*keyID))
+			hex64Key := hex.EncodeToString([]byte(keyID))
 			tlogVerifier, ok := p.tlogVerifiers[hex64Key]
 			if !ok {
 				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
@@ -77,7 +77,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 
 			searchParams := rekorEntries.NewSearchLogQueryParams()
 			searchLogQuery := rekorModels.SearchLogQuery{}
-			searchLogQuery.LogIndexes = []*int64{logIndex}
+			searchLogQuery.LogIndexes = []*int64{&logIndex}
 			searchParams.SetEntry(&searchLogQuery)
 
 			resp, err := client.Entries.SearchLogQuery(searchParams)
@@ -86,7 +86,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 			}
 
 			if len(resp.Payload) == 0 {
-				return fmt.Errorf("unable to locate log entry %d", *logIndex)
+				return fmt.Errorf("unable to locate log entry %d", logIndex)
 			} else if len(resp.Payload) > 1 {
 				return errors.New("too many log entries returned")
 			}

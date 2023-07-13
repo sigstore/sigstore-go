@@ -20,17 +20,29 @@ import (
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
 const IntotoMediaType = "application/vnd.in-toto+json"
 
-var ErrInvalidAttestation = errors.New("invalid attestation")
+var ErrValidation = errors.New("validation error")
+var ErrIncorrectMediaType = fmt.Errorf("%w: unsupported media type", ErrValidation)
+var ErrMissingVerificationMaterial = fmt.Errorf("%w: missing verification material", ErrValidation)
+var ErrUnimplemented = errors.New("unimplemented")
+var ErrInvalidAttestation = fmt.Errorf("%w: invalid attestation", ErrValidation)
 var ErrMissingEnvelope = fmt.Errorf("%w: missing envelope", ErrInvalidAttestation)
 var ErrDecodingJSON = fmt.Errorf("%w: decoding json", ErrInvalidAttestation)
 var ErrDecodingB64 = fmt.Errorf("%w: decoding base64", ErrInvalidAttestation)
+
+func ErrValidationError(err error) error {
+	return fmt.Errorf("%w: %w", ErrValidation, err)
+}
 
 type ProtobufBundle struct {
 	*protobundle.Bundle
 }
 
-func NewProtobufBundle(pbundle *protobundle.Bundle) *ProtobufBundle {
-	return &ProtobufBundle{Bundle: pbundle}
+func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
+	if pbundle.MediaType != SigstoreBundleMediaType01 {
+		return nil, ErrIncorrectMediaType
+	}
+	// TODO: Add support for bundle v0.2
+	return &ProtobufBundle{Bundle: pbundle}, nil
 }
 
 func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
@@ -207,35 +219,6 @@ func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
 		return nil, ErrDecodingJSON
 	}
 	return statement, nil
-}
-
-var ErrValidation = errors.New("validation error")
-var ErrIncorrectMediaType = fmt.Errorf("%w: unsupported media type", ErrValidation)
-var ErrMissingVerificationMaterial = fmt.Errorf("%w: missing verification material", ErrValidation)
-var ErrUnimplemented = errors.New("unimplemented")
-
-type ErrVerification struct {
-	err error
-}
-
-func NewVerificationError(e error) ErrVerification {
-	return ErrVerification{e}
-}
-
-func (e ErrVerification) Unwrap() error {
-	return e.err
-}
-
-func (e ErrVerification) String() string {
-	return fmt.Sprintf("verification error: %s", e.err.Error())
-}
-
-func (e ErrVerification) Error() string {
-	return e.String()
-}
-
-func ErrValidationError(err error) error {
-	return fmt.Errorf("%w: %w", ErrValidation, err)
 }
 
 func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {
