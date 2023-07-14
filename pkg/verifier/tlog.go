@@ -22,10 +22,9 @@ import (
 )
 
 type ArtifactTransparencyLogVerifier struct {
-	trustedRoot   root.TrustedRoot
-	threshold     int
-	online        bool
-	tlogVerifiers map[string]*root.TlogVerifier
+	trustedRoot root.TrustedRoot
+	threshold   int
+	online      bool
 }
 
 func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
@@ -63,7 +62,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
-			tlogVerifier, ok := p.tlogVerifiers[hex64Key]
+			tlogVerifier, ok := p.trustedRoot.TlogVerifiers()[hex64Key]
 			if !ok {
 				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}
@@ -123,12 +122,11 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 	return nil
 }
 
-func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedRoot, threshold int, online bool, tlogVerifiers map[string]*root.TlogVerifier) *ArtifactTransparencyLogVerifier {
+func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedRoot, threshold int, online bool) *ArtifactTransparencyLogVerifier {
 	return &ArtifactTransparencyLogVerifier{
-		trustedRoot:   trustedRoot,
-		threshold:     threshold,
-		online:        online,
-		tlogVerifiers: tlogVerifiers,
+		trustedRoot: trustedRoot,
+		threshold:   threshold,
+		online:      online,
 	}
 }
 
