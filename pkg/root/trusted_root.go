@@ -11,18 +11,14 @@ import (
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const TrustedRootMediaType01 = "application/vnd.dev.sigstore.trustedroot+json;version=0.1"
 
-type TrustedRoot interface {
-	TSACertificateAuthorities() []CertificateAuthority
-	FulcioCertificateAuthorities() []CertificateAuthority
-	TlogVerifiers() map[string]*TlogVerifier
-}
-
-type ParsedTrustedRoot struct {
+type TrustedRoot struct {
+	BaseTrustedMaterial
 	trustedRoot           *prototrustroot.TrustedRoot
 	tlogVerifiers         map[string]*TlogVerifier
 	fulcioCertAuthorities []CertificateAuthority
@@ -49,41 +45,79 @@ type TlogVerifier struct {
 	SignatureHashFunc crypto.Hash
 }
 
-func (tr *ParsedTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
+func (tr *TrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
 	return tr.tsaCertAuthorities
 }
 
-func (tr *ParsedTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
+func (tr *TrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 	return tr.fulcioCertAuthorities
 }
 
-func (tr *ParsedTrustedRoot) TlogVerifiers() map[string]*TlogVerifier {
+func (tr *TrustedRoot) TlogVerifiers() map[string]*TlogVerifier {
 	return tr.tlogVerifiers
 }
 
-func NewTrustedRootFromProtobuf(trustedRoot *prototrustroot.TrustedRoot) (parsedTrustedRoot *ParsedTrustedRoot, err error) {
-	if trustedRoot.GetMediaType() != TrustedRootMediaType01 {
-		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", trustedRoot.GetMediaType())
+type TrustedPublicKeyMaterial struct {
+	BaseTrustedMaterial
+	publicKeyVerifier func(string) (ValidityPeriodVerifier, error)
+}
+
+func (tr *TrustedPublicKeyMaterial) PublicKeyVerifier(keyID string) (ValidityPeriodVerifier, error) {
+	return tr.publicKeyVerifier(keyID)
+}
+
+func NewTrustedPublicKeyMaterial(publicKeyVerifier func(string) (ValidityPeriodVerifier, error)) *TrustedPublicKeyMaterial {
+	return &TrustedPublicKeyMaterial{
+		publicKeyVerifier: publicKeyVerifier,
+	}
+}
+
+func NewTrustedPublicKeyMaterialWithMapping(trustedPublicKeys map[string]crypto.PublicKey) *TrustedPublicKeyMaterial {
+	return NewTrustedPublicKeyMaterial(func(keyID string) (ValidityPeriodVerifier, error) {
+		pubKey, ok := trustedPublicKeys[keyID]
+		if !ok {
+			return nil, fmt.Errorf("public key not found for keyID: %s", keyID)
+		}
+		verifier, err := signature.LoadECDSAVerifier(pubKey.(*ecdsa.PublicKey), crypto.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		return &nonExpiringVerifier{verifier}, nil
+	})
+}
+
+type nonExpiringVerifier struct {
+	signature.Verifier
+}
+
+func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
+	return true
+}
+
+func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot) (trustedRoot *TrustedRoot, err error) {
+	if protobufTrustedRoot.GetMediaType() != TrustedRootMediaType01 {
+		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", protobufTrustedRoot.GetMediaType())
 	}
 
-	parsedTrustedRoot = &ParsedTrustedRoot{trustedRoot: trustedRoot}
-	parsedTrustedRoot.tlogVerifiers, err = ParseTlogVerifiers(trustedRoot)
+	trustedRoot = &TrustedRoot{trustedRoot: protobufTrustedRoot}
+	trustedRoot.tlogVerifiers, err = ParseTlogVerifiers(protobufTrustedRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	parsedTrustedRoot.fulcioCertAuthorities, err = ParseCertificateAuthorities(trustedRoot.GetCertificateAuthorities())
+	trustedRoot.fulcioCertAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetCertificateAuthorities())
 	if err != nil {
 		return nil, err
 	}
 
-	parsedTrustedRoot.tsaCertAuthorities, err = ParseCertificateAuthorities(trustedRoot.GetTimestampAuthorities())
+	trustedRoot.tsaCertAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetTimestampAuthorities())
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: Handle CT logs (trustedRoot.Ctlogs)
-	return parsedTrustedRoot, nil
+
+	return trustedRoot, nil
 }
 
 func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers map[string]*TlogVerifier, err error) {
@@ -210,7 +244,7 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 	return certificateAuthority, nil
 }
 
-func NewTrustedRootFromPath(path string) (*ParsedTrustedRoot, error) {
+func NewTrustedRootFromPath(path string) (*TrustedRoot, error) {
 	trustedrootJSON, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -220,7 +254,7 @@ func NewTrustedRootFromPath(path string) (*ParsedTrustedRoot, error) {
 }
 
 // NewTrustedRootFromJSON returns the Sigstore trusted root.
-func NewTrustedRootFromJSON(rootJSON []byte) (*ParsedTrustedRoot, error) {
+func NewTrustedRootFromJSON(rootJSON []byte) (*TrustedRoot, error) {
 	pbTrustedRoot, err := NewTrustedRootProtobuf(rootJSON)
 	if err != nil {
 		return nil, err

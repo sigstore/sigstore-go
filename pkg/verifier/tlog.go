@@ -20,7 +20,7 @@ import (
 )
 
 type ArtifactTransparencyLogVerifier struct {
-	trustedRoot root.TrustedRoot
+	trustedRoot root.TrustedMaterial
 	threshold   int
 	online      bool
 }
@@ -129,14 +129,14 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		}
 
 		// Ensure entry certificate matches bundle certificate
-		if !verificationContent.CompareKey(entry.Certificate()) {
+		if !verificationContent.CompareKey(entry.Certificate(), p.trustedRoot) {
 			return errors.New("transparency log certificate does not match")
 		}
 
 		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
-		if !verificationContent.ValidAtTime(entry.IntegratedTime()) {
+		if !verificationContent.ValidAtTime(entry.IntegratedTime(), p.trustedRoot) {
 			return errors.New("Integrated time outside certificate validity")
 		}
 	}
@@ -144,7 +144,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 	return nil
 }
 
-func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedRoot, threshold int, online bool) *ArtifactTransparencyLogVerifier {
+func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedMaterial, threshold int, online bool) *ArtifactTransparencyLogVerifier {
 	return &ArtifactTransparencyLogVerifier{
 		trustedRoot: trustedRoot,
 		threshold:   threshold,

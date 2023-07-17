@@ -6,11 +6,11 @@ import (
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
-type CertificateSignatureVerifier struct {
-	trustedRoot root.TrustedRoot
+type SignatureVerifier struct {
+	trustedRoot root.TrustedMaterial
 }
 
-func (p *CertificateSignatureVerifier) Verify(entity SignedEntity) error {
+func (p *SignatureVerifier) Verify(entity SignedEntity) error {
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {
 		return err
@@ -21,12 +21,12 @@ func (p *CertificateSignatureVerifier) Verify(entity SignedEntity) error {
 		return err
 	}
 
-	err = verificationContent.Verify(sigContent, p.trustedRoot.FulcioCertificateAuthorities())
+	err = verificationContent.Verify(sigContent, p.trustedRoot)
 	return err
 }
 
-func NewCertificateSignatureVerifier(trustedRoot root.TrustedRoot) *CertificateSignatureVerifier {
-	return &CertificateSignatureVerifier{
+func NewSignatureVerifier(trustedRoot root.TrustedMaterial) *SignatureVerifier {
+	return &SignatureVerifier{
 		trustedRoot: trustedRoot,
 	}
 }

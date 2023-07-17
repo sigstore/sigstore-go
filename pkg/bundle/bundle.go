@@ -140,12 +140,8 @@ func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
 		}
 		return certChain, nil
 	case *protobundle.VerificationMaterial_PublicKey:
-		// TODO - how do we get public key bytes from identifier?
-		hint := content.PublicKey.Hint
-		_ = hint
-
 		pk := &PublicKey{
-			PublicKey: nil,
+			Hint: content.PublicKey.Hint,
 		}
 		return pk, nil
 

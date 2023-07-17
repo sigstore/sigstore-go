@@ -14,9 +14,9 @@ import (
 )
 
 type VerificationContent interface {
-	CompareKey(any) bool
-	ValidAtTime(time.Time) bool
-	Verify(SignatureContent, []root.CertificateAuthority) error
+	CompareKey(any, root.TrustedMaterial) bool
+	ValidAtTime(time.Time, root.TrustedMaterial) bool
+	Verify(SignatureContent, root.TrustedMaterial) error
 	GetIssuer() string
 	GetSAN() string
 }
@@ -26,10 +26,10 @@ type CertificateChain struct {
 }
 
 type PublicKey struct {
-	PublicKey *crypto.PublicKey
+	Hint string
 }
 
-func (cc *CertificateChain) CompareKey(key any) bool {
+func (cc *CertificateChain) CompareKey(key any, _ root.TrustedMaterial) bool {
 	x509Key, ok := key.(*x509.Certificate)
 	if !ok {
 		return false
@@ -38,11 +38,11 @@ func (cc *CertificateChain) CompareKey(key any) bool {
 	return cc.Certificates[0].Equal(x509Key)
 }
 
-func (cc *CertificateChain) ValidAtTime(t time.Time) bool {
+func (cc *CertificateChain) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
 	return !(cc.Certificates[0].NotAfter.Before(t) || cc.Certificates[0].NotBefore.After(t))
 }
 
-func (cc *CertificateChain) Verify(sigContent SignatureContent, cas []root.CertificateAuthority) error {
+func (cc *CertificateChain) Verify(sigContent SignatureContent, trustedRoot root.TrustedMaterial) error {
 	verifier, err := signature.LoadVerifier(cc.Certificates[0].PublicKey, crypto.SHA256)
 	if err != nil {
 		return fmt.Errorf("invalid key: %w", err)
@@ -55,7 +55,7 @@ func (cc *CertificateChain) Verify(sigContent SignatureContent, cas []root.Certi
 
 	leafCert := cc.Certificates[0]
 
-	for _, ca := range cas {
+	for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
 		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
 			continue
 		}
@@ -108,18 +108,33 @@ func (cc *CertificateChain) GetSAN() string {
 	return cc.Certificates[0].URIs[0].String()
 }
 
-func (pk *PublicKey) CompareKey(any) bool {
-	return true
-}
-
-func (pk *PublicKey) ValidAtTime(time.Time) bool {
-	return true
-}
-
-func (pk *PublicKey) Verify(sigContent SignatureContent, _ []root.CertificateAuthority) error {
-	verifier, err := signature.LoadVerifier(pk.PublicKey, crypto.SHA256)
+func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
+	verifier, err := tm.PublicKeyVerifier(pk.Hint)
 	if err != nil {
-		return fmt.Errorf("invalid key: %w", err)
+		return false
+	}
+	pubKey, err := verifier.PublicKey()
+	if err != nil {
+		return false
+	}
+	if equaler, ok := key.(interface{ Equal(x crypto.PublicKey) bool }); ok {
+		return equaler.Equal(pubKey)
+	}
+	return false
+}
+
+func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
+	verifier, err := tm.PublicKeyVerifier(pk.Hint)
+	if err != nil {
+		return false
+	}
+	return verifier.ValidAtTime(t)
+}
+
+func (pk *PublicKey) Verify(sigContent SignatureContent, tm root.TrustedMaterial) error {
+	verifier, err := tm.PublicKeyVerifier(pk.Hint)
+	if err != nil {
+		return err
 	}
 
 	err = sigContent.CheckSignature(verifier)

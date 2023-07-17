@@ -44,6 +44,7 @@ type VirtualSigstore struct {
 	tsaCA                 root.CertificateAuthority
 	tsaLeafKey            *ecdsa.PrivateKey
 	rekorKey              *ecdsa.PrivateKey
+	publicKeyVerifier     map[string]root.ValidityPeriodVerifier
 }
 
 func NewVirtualSigstore() (*VirtualSigstore, error) {
@@ -224,6 +225,14 @@ func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelop
 	}
 
 	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil)
+}
+
+func (ca *VirtualSigstore) PublicKeyVerifier(keyID string) (root.ValidityPeriodVerifier, error) {
+	v, ok := ca.publicKeyVerifier[keyID]
+	if !ok {
+		return nil, fmt.Errorf("public key not found for keyID: %s", keyID)
+	}
+	return v, nil
 }
 
 func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte) (string, error) {

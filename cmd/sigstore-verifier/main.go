@@ -68,7 +68,7 @@ func main() {
 		verifier.SetExpectedSAN(opts, *expectedSAN)
 	}
 
-	var tr *root.ParsedTrustedRoot
+	var tr *root.TrustedRoot
 	var trustedrootJSON []byte
 
 	if *tufRootURL != "" {
@@ -91,7 +91,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	p := verifier.NewVerifierForTrustedRoot(tr, opts)
+	p := verifier.NewVerifier(tr, opts)
 	err = p.Verify(b)
 	if err != nil {
 		fmt.Println(err)

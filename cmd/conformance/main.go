@@ -122,7 +122,7 @@ func main() {
 		}
 
 		// Verify bundle
-		v := verifier.NewVerifierForTrustedRoot(tr, opts)
+		v := verifier.NewVerifier(tr, opts)
 		bun, err := bundle.NewProtobufBundle(&pb)
 		if err != nil {
 			log.Fatal(err)
@@ -165,7 +165,7 @@ func main() {
 		}
 
 		// Verify bundle
-		p := verifier.NewVerifierForTrustedRoot(tr, opts)
+		p := verifier.NewVerifier(tr, opts)
 		err = p.Verify(b)
 		if err != nil {
 			log.Fatal(err)

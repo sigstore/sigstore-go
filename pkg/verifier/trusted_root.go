@@ -65,8 +65,8 @@ func GetDefaultOptions() *protoverification.ArtifactVerificationOptions {
 	}
 }
 
-func NewVerifierForTrustedRoot(trustedRoot root.TrustedRoot, opts *protoverification.ArtifactVerificationOptions) *MultiVerifier {
-	verifiers := []Verifier{NewCertificateSignatureVerifier(trustedRoot)}
+func NewVerifier(trustedRoot root.TrustedMaterial, opts *protoverification.ArtifactVerificationOptions) *MultiVerifier {
+	verifiers := []Verifier{NewSignatureVerifier(trustedRoot)}
 
 	signers := opts.GetCertificateIdentities()
 	if signers != nil && len(signers.Identities) > 0 {
