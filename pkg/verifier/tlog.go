@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/x509"
 	"encoding/hex"
-	"encoding/pem"
 	"errors"
 	"fmt"
 
@@ -67,7 +65,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}
 
-			client, verifier, err := getRekorClient(tlogVerifier.BaseURL)
+			client, verifier, err := getRekorClient(tlogVerifier.BaseURL, tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 			if err != nil {
 				return err
 			}
@@ -130,28 +128,13 @@ func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedRoot, threshold 
 	}
 }
 
-func getRekorClient(baseURL string) (*rekorGeneratedClient.Rekor, *signature.Verifier, error) {
+func getRekorClient(baseURL string, publicKey crypto.PublicKey, hashFunc crypto.Hash) (*rekorGeneratedClient.Rekor, *signature.Verifier, error) {
 	client, err := rekorClient.GetRekorClient(baseURL)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	keyResp, err := client.Pubkey.GetPublicKey(nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	block, _ := pem.Decode([]byte(keyResp.Payload))
-	if block == nil {
-		return nil, nil, errors.New("failed to decode public key of server")
-	}
-
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	verifier, err := signature.LoadVerifier(pub, crypto.SHA256)
+	verifier, err := signature.LoadVerifier(publicKey, hashFunc)
 	if err != nil {
 		return nil, nil, err
 	}

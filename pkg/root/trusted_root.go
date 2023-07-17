@@ -42,8 +42,11 @@ type TlogVerifier struct {
 	ID                  []byte
 	ValidityPeriodStart time.Time
 	ValidityPeriodEnd   time.Time
-	HashFunc            crypto.Hash
-	PublicKey           crypto.PublicKey
+	// This is the hash algorithm used by the Merkle tree
+	HashFunc  crypto.Hash
+	PublicKey crypto.PublicKey
+	// The hash algorithm used during signature creation
+	SignatureHashFunc crypto.Hash
 }
 
 func (tr *ParsedTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
@@ -104,6 +107,14 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			return nil, fmt.Errorf("tlog missing public key raw bytes")
 		}
 
+		var hashFunc crypto.Hash
+		switch tlog.GetHashAlgorithm() {
+		case protocommon.HashAlgorithm_SHA2_256:
+			hashFunc = crypto.SHA256
+		default:
+			return nil, fmt.Errorf("unsupported hash function for the tlog")
+		}
+
 		switch tlog.GetPublicKey().GetKeyDetails() {
 		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256:
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
@@ -116,10 +127,11 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
 			}
 			tlogVerifiers[encodedKeyID] = &TlogVerifier{
-				BaseURL:   tlog.GetBaseUrl(),
-				ID:        tlog.GetLogId().GetKeyId(),
-				HashFunc:  crypto.SHA256,
-				PublicKey: ecKey,
+				BaseURL:           tlog.GetBaseUrl(),
+				ID:                tlog.GetLogId().GetKeyId(),
+				HashFunc:          hashFunc,
+				PublicKey:         ecKey,
+				SignatureHashFunc: crypto.SHA256,
 			}
 			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 				if validFor.GetStart() != nil {
