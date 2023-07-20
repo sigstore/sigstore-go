@@ -2,6 +2,7 @@ package tlog
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -23,6 +24,8 @@ import (
 	"github.com/sigstore/rekor/pkg/types"
 	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
+	rekorVerify "github.com/sigstore/rekor/pkg/verify"
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Entry struct {
@@ -42,7 +45,7 @@ type RekorPayload struct {
 
 var ErrNilValue = errors.New("validation error: nil value in transaction log entry")
 
-func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, signedEntryTimestamp []byte) (*Entry, error) {
+func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, signedEntryTimestamp []byte, inclusionProof *models.InclusionProof) (*Entry, error) {
 	pe, err := models.UnmarshalProposedEntry(bytes.NewReader(body), runtime.JSONConsumer())
 	if err != nil {
 		return nil, err
@@ -51,7 +54,8 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 	if err != nil {
 		return nil, err
 	}
-	return &Entry{
+
+	entry := &Entry{
 		rekorEntry: rekorEntry,
 		logEntryAnon: models.LogEntryAnon{
 			Body:           base64.StdEncoding.EncodeToString(body),
@@ -62,7 +66,15 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 		signedEntryTimestamp: signedEntryTimestamp,
 		kind:                 pe.Kind(),
 		version:              rekorEntry.APIVersion(),
-	}, nil
+	}
+
+	if inclusionProof != nil {
+		entry.logEntryAnon.Verification = &models.LogEntryAnonVerification{
+			InclusionProof: inclusionProof,
+		}
+	}
+
+	return entry, nil
 }
 
 // ParseEntry decodes the entry bytes to a specific entry type (types.EntryImpl).
@@ -73,12 +85,36 @@ func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 		protoEntry.LogIndex == 0 ||
 		protoEntry.LogId == nil ||
 		protoEntry.LogId.KeyId == nil ||
-		protoEntry.KindVersion == nil ||
-		protoEntry.InclusionPromise == nil ||
-		protoEntry.InclusionPromise.SignedEntryTimestamp == nil {
+		protoEntry.KindVersion == nil {
 		return nil, ErrNilValue
 	}
-	entry, err = NewEntry(protoEntry.CanonicalizedBody, protoEntry.IntegratedTime, protoEntry.LogIndex, protoEntry.LogId.KeyId, protoEntry.InclusionPromise.SignedEntryTimestamp)
+
+	signedEntryTimestamp := []byte{}
+	if protoEntry.InclusionPromise != nil && protoEntry.InclusionPromise.SignedEntryTimestamp != nil {
+		signedEntryTimestamp = protoEntry.InclusionPromise.SignedEntryTimestamp
+	}
+
+	var inclusionProof *models.InclusionProof
+
+	if protoEntry.InclusionProof != nil {
+		var hashes []string
+
+		for _, v := range protoEntry.InclusionProof.Hashes {
+			hashes = append(hashes, hex.EncodeToString(v))
+		}
+
+		rootHash := hex.EncodeToString(protoEntry.InclusionProof.RootHash)
+
+		inclusionProof = &models.InclusionProof{
+			LogIndex:   swag.Int64(protoEntry.InclusionProof.LogIndex),
+			RootHash:   &rootHash,
+			TreeSize:   swag.Int64(protoEntry.InclusionProof.TreeSize),
+			Hashes:     hashes,
+			Checkpoint: swag.String(protoEntry.InclusionProof.Checkpoint.Envelope),
+		}
+	}
+
+	entry, err = NewEntry(protoEntry.CanonicalizedBody, protoEntry.IntegratedTime, protoEntry.LogIndex, protoEntry.LogId.KeyId, signedEntryTimestamp, inclusionProof)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +189,28 @@ func (entry *Entry) LogKeyID() string {
 
 func (entry *Entry) LogIndex() int64 {
 	return *entry.logEntryAnon.LogIndex
+}
+
+func (entry *Entry) HasInclusionPromise() bool {
+	return entry.signedEntryTimestamp != nil
+}
+
+func (entry *Entry) HasInclusionProof() bool {
+	return entry.logEntryAnon.Verification != nil
+}
+
+func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {
+	err := rekorVerify.VerifyInclusion(context.TODO(), &entry.logEntryAnon)
+	if err != nil {
+		return err
+	}
+
+	err = rekorVerify.VerifyCheckpointSignature(&entry.logEntryAnon, verifier)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func VerifySET(entry *Entry, verifiers map[string]*root.TlogVerifier) error {

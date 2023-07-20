@@ -35,14 +35,41 @@ func ErrValidationError(err error) error {
 
 type ProtobufBundle struct {
 	*protobundle.Bundle
+	hasInclusionPromise bool
+	hasInclusionProof   bool
 }
 
 func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
-	if pbundle.MediaType != SigstoreBundleMediaType01 {
-		return nil, ErrIncorrectMediaType
+	bundle := &ProtobufBundle{
+		Bundle:              pbundle,
+		hasInclusionPromise: false,
+		hasInclusionProof:   false,
 	}
+
+	err := bundle.validate()
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: Add support for bundle v0.2
-	return &ProtobufBundle{Bundle: pbundle}, nil
+	return bundle, nil
+}
+
+func (b *ProtobufBundle) validate() error {
+	if b.Bundle.MediaType != SigstoreBundleMediaType01 {
+		return ErrIncorrectMediaType
+	}
+
+	_, err := b.TlogEntries()
+	if err != nil {
+		return err
+	}
+
+	if !b.hasInclusionPromise {
+		return errors.New("inclusion promises missing in bundle (required for bundle v0.1)")
+	}
+
+	return nil
 }
 
 func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
@@ -73,8 +100,9 @@ func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if b.Bundle.MediaType != SigstoreBundleMediaType01 {
-		return ErrIncorrectMediaType
+	err = b.validate()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -118,6 +146,14 @@ func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
 	}
 }
 
+func (b *ProtobufBundle) HasInclusionPromise() bool {
+	return b.hasInclusionPromise
+}
+
+func (b *ProtobufBundle) HasInclusionProof() bool {
+	return b.hasInclusionProof
+}
+
 func (b *ProtobufBundle) TlogEntries() ([]*tlog.Entry, error) {
 	if b.VerificationMaterial == nil {
 		return nil, nil
@@ -129,6 +165,13 @@ func (b *ProtobufBundle) TlogEntries() ([]*tlog.Entry, error) {
 		tlogEntries[i], err = tlog.ParseEntry(entry)
 		if err != nil {
 			return nil, ErrValidationError(err)
+		}
+
+		if tlogEntries[i].HasInclusionPromise() {
+			b.hasInclusionPromise = true
+		}
+		if tlogEntries[i].HasInclusionProof() {
+			b.hasInclusionProof = true
 		}
 	}
 

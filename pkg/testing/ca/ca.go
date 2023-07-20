@@ -223,7 +223,7 @@ func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set)
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil)
 }
 
 func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte) (string, error) {
@@ -355,6 +355,14 @@ type TestEntity struct {
 
 func (e *TestEntity) VerificationContent() (bundle.VerificationContent, error) {
 	return &bundle.CertificateChain{Certificates: e.certChain}, nil
+}
+
+func (e *TestEntity) HasInclusionPromise() bool {
+	return true
+}
+
+func (e *TestEntity) HasInclusionProof() bool {
+	return false
 }
 
 func (e *TestEntity) SignatureContent() (bundle.SignatureContent, error) {

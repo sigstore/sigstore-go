@@ -53,9 +53,29 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		}
 
 		if !p.online {
-			err = tlog.VerifySET(entry, p.trustedRoot.TlogVerifiers())
-			if err != nil {
-				return err
+			if entry.HasInclusionPromise() {
+				err = tlog.VerifySET(entry, p.trustedRoot.TlogVerifiers())
+				if err != nil {
+					return err
+				}
+			}
+			if entity.HasInclusionProof() {
+				keyID := entry.LogKeyID()
+				hex64Key := hex.EncodeToString([]byte(keyID))
+				tlogVerifier, ok := p.trustedRoot.TlogVerifiers()[hex64Key]
+				if !ok {
+					return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+				}
+
+				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
+				if err != nil {
+					return err
+				}
+
+				err = tlog.VerifyInclusion(entry, *verifier)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			keyID := entry.LogKeyID()
@@ -65,7 +85,11 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}
 
-			client, verifier, err := getRekorClient(tlogVerifier.BaseURL, tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
+			client, err := getRekorClient(tlogVerifier.BaseURL)
+			if err != nil {
+				return err
+			}
+			verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 			if err != nil {
 				return err
 			}
@@ -128,16 +152,20 @@ func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedRoot, threshold 
 	}
 }
 
-func getRekorClient(baseURL string, publicKey crypto.PublicKey, hashFunc crypto.Hash) (*rekorGeneratedClient.Rekor, *signature.Verifier, error) {
-	client, err := rekorClient.GetRekorClient(baseURL)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.Verifier, error) {
 	verifier, err := signature.LoadVerifier(publicKey, hashFunc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return client, &verifier, nil
+	return &verifier, nil
+}
+
+func getRekorClient(baseURL string) (*rekorGeneratedClient.Rekor, error) {
+	client, err := rekorClient.GetRekorClient(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }

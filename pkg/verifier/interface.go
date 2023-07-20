@@ -11,6 +11,14 @@ import (
 
 var errNotImplemented = errors.New("not implemented")
 
+type HasInclusionPromise interface {
+	HasInclusionPromise() bool
+}
+
+type HasInclusionProof interface {
+	HasInclusionProof() bool
+}
+
 type KeyIDProvider interface {
 	KeyID() (string, error)
 }
@@ -36,6 +44,8 @@ type Verifier interface {
 }
 
 type SignedEntity interface {
+	HasInclusionPromise
+	HasInclusionProof
 	KeyIDProvider
 	SignatureProvider
 	SignedTimestampProvider
