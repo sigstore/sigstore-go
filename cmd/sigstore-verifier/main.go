@@ -15,6 +15,7 @@ var expectedOIDC *string
 var expectedSAN *string
 var requireTSA *bool
 var requireTlog *bool
+var minBundleVersion *string
 var onlineTlog *bool
 var trustedrootJSONpath *string
 var tufRootURL *string
@@ -25,6 +26,7 @@ func init() {
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	requireTSA = flag.Bool("requireTSA", false, "Require RFC 3161 signed timestamp")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
+	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
 	onlineTlog = flag.Bool("onlineTlog", false, "Verify Artifact Transparency log entry online (Rekor)")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
@@ -46,6 +48,13 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	if *minBundleVersion != "" {
+		if !b.MinVersion(*minBundleVersion) {
+			fmt.Printf("bundle is not of minimum version %s\n", *minBundleVersion)
+			os.Exit(1)
+		}
 	}
 
 	opts := verifier.GetDefaultOptions()

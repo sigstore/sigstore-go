@@ -7,17 +7,21 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
+	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/github/sigstore-verifier/pkg/tlog"
 )
 
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
+const SigstoreBundleMediaType02 = "application/vnd.dev.sigstore.bundle+json;version=0.2"
 const IntotoMediaType = "application/vnd.in-toto+json"
 
 var ErrValidation = errors.New("validation error")
@@ -51,22 +55,26 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
 		return nil, err
 	}
 
-	// TODO: Add support for bundle v0.2
 	return bundle, nil
 }
 
 func (b *ProtobufBundle) validate() error {
-	if b.Bundle.MediaType != SigstoreBundleMediaType01 {
-		return ErrIncorrectMediaType
-	}
-
 	_, err := b.TlogEntries()
 	if err != nil {
 		return err
 	}
 
-	if !b.hasInclusionPromise {
-		return errors.New("inclusion promises missing in bundle (required for bundle v0.1)")
+	switch b.Bundle.MediaType {
+	case SigstoreBundleMediaType01:
+		if !b.hasInclusionPromise {
+			return errors.New("inclusion promises missing in bundle (required for bundle v0.1)")
+		}
+	case SigstoreBundleMediaType02:
+		if !b.hasInclusionProof {
+			return errors.New("inclusion proof missing in bundle (required for bundle v0.2)")
+		}
+	default:
+		return ErrIncorrectMediaType
 	}
 
 	return nil
@@ -262,6 +270,15 @@ func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
 		return nil, ErrDecodingJSON
 	}
 	return statement, nil
+}
+
+func (b *ProtobufBundle) MinVersion(version string) bool {
+	mediaTypeParts := strings.Split(b.Bundle.MediaType, "version=")
+	if len(mediaTypeParts) < 2 {
+		return false
+	}
+
+	return semver.Compare("v"+mediaTypeParts[1], "v"+version) >= 0
 }
 
 func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {

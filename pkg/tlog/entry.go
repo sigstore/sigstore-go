@@ -63,9 +63,12 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 			LogIndex:       swag.Int64(logIndex),
 			LogID:          swag.String(string(logID)),
 		},
-		signedEntryTimestamp: signedEntryTimestamp,
-		kind:                 pe.Kind(),
-		version:              rekorEntry.APIVersion(),
+		kind:    pe.Kind(),
+		version: rekorEntry.APIVersion(),
+	}
+
+	if len(signedEntryTimestamp) > 0 {
+		entry.signedEntryTimestamp = signedEntryTimestamp
 	}
 
 	if inclusionProof != nil {
