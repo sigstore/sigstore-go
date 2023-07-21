@@ -5,8 +5,8 @@ import (
 )
 
 type CertificateTransparencyLogVerifier struct {
-	trustedRoot root.TrustedMaterial
-	threshold   int
+	trustedMaterial root.TrustedMaterial
+	threshold       int
 }
 
 func (p *CertificateTransparencyLogVerifier) Verify(_ SignedEntity) error {
@@ -14,9 +14,9 @@ func (p *CertificateTransparencyLogVerifier) Verify(_ SignedEntity) error {
 	return nil
 }
 
-func NewCertificateTransparencyLogVerifier(trustedRoot root.TrustedMaterial, threshold int) *CertificateTransparencyLogVerifier {
+func NewCertificateTransparencyLogVerifier(trustedMaterial root.TrustedMaterial, threshold int) *CertificateTransparencyLogVerifier {
 	return &CertificateTransparencyLogVerifier{
-		trustedRoot: trustedRoot,
-		threshold:   threshold,
+		trustedMaterial: trustedMaterial,
+		threshold:       threshold,
 	}
 }

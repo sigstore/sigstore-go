@@ -20,9 +20,9 @@ import (
 )
 
 type ArtifactTransparencyLogVerifier struct {
-	trustedRoot root.TrustedMaterial
-	threshold   int
-	online      bool
+	trustedMaterial root.TrustedMaterial
+	threshold       int
+	online          bool
 }
 
 func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
@@ -54,7 +54,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 
 		if !p.online {
 			if entry.HasInclusionPromise() {
-				err = tlog.VerifySET(entry, p.trustedRoot.TlogVerifiers())
+				err = tlog.VerifySET(entry, p.trustedMaterial.TlogVerifiers())
 				if err != nil {
 					return err
 				}
@@ -62,7 +62,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
 				hex64Key := hex.EncodeToString([]byte(keyID))
-				tlogVerifier, ok := p.trustedRoot.TlogVerifiers()[hex64Key]
+				tlogVerifier, ok := p.trustedMaterial.TlogVerifiers()[hex64Key]
 				if !ok {
 					return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 				}
@@ -80,7 +80,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
-			tlogVerifier, ok := p.trustedRoot.TlogVerifiers()[hex64Key]
+			tlogVerifier, ok := p.trustedMaterial.TlogVerifiers()[hex64Key]
 			if !ok {
 				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}
@@ -129,14 +129,14 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		}
 
 		// Ensure entry certificate matches bundle certificate
-		if !verificationContent.CompareKey(entry.Certificate(), p.trustedRoot) {
+		if !verificationContent.CompareKey(entry.Certificate(), p.trustedMaterial) {
 			return errors.New("transparency log certificate does not match")
 		}
 
 		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
-		if !verificationContent.ValidAtTime(entry.IntegratedTime(), p.trustedRoot) {
+		if !verificationContent.ValidAtTime(entry.IntegratedTime(), p.trustedMaterial) {
 			return errors.New("Integrated time outside certificate validity")
 		}
 	}
@@ -144,11 +144,11 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 	return nil
 }
 
-func NewArtifactTransparencyLogVerifier(trustedRoot root.TrustedMaterial, threshold int, online bool) *ArtifactTransparencyLogVerifier {
+func NewArtifactTransparencyLogVerifier(trustedMaterial root.TrustedMaterial, threshold int, online bool) *ArtifactTransparencyLogVerifier {
 	return &ArtifactTransparencyLogVerifier{
-		trustedRoot: trustedRoot,
-		threshold:   threshold,
-		online:      online,
+		trustedMaterial: trustedMaterial,
+		threshold:       threshold,
+		online:          online,
 	}
 }
 

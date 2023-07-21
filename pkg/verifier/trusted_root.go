@@ -65,8 +65,8 @@ func GetDefaultOptions() *protoverification.ArtifactVerificationOptions {
 	}
 }
 
-func NewVerifier(trustedRoot root.TrustedMaterial, opts *protoverification.ArtifactVerificationOptions) *MultiVerifier {
-	verifiers := []Verifier{NewSignatureVerifier(trustedRoot)}
+func NewVerifier(trustedMaterial root.TrustedMaterial, opts *protoverification.ArtifactVerificationOptions) *MultiVerifier {
+	verifiers := []Verifier{NewSignatureVerifier(trustedMaterial)}
 
 	signers := opts.GetCertificateIdentities()
 	if signers != nil && len(signers.Identities) > 0 {
@@ -85,17 +85,17 @@ func NewVerifier(trustedRoot root.TrustedMaterial, opts *protoverification.Artif
 
 	if tsaOpts := opts.GetTsaOptions(); tsaOpts != nil {
 		if !tsaOpts.GetDisable() {
-			verifiers = append(verifiers, NewTimestampAuthorityVerifier(trustedRoot, int(tsaOpts.GetThreshold())))
+			verifiers = append(verifiers, NewTimestampAuthorityVerifier(trustedMaterial, int(tsaOpts.GetThreshold())))
 		}
 	}
 	if tlogOptions := opts.GetTlogOptions(); tlogOptions != nil {
 		if !tlogOptions.GetDisable() {
-			verifiers = append(verifiers, NewArtifactTransparencyLogVerifier(trustedRoot, int(tlogOptions.GetThreshold()), tlogOptions.GetPerformOnlineVerification()))
+			verifiers = append(verifiers, NewArtifactTransparencyLogVerifier(trustedMaterial, int(tlogOptions.GetThreshold()), tlogOptions.GetPerformOnlineVerification()))
 		}
 	}
 	if ctlogOptions := opts.GetCtlogOptions(); ctlogOptions != nil {
 		if !ctlogOptions.GetDisable() {
-			verifiers = append(verifiers, NewCertificateTransparencyLogVerifier(trustedRoot, int(ctlogOptions.GetThreshold())))
+			verifiers = append(verifiers, NewCertificateTransparencyLogVerifier(trustedMaterial, int(ctlogOptions.GetThreshold())))
 		}
 	}
 

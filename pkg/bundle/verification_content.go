@@ -42,7 +42,7 @@ func (cc *CertificateChain) ValidAtTime(t time.Time, _ root.TrustedMaterial) boo
 	return !(cc.Certificates[0].NotAfter.Before(t) || cc.Certificates[0].NotBefore.After(t))
 }
 
-func (cc *CertificateChain) Verify(sigContent SignatureContent, trustedRoot root.TrustedMaterial) error {
+func (cc *CertificateChain) Verify(sigContent SignatureContent, trustedMaterial root.TrustedMaterial) error {
 	verifier, err := signature.LoadVerifier(cc.Certificates[0].PublicKey, crypto.SHA256)
 	if err != nil {
 		return fmt.Errorf("invalid key: %w", err)
@@ -55,7 +55,7 @@ func (cc *CertificateChain) Verify(sigContent SignatureContent, trustedRoot root
 
 	leafCert := cc.Certificates[0]
 
-	for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
+	for _, ca := range trustedMaterial.FulcioCertificateAuthorities() {
 		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
 			continue
 		}

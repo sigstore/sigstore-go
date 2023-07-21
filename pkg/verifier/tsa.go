@@ -12,8 +12,8 @@ import (
 )
 
 type TimestampAuthorityVerifier struct {
-	trustedRoot root.TrustedMaterial
-	threshold   int
+	trustedMaterial root.TrustedMaterial
+	threshold       int
 }
 
 func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
@@ -29,7 +29,7 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
 
 	signatureBytes := sigContent.GetSignature()
 
-	certAuthorities := p.trustedRoot.TSACertificateAuthorities()
+	certAuthorities := p.trustedMaterial.TSACertificateAuthorities()
 
 	for _, timestamp := range signedTimestamps {
 		err = verifySignedTimestamp(timestamp, signatureBytes, certAuthorities)
@@ -91,9 +91,9 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, ce
 	return errors.New("Unable to verify signed timestamps")
 }
 
-func NewTimestampAuthorityVerifier(trustedRoot root.TrustedMaterial, threshold int) *TimestampAuthorityVerifier {
+func NewTimestampAuthorityVerifier(trustedMaterial root.TrustedMaterial, threshold int) *TimestampAuthorityVerifier {
 	return &TimestampAuthorityVerifier{
-		trustedRoot: trustedRoot,
-		threshold:   threshold,
+		trustedMaterial: trustedMaterial,
+		threshold:       threshold,
 	}
 }

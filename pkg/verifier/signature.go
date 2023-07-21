@@ -7,7 +7,7 @@ import (
 )
 
 type SignatureVerifier struct {
-	trustedRoot root.TrustedMaterial
+	trustedMaterial root.TrustedMaterial
 }
 
 func (p *SignatureVerifier) Verify(entity SignedEntity) error {
@@ -21,13 +21,13 @@ func (p *SignatureVerifier) Verify(entity SignedEntity) error {
 		return err
 	}
 
-	err = verificationContent.Verify(sigContent, p.trustedRoot)
+	err = verificationContent.Verify(sigContent, p.trustedMaterial)
 	return err
 }
 
-func NewSignatureVerifier(trustedRoot root.TrustedMaterial) *SignatureVerifier {
+func NewSignatureVerifier(trustedMaterial root.TrustedMaterial) *SignatureVerifier {
 	return &SignatureVerifier{
-		trustedRoot: trustedRoot,
+		trustedMaterial: trustedMaterial,
 	}
 }
 
