@@ -72,7 +72,17 @@ func NewTrustedPublicKeyMaterial(publicKeyVerifier func(string) (ValidityPeriodV
 	}
 }
 
-func NewTrustedPublicKeyMaterialWithMapping(trustedPublicKeys map[string]crypto.PublicKey) *TrustedPublicKeyMaterial {
+func NewTrustedPublicKeyMaterialFromPublicKey(pk crypto.PublicKey) *TrustedPublicKeyMaterial {
+	return NewTrustedPublicKeyMaterial(func(string) (ValidityPeriodVerifier, error) {
+		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		return &nonExpiringVerifier{verifier}, nil
+	})
+}
+
+func NewTrustedPublicKeyMaterialFromMapping(trustedPublicKeys map[string]crypto.PublicKey) *TrustedPublicKeyMaterial {
 	return NewTrustedPublicKeyMaterial(func(keyID string) (ValidityPeriodVerifier, error) {
 		pubKey, ok := trustedPublicKeys[keyID]
 		if !ok {

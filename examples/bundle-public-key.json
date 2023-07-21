@@ -1,0 +1,22 @@
+{
+  "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.1",
+  "verificationMaterial": {
+    "tlogEntries": [],
+    "timestampVerificationData": {
+      "rfc3161Timestamps": []
+    },
+    "publicKey": {
+      "hint": "9a76331edc1cfd3933040996615b1c06adbe6f9b4f11df4106dcceb66e3bdb1b"
+    }
+  },
+  "dsseEnvelope": {
+    "payload": "aGVsbG8sIHdvcmxkIQ==",
+    "payloadType": "text/plain",
+    "signatures": [
+      {
+        "sig": "MEUCICUhAVewfwKlk5fVzpRDUPhEw9O8I2pxC5nTnPfYDBsOAiEA0ZFqs99QgR9mAtFMWtWrOjmUC47zgaoolKIoLH/OwdM=",
+        "keyid": ""
+      }
+    ]
+  }
+}
