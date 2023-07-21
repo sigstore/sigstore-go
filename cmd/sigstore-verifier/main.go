@@ -89,7 +89,7 @@ func main() {
 		}
 	}
 
-	if len(trustedrootJSON) == 0 {
+	if len(trustedrootJSON) > 0 {
 		var trustedRoot *root.TrustedRoot
 		trustedRoot, err = root.NewTrustedRootFromJSON(trustedrootJSON)
 		if err != nil {

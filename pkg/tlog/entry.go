@@ -167,23 +167,30 @@ func (entry *Entry) Signature() []byte {
 	return []byte{}
 }
 
-func (entry *Entry) Certificate() *x509.Certificate {
-	var certPemString []byte
+func (entry *Entry) PublicKey() any {
+	var pemString []byte
 
 	switch e := entry.rekorEntry.(type) {
 	case *hashedrekord_v001.V001Entry:
-		certPemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
+		pemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
 	case *intoto_v002.V002Entry:
-		certPemString = []byte(*e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
+		pemString = []byte(*e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
 	}
 
-	certBlock, _ := pem.Decode(certPemString)
-	cert, err := x509.ParseCertificate(certBlock.Bytes)
+	certBlock, _ := pem.Decode(pemString)
+
+	var pk any
+	var err error
+
+	pk, err = x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
-		return nil
+		pk, err = x509.ParsePKIXPublicKey(certBlock.Bytes)
+		if err != nil {
+			return nil
+		}
 	}
 
-	return cert
+	return pk
 }
 
 func (entry *Entry) LogKeyID() string {

@@ -129,7 +129,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		}
 
 		// Ensure entry certificate matches bundle certificate
-		if !verificationContent.CompareKey(entry.Certificate(), p.trustedMaterial) {
+		if !verificationContent.CompareKey(entry.PublicKey(), p.trustedMaterial) {
 			return errors.New("transparency log certificate does not match")
 		}
 
