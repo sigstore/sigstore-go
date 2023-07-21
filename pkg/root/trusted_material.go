@@ -34,6 +34,8 @@ func (b *BaseTrustedMaterial) PublicKeyVerifier(_ string) (ValidityPeriodVerifie
 
 type TrustedMaterialCollection []TrustedMaterial
 
+// Ensure types implement interfaces
+var _ TrustedMaterial = &BaseTrustedMaterial{}
 var _ TrustedMaterial = TrustedMaterialCollection{}
 
 func (tmc TrustedMaterialCollection) PublicKeyVerifier(keyID string) (ValidityPeriodVerifier, error) {
