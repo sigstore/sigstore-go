@@ -57,45 +57,6 @@ func (tr *TrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
 	return tr.tlogAuthorities
 }
 
-type TrustedPublicKeyMaterial struct {
-	BaseTrustedMaterial
-	publicKeyVerifier func(string) (ValidityPeriodVerifier, error)
-}
-
-func (tr *TrustedPublicKeyMaterial) PublicKeyVerifier(keyID string) (ValidityPeriodVerifier, error) {
-	return tr.publicKeyVerifier(keyID)
-}
-
-func NewTrustedPublicKeyMaterial(publicKeyVerifier func(string) (ValidityPeriodVerifier, error)) *TrustedPublicKeyMaterial {
-	return &TrustedPublicKeyMaterial{
-		publicKeyVerifier: publicKeyVerifier,
-	}
-}
-
-func NewTrustedPublicKeyMaterialFromPublicKey(pk crypto.PublicKey) *TrustedPublicKeyMaterial {
-	return NewTrustedPublicKeyMaterial(func(string) (ValidityPeriodVerifier, error) {
-		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
-		if err != nil {
-			return nil, err
-		}
-		return &nonExpiringVerifier{verifier}, nil
-	})
-}
-
-func NewTrustedPublicKeyMaterialFromMapping(trustedPublicKeys map[string]crypto.PublicKey) *TrustedPublicKeyMaterial {
-	return NewTrustedPublicKeyMaterial(func(keyID string) (ValidityPeriodVerifier, error) {
-		pubKey, ok := trustedPublicKeys[keyID]
-		if !ok {
-			return nil, fmt.Errorf("public key not found for keyID: %s", keyID)
-		}
-		verifier, err := signature.LoadECDSAVerifier(pubKey.(*ecdsa.PublicKey), crypto.SHA256)
-		if err != nil {
-			return nil, err
-		}
-		return &nonExpiringVerifier{verifier}, nil
-	})
-}
-
 type nonExpiringVerifier struct {
 	signature.Verifier
 }

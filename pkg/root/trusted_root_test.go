@@ -23,10 +23,10 @@ func TestGetSigstoreTrustedRoot(t *testing.T) {
 
 type singleKeyVerifier struct {
 	BaseTrustedMaterial
-	verifier ValidityPeriodVerifier
+	verifier TimeConstrainedVerifier
 }
 
-func (f *singleKeyVerifier) PublicKeyVerifier(_ string) (ValidityPeriodVerifier, error) {
+func (f *singleKeyVerifier) PublicKeyVerifier(_ string) (TimeConstrainedVerifier, error) {
 	return f.verifier, nil
 }
 
