@@ -15,17 +15,19 @@ import (
 	"time"
 
 	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
-	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/types"
+	dsse_v001 "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
 	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
+
+	"github.com/github/sigstore-verifier/pkg/root"
 )
 
 type Entry struct {
@@ -131,6 +133,11 @@ func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 
 func ValidateEntry(entry *Entry) error {
 	switch e := entry.rekorEntry.(type) {
+	case *dsse_v001.V001Entry:
+		err := e.DSSEObj.Validate(strfmt.Default)
+		if err != nil {
+			return err
+		}
 	case *hashedrekord_v001.V001Entry:
 		err := e.HashedRekordObj.Validate(strfmt.Default)
 		if err != nil {
@@ -154,6 +161,12 @@ func (entry *Entry) IntegratedTime() time.Time {
 
 func (entry *Entry) Signature() []byte {
 	switch e := entry.rekorEntry.(type) {
+	case *dsse_v001.V001Entry:
+		sigBytes, err := base64.StdEncoding.DecodeString(*e.DSSEObj.Signatures[0].Signature)
+		if err != nil {
+			return []byte{}
+		}
+		return sigBytes
 	case *hashedrekord_v001.V001Entry:
 		return e.HashedRekordObj.Signature.Content
 	case *intoto_v002.V002Entry:
@@ -171,6 +184,8 @@ func (entry *Entry) PublicKey() any {
 	var pemString []byte
 
 	switch e := entry.rekorEntry.(type) {
+	case *dsse_v001.V001Entry:
+		certPemString = []byte(*e.DSSEObj.Signatures[0].Verifier)
 	case *hashedrekord_v001.V001Entry:
 		pemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
 	case *intoto_v002.V002Entry:
