@@ -185,7 +185,7 @@ func (entry *Entry) PublicKey() any {
 
 	switch e := entry.rekorEntry.(type) {
 	case *dsse_v001.V001Entry:
-		certPemString = []byte(*e.DSSEObj.Signatures[0].Verifier)
+		pemString = []byte(*e.DSSEObj.Signatures[0].Verifier)
 	case *hashedrekord_v001.V001Entry:
 		pemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
 	case *intoto_v002.V002Entry:
