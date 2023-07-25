@@ -10,7 +10,7 @@ import (
 type TrustedMaterial interface {
 	TSACertificateAuthorities() []CertificateAuthority
 	FulcioCertificateAuthorities() []CertificateAuthority
-	TlogVerifiers() map[string]*TlogVerifier
+	TlogAuthorities() map[string]*TlogAuthority
 	PublicKeyVerifier(string) (ValidityPeriodVerifier, error)
 }
 
@@ -24,8 +24,8 @@ func (b *BaseTrustedMaterial) FulcioCertificateAuthorities() []CertificateAuthor
 	return []CertificateAuthority{}
 }
 
-func (b *BaseTrustedMaterial) TlogVerifiers() map[string]*TlogVerifier {
-	return map[string]*TlogVerifier{}
+func (b *BaseTrustedMaterial) TlogAuthorities() map[string]*TlogAuthority {
+	return map[string]*TlogAuthority{}
 }
 
 func (b *BaseTrustedMaterial) PublicKeyVerifier(_ string) (ValidityPeriodVerifier, error) {
@@ -64,14 +64,14 @@ func (tmc TrustedMaterialCollection) FulcioCertificateAuthorities() []Certificat
 	return certAuthorities
 }
 
-func (tmc TrustedMaterialCollection) TlogVerifiers() map[string]*TlogVerifier {
-	tlogVerifiers := make(map[string]*TlogVerifier)
+func (tmc TrustedMaterialCollection) TlogAuthorities() map[string]*TlogAuthority {
+	tlogAuthorities := make(map[string]*TlogAuthority)
 	for _, tm := range tmc {
-		for keyID, tlogVerifier := range tm.TlogVerifiers() {
-			tlogVerifiers[keyID] = tlogVerifier
+		for keyID, tlogVerifier := range tm.TlogAuthorities() {
+			tlogAuthorities[keyID] = tlogVerifier
 		}
 	}
-	return tlogVerifiers
+	return tlogAuthorities
 }
 
 type ValidityPeriodChecker interface {

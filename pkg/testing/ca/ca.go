@@ -337,13 +337,13 @@ func (ca *VirtualSigstore) FulcioCertificateAuthorities() []root.CertificateAuth
 	return []root.CertificateAuthority{ca.fulcioCA}
 }
 
-func (ca *VirtualSigstore) TlogVerifiers() map[string]*root.TlogVerifier {
-	verifiers := make(map[string]*root.TlogVerifier)
+func (ca *VirtualSigstore) TlogAuthorities() map[string]*root.TlogAuthority {
+	verifiers := make(map[string]*root.TlogAuthority)
 	logID, err := getLogID(ca.rekorKey.Public())
 	if err != nil {
 		panic(err)
 	}
-	verifiers[logID] = &root.TlogVerifier{
+	verifiers[logID] = &root.TlogAuthority{
 		BaseURL:             "test",
 		ID:                  []byte(logID),
 		ValidityPeriodStart: time.Now().Add(-time.Hour),

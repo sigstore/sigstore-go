@@ -54,7 +54,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 
 		if !p.online {
 			if entry.HasInclusionPromise() {
-				err = tlog.VerifySET(entry, p.trustedMaterial.TlogVerifiers())
+				err = tlog.VerifySET(entry, p.trustedMaterial.TlogAuthorities())
 				if err != nil {
 					return err
 				}
@@ -62,7 +62,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
 				hex64Key := hex.EncodeToString([]byte(keyID))
-				tlogVerifier, ok := p.trustedMaterial.TlogVerifiers()[hex64Key]
+				tlogVerifier, ok := p.trustedMaterial.TlogAuthorities()[hex64Key]
 				if !ok {
 					return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 				}
@@ -80,7 +80,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
-			tlogVerifier, ok := p.trustedMaterial.TlogVerifiers()[hex64Key]
+			tlogVerifier, ok := p.trustedMaterial.TlogAuthorities()[hex64Key]
 			if !ok {
 				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}

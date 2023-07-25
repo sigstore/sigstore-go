@@ -20,7 +20,7 @@ const TrustedRootMediaType01 = "application/vnd.dev.sigstore.trustedroot+json;ve
 type TrustedRoot struct {
 	BaseTrustedMaterial
 	trustedRoot           *prototrustroot.TrustedRoot
-	tlogVerifiers         map[string]*TlogVerifier
+	tlogAuthorities       map[string]*TlogAuthority
 	fulcioCertAuthorities []CertificateAuthority
 	tsaCertAuthorities    []CertificateAuthority
 }
@@ -33,7 +33,7 @@ type CertificateAuthority struct {
 	ValidityPeriodEnd   time.Time
 }
 
-type TlogVerifier struct {
+type TlogAuthority struct {
 	BaseURL             string
 	ID                  []byte
 	ValidityPeriodStart time.Time
@@ -53,8 +53,8 @@ func (tr *TrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 	return tr.fulcioCertAuthorities
 }
 
-func (tr *TrustedRoot) TlogVerifiers() map[string]*TlogVerifier {
-	return tr.tlogVerifiers
+func (tr *TrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
+	return tr.tlogAuthorities
 }
 
 type TrustedPublicKeyMaterial struct {
@@ -110,7 +110,7 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 	}
 
 	trustedRoot = &TrustedRoot{trustedRoot: protobufTrustedRoot}
-	trustedRoot.tlogVerifiers, err = ParseTlogVerifiers(protobufTrustedRoot)
+	trustedRoot.tlogAuthorities, err = ParseTlogAuthorities(protobufTrustedRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +130,8 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 	return trustedRoot, nil
 }
 
-func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers map[string]*TlogVerifier, err error) {
-	tlogVerifiers = make(map[string]*TlogVerifier)
+func ParseTlogAuthorities(trustedRoot *prototrustroot.TrustedRoot) (tlogAuthorities map[string]*TlogAuthority, err error) {
+	tlogAuthorities = make(map[string]*TlogAuthority)
 	for _, tlog := range trustedRoot.GetTlogs() {
 		if tlog.GetHashAlgorithm() != protocommon.HashAlgorithm_SHA2_256 {
 			return nil, fmt.Errorf("unsupported tlog hash algorithm: %s", tlog.GetHashAlgorithm())
@@ -170,7 +170,7 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
 				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
 			}
-			tlogVerifiers[encodedKeyID] = &TlogVerifier{
+			tlogAuthorities[encodedKeyID] = &TlogAuthority{
 				BaseURL:           tlog.GetBaseUrl(),
 				ID:                tlog.GetLogId().GetKeyId(),
 				HashFunc:          hashFunc,
@@ -179,12 +179,12 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			}
 			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 				if validFor.GetStart() != nil {
-					tlogVerifiers[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
+					tlogAuthorities[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
 				} else {
 					return nil, fmt.Errorf("tlog missing public key validity period start time")
 				}
 				if validFor.GetEnd() != nil {
-					tlogVerifiers[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
+					tlogAuthorities[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
 				}
 			} else {
 				return nil, fmt.Errorf("tlog missing public key validity period")
@@ -193,7 +193,7 @@ func ParseTlogVerifiers(trustedRoot *prototrustroot.TrustedRoot) (tlogVerifiers 
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
 	}
-	return tlogVerifiers, nil
+	return tlogAuthorities, nil
 }
 
 func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (certificateAuthorities []CertificateAuthority, err error) {
