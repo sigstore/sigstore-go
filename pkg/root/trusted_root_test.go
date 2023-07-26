@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,14 @@ type singleKeyVerifier struct {
 
 func (f *singleKeyVerifier) PublicKeyVerifier(_ string) (TimeConstrainedVerifier, error) {
 	return f.verifier, nil
+}
+
+type nonExpiringVerifier struct {
+	signature.Verifier
+}
+
+func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
+	return true
 }
 
 func TestTrustedMaterialCollection(t *testing.T) {

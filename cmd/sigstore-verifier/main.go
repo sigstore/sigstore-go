@@ -1,16 +1,20 @@
 package main
 
 import (
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tuf"
 	"github.com/github/sigstore-verifier/pkg/verifier"
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 var expectedOIDC *string
@@ -114,7 +118,7 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		trustedMaterial = append(trustedMaterial, root.NewTrustedPublicKeyMaterialFromPublicKey(pubKey))
+		trustedMaterial = append(trustedMaterial, trustedPublicKeyMaterial(pubKey))
 	}
 
 	if len(trustedMaterial) == 0 {
@@ -130,4 +134,22 @@ func main() {
 	}
 
 	fmt.Println("Verification successful!")
+}
+
+type nonExpiringVerifier struct {
+	signature.Verifier
+}
+
+func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
+	return true
+}
+
+func trustedPublicKeyMaterial(pk crypto.PublicKey) *root.TrustedPublicKeyMaterial {
+	return root.NewTrustedPublicKeyMaterial(func(string) (root.TimeConstrainedVerifier, error) {
+		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		return &nonExpiringVerifier{verifier}, nil
+	})
 }

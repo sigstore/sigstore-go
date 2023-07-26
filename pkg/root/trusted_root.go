@@ -11,7 +11,6 @@ import (
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
-	"github.com/sigstore/sigstore/pkg/signature"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -55,14 +54,6 @@ func (tr *TrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 
 func (tr *TrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
 	return tr.tlogAuthorities
-}
-
-type nonExpiringVerifier struct {
-	signature.Verifier
-}
-
-func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
-	return true
 }
 
 func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot) (trustedRoot *TrustedRoot, err error) {

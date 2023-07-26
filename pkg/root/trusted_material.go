@@ -1,8 +1,6 @@
 package root
 
 import (
-	"crypto"
-	"crypto/ecdsa"
 	"fmt"
 	"time"
 
@@ -98,16 +96,6 @@ func NewTrustedPublicKeyMaterial(publicKeyVerifier func(string) (TimeConstrained
 	return &TrustedPublicKeyMaterial{
 		publicKeyVerifier: publicKeyVerifier,
 	}
-}
-
-func NewTrustedPublicKeyMaterialFromPublicKey(pk crypto.PublicKey) *TrustedPublicKeyMaterial {
-	return NewTrustedPublicKeyMaterial(func(string) (TimeConstrainedVerifier, error) {
-		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
-		if err != nil {
-			return nil, err
-		}
-		return &nonExpiringVerifier{verifier}, nil
-	})
 }
 
 // ExpiringKey is a TimeConstrainedVerifier with a static validity period.
