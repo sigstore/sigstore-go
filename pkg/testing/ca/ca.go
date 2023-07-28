@@ -125,7 +125,7 @@ func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Cert
 	if err != nil {
 		return nil, nil, err
 	}
-	leafCert, err := GenerateLeafCert(identity, issuer, time.Now().Add(5*time.Minute), privKey, ca.fulcioCA.Intermediates[0], ca.fulcioIntermediateKey)
+	leafCert, err := GenerateLeafCert(identity, issuer, time.Now(), privKey, ca.fulcioCA.Intermediates[0], ca.fulcioIntermediateKey)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -8,6 +8,7 @@ import (
 
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
+	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
@@ -29,10 +30,13 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
 
 	signatureBytes := sigContent.GetSignature()
 
-	certAuthorities := p.trustedMaterial.TSACertificateAuthorities()
+	verificationContent, err := entity.VerificationContent()
+	if err != nil {
+		return err
+	}
 
 	for _, timestamp := range signedTimestamps {
-		err = verifySignedTimestamp(timestamp, signatureBytes, certAuthorities)
+		err = verifySignedTimestamp(timestamp, signatureBytes, p.trustedMaterial, verificationContent)
 		if err != nil {
 			return errors.New("unable to verify timestamp")
 		}
@@ -40,7 +44,9 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
 	return nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, certAuthorities []root.CertificateAuthority) error {
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent bundle.VerificationContent) error {
+	certAuthorities := trustedMaterial.TSACertificateAuthorities()
+
 	// Iterate through TSA certificate authorities to find one that verifies
 	for _, ca := range certAuthorities {
 		trustedRootVerificationOptions := tsaverification.VerifyOpts{
@@ -81,6 +87,11 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, ce
 			continue
 		}
 		if !ca.ValidityPeriodEnd.IsZero() && timestamp.Time.After(ca.ValidityPeriodEnd) {
+			continue
+		}
+
+		// Check tlog entry time against bundle certificates
+		if !verificationContent.ValidAtTime(timestamp.Time, trustedMaterial) {
 			continue
 		}
 
