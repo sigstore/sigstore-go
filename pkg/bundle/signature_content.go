@@ -5,7 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"log"
+	"errors"
 
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -14,7 +14,7 @@ import (
 )
 
 type SignatureContent interface {
-	EnsureFileMatchesDigest([]byte)
+	EnsureFileMatchesDigest([]byte) error
 	CheckSignature(signature.Verifier) error
 	GetSignature() []byte
 }
@@ -29,21 +29,23 @@ type Envelope struct {
 	*dsse.Envelope
 }
 
-func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) {
+func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {
 	if m.DigestAlgorithm != "SHA2_256" {
-		log.Fatal("Message has unsupported hash algorithm")
+		return errors.New("Message has unsupported hash algorithm")
 	}
 
 	fileDigest := sha256.Sum256(fileBytes)
 	if !bytes.Equal(m.Digest, fileDigest[:]) {
-		log.Fatal("Message signature does not match supplied file")
+		return errors.New("Message signature does not match supplied file")
 	}
+	return nil
 }
 
-func (e *Envelope) EnsureFileMatchesDigest(fileBytes []byte) {
+func (e *Envelope) EnsureFileMatchesDigest(fileBytes []byte) error {
 	if e.Payload != base64.StdEncoding.EncodeToString(fileBytes) {
-		log.Fatal("Envelope payload does not match supplied file")
+		return errors.New("Envelope payload does not match supplied file")
 	}
+	return nil
 }
 
 func (m *MessageSignature) CheckSignature(verifier signature.Verifier) error {
