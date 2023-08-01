@@ -2,6 +2,12 @@ name: Conformance Tests
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -20,6 +26,7 @@ jobs:
 
       - run: go build -o conformance cmd/conformance/main.go
 
-      - uses: sigstore/sigstore-conformance@main # so we can get `test_bundle.py`
+      - uses: sigstore/sigstore-conformance@main # maybe we should pin this in the future, once sigstore-conformace development slows down?
         with:
           entrypoint: ${{ github.workspace }}/conformance
+          skip-signing: true

@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
+	"runtime"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/github/sigstore-verifier/pkg/tuf"
 	"github.com/github/sigstore-verifier/pkg/verifier"
 )
 
@@ -116,7 +119,19 @@ func main() {
 		}
 
 		// Load trust root
-		tr, err := root.NewTrustedRootFromPath("examples/trusted-root-public-good.json")
+		_, filename, _, ok := runtime.Caller(1)
+		if !ok {
+			log.Fatal("unable to get path")
+		}
+
+		tufDir := path.Join(path.Dir(filename), "tufdata")
+
+		trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		tr, err := root.NewTrustedRootFromJSON(trustedrootJSON)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -159,7 +174,19 @@ func main() {
 		}
 
 		// Load trust root
-		tr, err := root.NewTrustedRootFromPath("examples/trusted-root-public-good.json")
+		_, filename, _, ok := runtime.Caller(1)
+		if !ok {
+			log.Fatal("unable to get path")
+		}
+
+		tufDir := path.Join(path.Dir(filename), "tufdata")
+
+		trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		tr, err := root.NewTrustedRootFromJSON(trustedrootJSON)
 		if err != nil {
 			log.Fatal(err)
 		}
