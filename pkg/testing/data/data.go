@@ -23,6 +23,9 @@ func Unmarshal[T any](t *testing.T, data []byte) T {
 //go:embed sigstoreBundle.json
 var SigstoreBundleRaw []byte
 
+//go:embed sigstore.js@2.0.0-provenanceBundle.json
+var SigstoreJS200ProvenanceBundleRaw []byte
+
 func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
 	var b protobundle.Bundle
 	err := protojson.Unmarshal(raw, &b)
@@ -39,4 +42,8 @@ func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
 // SigstoreBundle returns a test *sigstore.Bundle
 func SigstoreBundle(t *testing.T) *bundle.ProtobufBundle {
 	return TestBundle(t, SigstoreBundleRaw)
+}
+
+func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.ProtobufBundle {
+	return TestBundle(t, SigstoreJS200ProvenanceBundleRaw)
 }
