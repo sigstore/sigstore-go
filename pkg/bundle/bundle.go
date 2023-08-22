@@ -59,18 +59,18 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
 }
 
 func (b *ProtobufBundle) validate() error {
-	_, err := b.TlogEntries()
+	entries, err := b.TlogEntries()
 	if err != nil {
 		return err
 	}
 
 	switch b.Bundle.MediaType {
 	case SigstoreBundleMediaType01:
-		if !b.hasInclusionPromise {
+		if len(entries) > 0 && !b.hasInclusionPromise {
 			return errors.New("inclusion promises missing in bundle (required for bundle v0.1)")
 		}
 	case SigstoreBundleMediaType02:
-		if !b.hasInclusionProof {
+		if len(entries) > 0 && !b.hasInclusionProof {
 			return errors.New("inclusion proof missing in bundle (required for bundle v0.2)")
 		}
 	default:
