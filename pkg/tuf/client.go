@@ -84,6 +84,7 @@ func GetTrustedrootJSON(tufRootURL, workPath string) (trustedrootJSON []byte, er
 		for hashfunc, hash := range trustedrootMeta.FileMeta.Hashes {
 			switch hashfunc {
 			case "sha512":
+				// Error out if hash length is invalid, otherwise it will panic when casting to [64]byte
 				if len(hash) != 64 {
 					return nil, fmt.Errorf("sha512 hash for %s is not 64 bytes", TrustedRootTUFPath)
 				}
