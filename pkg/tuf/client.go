@@ -1,8 +1,7 @@
 package tuf
 
 import (
-	"crypto/sha256"
-	"crypto/sha512"
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 
 	tufclient "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
+	tufdata "github.com/theupdateframework/go-tuf/data"
+	tufutil "github.com/theupdateframework/go-tuf/util"
 )
 
 //go:embed repository
@@ -18,6 +19,7 @@ var embeddedRepos embed.FS
 const TrustedRootTUFPath = "trusted_root.json"
 const RootTUFPath = "root.json"
 
+// Implementation of go-tuf/client.Destination interface
 type Writer struct {
 	Bytes []byte
 }
@@ -27,7 +29,8 @@ func (w *Writer) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (w Writer) Delete() error {
+func (w *Writer) Delete() error {
+	w = nil
 	return nil
 }
 
@@ -81,24 +84,8 @@ func GetTrustedrootJSON(tufRootURL, workPath string) (trustedrootJSON []byte, er
 
 	trustedroot, ok := tufMetaMap[TrustedRootTUFPath]
 	if ok {
-		for hashfunc, hash := range trustedrootMeta.FileMeta.Hashes {
-			switch hashfunc {
-			case "sha512":
-				// Error out if hash length is invalid, otherwise it will panic when casting to [64]byte
-				if len(hash) != 64 {
-					return nil, fmt.Errorf("sha512 hash for %s is not 64 bytes", TrustedRootTUFPath)
-				}
-				if sha512.Sum512([]byte(trustedroot)) == [64]byte(hash) {
-					return trustedroot, nil
-				}
-			case "sha256":
-				if len(hash) != 32 {
-					return nil, fmt.Errorf("sha256 hash for %s is not 32 bytes", TrustedRootTUFPath)
-				}
-				if sha256.Sum256([]byte(trustedroot)) == [32]byte(hash) {
-					return trustedroot, nil
-				}
-			}
+		if ok, _ := validTarget(trustedrootMeta, trustedroot); ok {
+			return trustedroot, nil
 		}
 	}
 
@@ -134,4 +121,17 @@ func checkEmbedded(tufRootURL string, fileJSONStore *filejsonstore.FileJSONStore
 	}
 
 	return root, nil
+}
+
+func validTarget(expected tufdata.TargetFileMeta, localTarget []byte) (bool, error) {
+	got, err := tufutil.GenerateTargetFileMeta(
+		bytes.NewReader(localTarget),
+		"sha256", "sha512")
+	if err != nil {
+		return false, err
+	}
+	if err = tufutil.TargetFileMetaEqual(got, expected); err != nil {
+		return false, err
+	}
+	return true, nil
 }
