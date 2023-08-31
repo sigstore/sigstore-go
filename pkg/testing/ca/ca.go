@@ -44,6 +44,7 @@ type VirtualSigstore struct {
 	tsaCA                 root.CertificateAuthority
 	tsaLeafKey            *ecdsa.PrivateKey
 	rekorKey              *ecdsa.PrivateKey
+	ctlogKey              *ecdsa.PrivateKey
 	publicKeyVerifier     map[string]root.TimeConstrainedVerifier
 }
 
@@ -83,6 +84,11 @@ func NewVirtualSigstore() (*VirtualSigstore, error) {
 	ss.tsaCA.ValidityPeriodEnd = time.Now().Add(time.Hour)
 
 	ss.rekorKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	ss.ctlogKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -350,6 +356,23 @@ func (ca *VirtualSigstore) TlogAuthorities() map[string]*root.TlogAuthority {
 		ValidityPeriodEnd:   time.Now().Add(time.Hour),
 		HashFunc:            crypto.SHA256,
 		PublicKey:           ca.rekorKey.Public(),
+	}
+	return verifiers
+}
+
+func (ca *VirtualSigstore) CTlogAuthorities() map[string]*root.TlogAuthority {
+	verifiers := make(map[string]*root.TlogAuthority)
+	logID, err := getLogID(ca.ctlogKey.Public())
+	if err != nil {
+		panic(err)
+	}
+	verifiers[logID] = &root.TlogAuthority{
+		BaseURL:             "test",
+		ID:                  []byte(logID),
+		ValidityPeriodStart: time.Now().Add(-time.Hour),
+		ValidityPeriodEnd:   time.Now().Add(time.Hour),
+		HashFunc:            crypto.SHA256,
+		PublicKey:           ca.ctlogKey.Public(),
 	}
 	return verifiers
 }

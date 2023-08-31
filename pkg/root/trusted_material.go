@@ -11,6 +11,7 @@ type TrustedMaterial interface {
 	TSACertificateAuthorities() []CertificateAuthority
 	FulcioCertificateAuthorities() []CertificateAuthority
 	TlogAuthorities() map[string]*TlogAuthority
+	CTlogAuthorities() map[string]*TlogAuthority
 	PublicKeyVerifier(string) (TimeConstrainedVerifier, error)
 }
 
@@ -25,6 +26,10 @@ func (b *BaseTrustedMaterial) FulcioCertificateAuthorities() []CertificateAuthor
 }
 
 func (b *BaseTrustedMaterial) TlogAuthorities() map[string]*TlogAuthority {
+	return map[string]*TlogAuthority{}
+}
+
+func (b *BaseTrustedMaterial) CTlogAuthorities() map[string]*TlogAuthority {
 	return map[string]*TlogAuthority{}
 }
 
@@ -68,6 +73,16 @@ func (tmc TrustedMaterialCollection) TlogAuthorities() map[string]*TlogAuthority
 	tlogAuthorities := make(map[string]*TlogAuthority)
 	for _, tm := range tmc {
 		for keyID, tlogVerifier := range tm.TlogAuthorities() {
+			tlogAuthorities[keyID] = tlogVerifier
+		}
+	}
+	return tlogAuthorities
+}
+
+func (tmc TrustedMaterialCollection) CTlogAuthorities() map[string]*TlogAuthority {
+	tlogAuthorities := make(map[string]*TlogAuthority)
+	for _, tm := range tmc {
+		for keyID, tlogVerifier := range tm.CTlogAuthorities() {
 			tlogAuthorities[keyID] = tlogVerifier
 		}
 	}

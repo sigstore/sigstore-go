@@ -9,9 +9,13 @@ type CertificateTransparencyLogVerifier struct {
 	threshold       int
 }
 
-func (p *CertificateTransparencyLogVerifier) Verify(_ SignedEntity) error {
-	// TODO CT verification
-	return nil
+func (p *CertificateTransparencyLogVerifier) Verify(entity SignedEntity) error {
+	verificationContent, err := entity.VerificationContent()
+	if err != nil {
+		return err
+	}
+
+	return verificationContent.VerifySCT(p.threshold, p.trustedMaterial)
 }
 
 func NewCertificateTransparencyLogVerifier(trustedMaterial root.TrustedMaterial, threshold int) *CertificateTransparencyLogVerifier {

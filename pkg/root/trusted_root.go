@@ -21,6 +21,7 @@ type TrustedRoot struct {
 	trustedRoot           *prototrustroot.TrustedRoot
 	tlogAuthorities       map[string]*TlogAuthority
 	fulcioCertAuthorities []CertificateAuthority
+	ctLogAuthorities      map[string]*TlogAuthority
 	tsaCertAuthorities    []CertificateAuthority
 }
 
@@ -56,13 +57,17 @@ func (tr *TrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
 	return tr.tlogAuthorities
 }
 
+func (tr *TrustedRoot) CTlogAuthorities() map[string]*TlogAuthority {
+	return tr.ctLogAuthorities
+}
+
 func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot) (trustedRoot *TrustedRoot, err error) {
 	if protobufTrustedRoot.GetMediaType() != TrustedRootMediaType01 {
 		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", protobufTrustedRoot.GetMediaType())
 	}
 
 	trustedRoot = &TrustedRoot{trustedRoot: protobufTrustedRoot}
-	trustedRoot.tlogAuthorities, err = ParseTlogAuthorities(protobufTrustedRoot)
+	trustedRoot.tlogAuthorities, err = ParseTlogAuthorities(protobufTrustedRoot.GetTlogs())
 	if err != nil {
 		return nil, err
 	}
@@ -77,14 +82,17 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 		return nil, err
 	}
 
-	// TODO: Handle CT logs (trustedRoot.Ctlogs)
+	trustedRoot.ctLogAuthorities, err = ParseTlogAuthorities(protobufTrustedRoot.GetCtlogs())
+	if err != nil {
+		return nil, err
+	}
 
 	return trustedRoot, nil
 }
 
-func ParseTlogAuthorities(trustedRoot *prototrustroot.TrustedRoot) (tlogAuthorities map[string]*TlogAuthority, err error) {
+func ParseTlogAuthorities(tlogs []*prototrustroot.TransparencyLogInstance) (tlogAuthorities map[string]*TlogAuthority, err error) {
 	tlogAuthorities = make(map[string]*TlogAuthority)
-	for _, tlog := range trustedRoot.GetTlogs() {
+	for _, tlog := range tlogs {
 		if tlog.GetHashAlgorithm() != protocommon.HashAlgorithm_SHA2_256 {
 			return nil, fmt.Errorf("unsupported tlog hash algorithm: %s", tlog.GetHashAlgorithm())
 		}
