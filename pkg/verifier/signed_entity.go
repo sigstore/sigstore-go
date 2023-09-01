@@ -1,0 +1,310 @@
+package verifier
+
+import (
+	"crypto/x509"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/github/sigstore-verifier/pkg/bundle"
+	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
+	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/in-toto/in-toto-golang/in_toto"
+)
+
+type SignedEntityVerifier struct {
+	trustedMaterial           root.TrustedMaterial
+	performOnlineVerification bool
+	weExpectSignedTimestamps  bool
+	signedTimestampThreshold  int
+	weExpectTlogEntries       bool
+	tlogEntriesThreshold      int
+	weExpectSCTs              bool
+}
+
+func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...func(*SignedEntityVerifier)) (*SignedEntityVerifier, error) {
+	v := &SignedEntityVerifier{
+		trustedMaterial: trustedMaterial,
+	}
+
+	for _, opt := range options {
+		opt(v)
+	}
+
+	err := v.ValidateObserverOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
+}
+
+func WithOnlineVerification() func(*SignedEntityVerifier) {
+	return func(v *SignedEntityVerifier) {
+		v.performOnlineVerification = true
+	}
+}
+
+func WithSignedTimestamps(thresholdArgs ...int) func(*SignedEntityVerifier) {
+	return func(v *SignedEntityVerifier) {
+		v.weExpectSignedTimestamps = true
+
+		if len(thresholdArgs) > 0 {
+			v.signedTimestampThreshold = thresholdArgs[0]
+		}
+
+		// can't enable signed ts checking with a threshold < 1
+		if v.signedTimestampThreshold < 1 {
+			v.signedTimestampThreshold = 1
+		}
+	}
+}
+
+func WithTransparencyLog(thresholdArgs ...int) func(*SignedEntityVerifier) {
+	return func(v *SignedEntityVerifier) {
+		v.weExpectTlogEntries = true
+
+		if len(thresholdArgs) > 0 {
+			v.tlogEntriesThreshold = thresholdArgs[0]
+		}
+
+		// can't enable tlogEntry checking with a threshold < 1
+		if v.tlogEntriesThreshold < 1 {
+			v.tlogEntriesThreshold = 1
+		}
+	}
+}
+
+func WithSignedCertificateTimestamps() func(*SignedEntityVerifier) {
+	return func(v *SignedEntityVerifier) {
+		v.weExpectSCTs = true
+	}
+}
+
+func (v *SignedEntityVerifier) ValidateObserverOptions() error {
+	if !v.weExpectSignedTimestamps && !v.weExpectTlogEntries {
+		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one, or both, of WithSignedTimestamps() or WithTransparencyLog()")
+	}
+
+	return nil
+}
+
+type VerificationResult struct {
+	Version            int                           `json:"version"`
+	Statement          *in_toto.Statement            `json:"statement,omitempty"`
+	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
+	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
+}
+
+type SignatureVerificationResult struct {
+	PublicKeyID *[]byte              `json:"publicKeyId,omitempty"`
+	Certificate *certificate.Summary `json:"certificate,omitempty"`
+}
+
+type TimestampVerificationResult struct {
+	Type      string    `json:"type"`
+	URI       string    `json:"uri"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func NewVerificationResult() *VerificationResult {
+	return &VerificationResult{
+		Version: 20230823,
+	}
+}
+
+// Verify checks the cryptographic integrity of a given SignedEntity according
+// to the options configured in the NewSignedEntityVerifier. Its purpose is to
+// determine whether the SignedEntity was created by a Sigstore deployment we
+// trust, as defined by keys in our TrustedMaterial.
+//
+// Verify then returns a VerificationResult struct whose contents' integrity
+// have been verified, and can be used by the caller to enforce additional
+// policy choices. For example, callers of this function SHOULD:
+//   - (if the signed entity has a certificate) verify that its Subject Alternate
+//     Name matches a trusted identity.
+//   - (if the signed entity has a dsse envelope) verify that the envelope's
+//     statement's subject matches the artifact being verified
+func (v *SignedEntityVerifier) Verify(entity SignedEntity) (*VerificationResult, error) {
+	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.msyyz1cr5bcs
+	// > ## Establishing a Time for the Signature
+	// > First, establish a time for the signature. This timestamp is required to validate the certificate chain, so this step comes first.
+
+	verifiedTimestamps, err := v.VerifyObserverTimestamps(entity)
+	if err != nil {
+		return nil, err
+	}
+
+	verificationContent, err := entity.VerificationContent()
+	if err != nil {
+		return nil, err
+	}
+
+	var signedWithCertificate bool
+	var certSummary certificate.Summary
+
+	// If the bundle was signed with a long-lived key, and does not have a Fulcio certificate,
+	// then skip the certificate verification steps
+	if cc, ok := verificationContent.(*bundle.CertificateChain); ok {
+		signedWithCertificate = true
+
+		// From spec:
+		// > ## Certificate
+		// > …
+		// > The Verifier MUST perform certification path validation (RFC 5280 §6) of the certificate chain with the pre-distributed Fulcio root certificate(s) as a trust anchor, but with a fake “current time.” If a timestamp from the timestamping service is available, the Verifier MUST perform path validation using the timestamp from the Timestamping Service. If a timestamp from the Transparency Service is available, the Verifier MUST perform path validation using the timestamp from the Transparency Service. If both are available, the Verifier performs path validation twice. If either fails, verification fails.
+
+		leafCert := cc.Certificates[0]
+
+		for _, verifiedTs := range verifiedTimestamps {
+			// verify the leaf certificate against the root
+			err = v.VerifyLeafCertificate(verifiedTs.Timestamp, leafCert)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// From spec:
+		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
+
+		if !v.performOnlineVerification && v.weExpectSCTs { // nolint:revive,staticcheck
+			// TODO: extract SCT
+			// TODO: verify SCT
+		}
+
+		certSummary, err = certificate.SummarizeCertificate(leafCert)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// From spec:
+	// > ## Signature Verification
+	// > The Verifier MUST verify the provided signature for the constructed payload against the key in the leaf of the certificate chain.
+
+	// TODO: if the SignatureContent is a MessageSignature, then we MUST provide the artifact []byte
+	// to its Verify function, because if it was signed with the ed25519 algo it won't work otherwise.
+	// At present we have punted figuring that out; we can't _always_ require the artifact, because
+	// in certain contexts we may not have access to the artifact. Something in this func signature
+	// will have to change, but what exactly is not clear yet.
+
+	sigContent, err := entity.SignatureContent()
+	if err != nil {
+		return nil, err
+	}
+
+	err = verificationContent.Verify(sigContent, v.trustedMaterial)
+	if err != nil {
+		return nil, err
+	}
+
+	// Hooray! We've verified all of the entity's constituent parts! 🎉 🥳
+	// Now we can construct the results object accordingly.
+	result := NewVerificationResult()
+	if signedWithCertificate {
+		result.Signature = &SignatureVerificationResult{
+			Certificate: &certSummary,
+		}
+	}
+
+	// SignatureContent can be either a bundle.Envelope or a MessageSignature.
+	// If it's an Envelope, let's pop the Statement for our results:
+	if envelope, ok := sigContent.(*bundle.Envelope); ok {
+		stmt, err := envelope.Statement()
+		if err != nil {
+			return nil, err
+		}
+
+		result.Statement = stmt
+	}
+
+	result.VerifiedTimestamps = verifiedTimestamps
+
+	return result, nil
+
+	// From ## Certificate section,
+	// >The Verifier MUST then check the certificate against the verification policy. Details on how to do this depend on the verification policy, but the Verifier SHOULD check the Issuer X.509 extension (OID 1.3.6.1.4.1.57264.1.1) at a minimum, and will in most cases check the SubjectAlternativeName as well. See  Spec: Fulcio §TODO for example checks on the certificate.
+	// Checking the X.509 OID Issuer and SubjectAlternativeName is left as an exercise for the caller of this function
+}
+
+// VerifyObserverTimestamps verifies TlogEntries and SignedTimestamps, if we
+// expect them, and returns a slice of verified results, which embed the actual
+// time.Time value. This value can then be used to verify certificates, if any.
+// In order to be verifiable, a SignedEntity must have at least one verified
+// "observer timestamp".
+func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]TimestampVerificationResult, error) {
+	verifiedTimestamps := []TimestampVerificationResult{}
+
+	// From spec:
+	// > … if verification or timestamp parsing fails, the Verifier MUST abort
+	if v.weExpectSignedTimestamps {
+		tsaVerifier := NewTimestampAuthorityVerifier(v.trustedMaterial, v.signedTimestampThreshold)
+		verifiedSignedTimestamps, err := tsaVerifier.NewVerify(entity)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, vts := range verifiedSignedTimestamps {
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: "TODO", Timestamp: vts})
+		}
+	}
+
+	if v.weExpectTlogEntries {
+		tlogVerifier := NewArtifactTransparencyLogVerifier(v.trustedMaterial, v.tlogEntriesThreshold, v.performOnlineVerification)
+		verifiedTlogTimestamps, err := tlogVerifier.NewVerify(entity)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, vts := range verifiedTlogTimestamps {
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "Tlog", URI: "TODO", Timestamp: vts})
+		}
+	}
+
+	if len(verifiedTimestamps) == 0 {
+		return nil, fmt.Errorf("no valid observer timestamps found")
+	}
+
+	return verifiedTimestamps, nil
+}
+
+// this function is copied from CertificateChain.Verify but it is modified to:
+// - only concern itself with certificate verification
+// - accept an observerTimestamp
+// TODO: move this refactor to the original function
+func (v *SignedEntityVerifier) VerifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certificate) error {
+	for _, ca := range v.trustedMaterial.FulcioCertificateAuthorities() {
+		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
+			continue
+		}
+		if !ca.ValidityPeriodEnd.IsZero() && leafCert.NotAfter.After(ca.ValidityPeriodEnd) {
+			continue
+		}
+
+		rootCertPool := x509.NewCertPool()
+		rootCertPool.AddCert(ca.Root)
+		intermediateCertPool := x509.NewCertPool()
+		for _, cert := range ca.Intermediates {
+			intermediateCertPool.AddCert(cert)
+		}
+
+		// From spec:
+		// > ## Certificate
+		// > For a signature with a given certificate to be considered valid, it must have a timestamp while every certificate in the chain up to the root is valid (the so-called “hybrid model” of certificate verification per Braun et al. (2013)).
+
+		opts := x509.VerifyOptions{
+			CurrentTime:   observerTimestamp,
+			Roots:         rootCertPool,
+			Intermediates: intermediateCertPool,
+			KeyUsages: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageCodeSigning,
+			},
+		}
+
+		_, err := leafCert.Verify(opts)
+		if err == nil {
+			return nil
+		}
+	}
+
+	return errors.New("leaf certificate verification failed")
+}

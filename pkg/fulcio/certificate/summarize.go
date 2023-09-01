@@ -19,12 +19,12 @@ const (
 )
 
 type SubjectAlternativeName struct {
-	Type  SubjectAlternativeNameType
-	Value string
+	Type  SubjectAlternativeNameType `json:"type"`
+	Value string                     `json:"value"`
 }
 
 type Summary struct {
-	SubjectAlternativeName SubjectAlternativeName
+	SubjectAlternativeName SubjectAlternativeName `json:"subjectAlternativeName"`
 	Extensions
 }
 

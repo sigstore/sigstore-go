@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	rekorClient "github.com/sigstore/rekor/pkg/client"
 	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
@@ -26,72 +27,90 @@ type ArtifactTransparencyLogVerifier struct {
 }
 
 func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
+	_, err := p.NewVerify(entity)
+	return err
+}
+
+func (p *ArtifactTransparencyLogVerifier) NewVerify(entity SignedEntity) ([]time.Time, error) {
 	entries, err := entity.TlogEntries()
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	// TODO: dedupe tlog entries, since these can be maliciously repeated
 	if len(entries) < p.threshold {
-		return fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
+		return nil, fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
 	}
 
 	sigContent, err := entity.SignatureContent()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	entitySignature := sigContent.GetSignature()
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	verifiedTimestamps := []time.Time{}
 
 	for _, entry := range entries {
 		err := tlog.ValidateEntry(entry)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !p.online {
+			var inclusionVerified bool
+			// TODO: do we validate that an entry has EITHER a promise OR a proof?
 			if entry.HasInclusionPromise() {
 				err = tlog.VerifySET(entry, p.trustedMaterial.TlogAuthorities())
 				if err != nil {
-					return err
+					return nil, err
 				}
+				inclusionVerified = true
 			}
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
 				hex64Key := hex.EncodeToString([]byte(keyID))
 				tlogVerifier, ok := p.trustedMaterial.TlogAuthorities()[hex64Key]
 				if !ok {
-					return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+					return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 				}
 
 				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = tlog.VerifyInclusion(entry, *verifier)
 				if err != nil {
-					return err
+					return nil, err
 				}
+
+				inclusionVerified = true
+			}
+
+			if inclusionVerified {
+				verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 			}
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
 			tlogVerifier, ok := p.trustedMaterial.TlogAuthorities()[hex64Key]
 			if !ok {
-				return fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+				return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}
 
 			client, err := getRekorClient(tlogVerifier.BaseURL)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			logIndex := entry.LogIndex()
@@ -103,13 +122,13 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 
 			resp, err := client.Entries.SearchLogQuery(searchParams)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if len(resp.Payload) == 0 {
-				return fmt.Errorf("unable to locate log entry %d", logIndex)
+				return nil, fmt.Errorf("unable to locate log entry %d", logIndex)
 			} else if len(resp.Payload) > 1 {
-				return errors.New("too many log entries returned")
+				return nil, errors.New("too many log entries returned")
 			}
 
 			logEntry := resp.Payload[0]
@@ -118,30 +137,31 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
 				v := v
 				err = rekorVerify.VerifyLogEntry(context.TODO(), &v, *verifier)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
+			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 		}
 
 		// Ensure entry signature matches signature from bundle
 		if !bytes.Equal(entry.Signature(), entitySignature) {
-			return errors.New("transparency log signature does not match")
+			return nil, errors.New("transparency log signature does not match")
 		}
 
 		// Ensure entry certificate matches bundle certificate
 		if !verificationContent.CompareKey(entry.PublicKey(), p.trustedMaterial) {
-			return errors.New("transparency log certificate does not match")
+			return nil, errors.New("transparency log certificate does not match")
 		}
 
 		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
 		if !verificationContent.ValidAtTime(entry.IntegratedTime(), p.trustedMaterial) {
-			return errors.New("Integrated time outside certificate validity")
+			return nil, errors.New("Integrated time outside certificate validity")
 		}
 	}
 
-	return nil
+	return verifiedTimestamps, nil
 }
 
 func NewArtifactTransparencyLogVerifier(trustedMaterial root.TrustedMaterial, threshold int, online bool) *ArtifactTransparencyLogVerifier {

@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 
+	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
@@ -27,6 +29,23 @@ type MessageSignature struct {
 
 type Envelope struct {
 	*dsse.Envelope
+}
+
+func (e *Envelope) Statement() (*in_toto.Statement, error) {
+	if e.PayloadType != IntotoMediaType {
+		return nil, ErrIncorrectMediaType
+	}
+
+	var statement *in_toto.Statement
+	raw, err := e.DecodeB64Payload()
+	if err != nil {
+		return nil, ErrDecodingB64
+	}
+	err = json.Unmarshal(raw, &statement)
+	if err != nil {
+		return nil, ErrDecodingJSON
+	}
+	return statement, nil
 }
 
 func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {

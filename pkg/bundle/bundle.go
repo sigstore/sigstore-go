@@ -3,7 +3,6 @@ package bundle
 import (
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -216,14 +215,14 @@ func (b *ProtobufBundle) SignatureContent() (SignatureContent, error) {
 	return nil, ErrMissingVerificationMaterial
 }
 
-func (b *ProtobufBundle) dsseEnvelope() (*dsse.Envelope, error) {
+func (b *ProtobufBundle) Envelope() (*Envelope, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		envelope, err := parseEnvelope(content.DsseEnvelope)
 		if err != nil {
 			return nil, err
 		}
-		return envelope.Envelope, nil
+		return envelope, nil
 	}
 	return nil, ErrMissingVerificationMaterial
 }
@@ -247,24 +246,16 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 }
 
 func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
-	envelope, err := b.dsseEnvelope()
+	envelope, err := b.Envelope()
 	if err != nil {
 		return nil, err
 	}
 
-	if envelope.PayloadType != IntotoMediaType {
-		return nil, ErrIncorrectMediaType
+	statement, err := envelope.Statement()
+	if err != nil {
+		return nil, err
 	}
 
-	var statement *in_toto.Statement
-	raw, err := envelope.DecodeB64Payload()
-	if err != nil {
-		return nil, ErrDecodingB64
-	}
-	err = json.Unmarshal(raw, &statement)
-	if err != nil {
-		return nil, ErrDecodingJSON
-	}
 	return statement, nil
 }
 

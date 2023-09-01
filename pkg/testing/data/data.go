@@ -3,10 +3,13 @@ package data
 import (
 	_ "embed"
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/github/sigstore-verifier/pkg/bundle"
+	"github.com/github/sigstore-verifier/pkg/root"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -46,4 +49,13 @@ func SigstoreBundle(t *testing.T) *bundle.ProtobufBundle {
 
 func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.ProtobufBundle {
 	return TestBundle(t, SigstoreJS200ProvenanceBundleRaw)
+}
+
+func PublicGoodTrustedMaterialRoot(t *testing.T) *root.TrustedRoot {
+	trustedrootJSON, _ := os.ReadFile("../../examples/trusted-root-public-good.json")
+	trustedRoot, _ := root.NewTrustedRootFromJSON(trustedrootJSON)
+
+	assert.NotNil(t, trustedRoot)
+
+	return trustedRoot
 }

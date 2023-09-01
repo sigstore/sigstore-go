@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"time"
 
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
@@ -18,33 +19,42 @@ type TimestampAuthorityVerifier struct {
 }
 
 func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
+	_, err := p.NewVerify(entity)
+	return err
+}
+
+func (p *TimestampAuthorityVerifier) NewVerify(entity SignedEntity) ([]time.Time, error) {
 	signedTimestamps, err := entity.Timestamps()
+	// TODO: dedupe signed timestamps, since these can be maliciously repeated
+
 	if err != nil || (len(signedTimestamps) < p.threshold) {
-		return fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
+		return nil, fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
 	}
 
 	sigContent, err := entity.SignatureContent()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	signatureBytes := sigContent.GetSignature()
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	verifiedTimestamps := []time.Time{}
 	for _, timestamp := range signedTimestamps {
-		err = verifySignedTimestamp(timestamp, signatureBytes, p.trustedMaterial, verificationContent)
+		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, p.trustedMaterial, verificationContent)
 		if err != nil {
-			return errors.New("unable to verify timestamp")
+			return nil, errors.New("unable to verify timestamp")
 		}
+		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
-	return nil
+	return verifiedTimestamps, nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent bundle.VerificationContent) error {
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent bundle.VerificationContent) (time.Time, error) {
 	certAuthorities := trustedMaterial.TSACertificateAuthorities()
 
 	// Iterate through TSA certificate authorities to find one that verifies
@@ -91,15 +101,16 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, tr
 		}
 
 		// Check tlog entry time against bundle certificates
+		// TODO: technically no longer needed since we check the cert validity period in the main Verify loop
 		if !verificationContent.ValidAtTime(timestamp.Time, trustedMaterial) {
 			continue
 		}
 
 		// All above verification successful, so return nil
-		return nil
+		return timestamp.Time, nil
 	}
 
-	return errors.New("Unable to verify signed timestamps")
+	return time.Time{}, errors.New("Unable to verify signed timestamps")
 }
 
 func NewTimestampAuthorityVerifier(trustedMaterial root.TrustedMaterial, threshold int) *TimestampAuthorityVerifier {

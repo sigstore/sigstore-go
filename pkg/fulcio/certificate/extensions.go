@@ -68,74 +68,74 @@ type Extensions struct {
 	// a federated login like Dex it should match the issuer URL of the
 	// upstream issuer. The issuer is not set the extensions are invalid and
 	// will fail to render.
-	Issuer string // OID 1.3.6.1.4.1.57264.1.8 and 1.3.6.1.4.1.57264.1.1 (Deprecated)
+	Issuer string `json:"issuer"` // OID 1.3.6.1.4.1.57264.1.8 and 1.3.6.1.4.1.57264.1.1 (Deprecated)
 
 	// Deprecated
 	// Triggering event of the Github Workflow. Matches the `event_name` claim of ID
 	// tokens from Github Actions
-	GithubWorkflowTrigger string // OID 1.3.6.1.4.1.57264.1.2
+	GithubWorkflowTrigger string `json:"githubWorkflowTrigger"` // OID 1.3.6.1.4.1.57264.1.2
 
 	// Deprecated
 	// SHA of git commit being built in Github Actions. Matches the `sha` claim of ID
 	// tokens from Github Actions
-	GithubWorkflowSHA string // OID 1.3.6.1.4.1.57264.1.3
+	GithubWorkflowSHA string `json:"githubWorkflowSHA"` //nolint:tagliatelle // OID 1.3.6.1.4.1.57264.1.3
 
 	// Deprecated
 	// Name of Github Actions Workflow. Matches the `workflow` claim of the ID
 	// tokens from Github Actions
-	GithubWorkflowName string // OID 1.3.6.1.4.1.57264.1.4
+	GithubWorkflowName string `json:"githubWorkflowName"` // OID 1.3.6.1.4.1.57264.1.4
 
 	// Deprecated
 	// Repository of the Github Actions Workflow. Matches the `repository` claim of the ID
 	// tokens from Github Actions
-	GithubWorkflowRepository string // OID 1.3.6.1.4.1.57264.1.5
+	GithubWorkflowRepository string `json:"githubWorkflowRepository"` // OID 1.3.6.1.4.1.57264.1.5
 
 	// Deprecated
 	// Git Ref of the Github Actions Workflow. Matches the `ref` claim of the ID tokens
 	// from Github Actions
-	GithubWorkflowRef string // 1.3.6.1.4.1.57264.1.6
+	GithubWorkflowRef string `json:"githubWorkflowRef"` // 1.3.6.1.4.1.57264.1.6
 
 	// Reference to specific build instructions that are responsible for signing.
-	BuildSignerURI string // 1.3.6.1.4.1.57264.1.9
+	BuildSignerURI string `json:"buildSignerURI"` //nolint:tagliatelle // 1.3.6.1.4.1.57264.1.9
 
 	// Immutable reference to the specific version of the build instructions that is responsible for signing.
-	BuildSignerDigest string // 1.3.6.1.4.1.57264.1.10
+	BuildSignerDigest string `json:"buildSignerDigest"` // 1.3.6.1.4.1.57264.1.10
 
 	// Specifies whether the build took place in platform-hosted cloud infrastructure or customer/self-hosted infrastructure.
-	RunnerEnvironment string // 1.3.6.1.4.1.57264.1.11
+	RunnerEnvironment string `json:"runnerEnvironment"` // 1.3.6.1.4.1.57264.1.11
 
 	// Source repository URL that the build was based on.
-	SourceRepositoryURI string // 1.3.6.1.4.1.57264.1.12
+	SourceRepositoryURI string `json:"sourceRepositoryURI"` //nolint:tagliatelle  // 1.3.6.1.4.1.57264.1.12
 
 	// Immutable reference to a specific version of the source code that the build was based upon.
-	SourceRepositoryDigest string // 1.3.6.1.4.1.57264.1.13
+	SourceRepositoryDigest string `json:"sourceRepositoryDigest"` // 1.3.6.1.4.1.57264.1.13
 
 	// Source Repository Ref that the build run was based upon.
-	SourceRepositoryRef string // 1.3.6.1.4.1.57264.1.14
+	SourceRepositoryRef string `json:"sourceRepositoryRef"` // 1.3.6.1.4.1.57264.1.14
 
 	// Immutable identifier for the source repository the workflow was based upon.
-	SourceRepositoryIdentifier string // 1.3.6.1.4.1.57264.1.15
+	SourceRepositoryIdentifier string `json:"sourceRepositoryIdentifier"` // 1.3.6.1.4.1.57264.1.15
 
 	// Source repository owner URL of the owner of the source repository that the build was based on.
-	SourceRepositoryOwnerURI string // 1.3.6.1.4.1.57264.1.16
+	SourceRepositoryOwnerURI string `json:"sourceRepositoryOwnerURI"` //nolint:tagliatelle // 1.3.6.1.4.1.57264.1.16
 
 	// Immutable identifier for the owner of the source repository that the workflow was based upon.
-	SourceRepositoryOwnerIdentifier string // 1.3.6.1.4.1.57264.1.17
+	SourceRepositoryOwnerIdentifier string `json:"sourceRepositoryOwnerIdentifier"` // 1.3.6.1.4.1.57264.1.17
 
 	// Build Config URL to the top-level/initiating build instructions.
-	BuildConfigURI string // 1.3.6.1.4.1.57264.1.18
+	BuildConfigURI string `json:"buildConfigURI"` //nolint:tagliatelle // 1.3.6.1.4.1.57264.1.18
 
 	// Immutable reference to the specific version of the top-level/initiating build instructions.
-	BuildConfigDigest string // 1.3.6.1.4.1.57264.1.19
+	BuildConfigDigest string `json:"buildConfigDigest"` // 1.3.6.1.4.1.57264.1.19
 
 	// Event or action that initiated the build.
-	BuildTrigger string // 1.3.6.1.4.1.57264.1.20
+	BuildTrigger string `json:"buildTrigger"` // 1.3.6.1.4.1.57264.1.20
 
 	// Run Invocation URL to uniquely identify the build execution.
-	RunInvocationURI string // 1.3.6.1.4.1.57264.1.21
+	RunInvocationURI string `json:"runInvocationURI"` //nolint:tagliatelle // 1.3.6.1.4.1.57264.1.21
 
 	// Source repository visibility at the time of signing the certificate.
-	SourceRepositoryVisibilityAtSigning string // 1.3.6.1.4.1.57264.1.22
+	SourceRepositoryVisibilityAtSigning string `json:"sourceRepositoryVisibilityAtSigning"` // 1.3.6.1.4.1.57264.1.22
 }
 
 func ParseExtensions(ext []pkix.Extension) (Extensions, error) {
