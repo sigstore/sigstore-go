@@ -15,8 +15,5 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: go.mod
-      - name: Configure Go private module access
-        run: |
-          echo "machine goproxy.githubapp.com login nobody password ${{ secrets.GOPROXY_TOKEN }}" >> $HOME/.netrc
       - name: Run tests
         run: make test

@@ -14,19 +14,11 @@ jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
-    env:
-      GOPROXY: https://goproxy.githubapp.com/mod,https://proxy.golang.org/,direct
-      GOPRIVATE: ''
-      GONOPROXY: ''
-      GONOSUMDB: github.com/github/*
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
           go-version-file: go.mod
-      - name: Configure Go private module access
-        run: |
-          echo "machine goproxy.githubapp.com login nobody password ${{ secrets.GOPROXY_TOKEN }}" >> $HOME/.netrc
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:

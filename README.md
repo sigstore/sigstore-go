@@ -1,30 +1,30 @@
 # sigstore-verifier
 
-An experimental verifier for Sigstore, created by the Package Security Team
+A Go client library for [Sigstore](https://www.sigstore.dev/)
 
-This can be thought of as a prototype for `sigstore-go`, a general purpose Go library for Sigstore.
+This library focused on verifying Sigstore bundles, although it can also verify signature files by creating a bundle for them.
 
-## Usage
+It supports a wide variety of use cases through the [verification options](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_verification.proto).
 
-This library is primarily intended to be used a dependency for Go applications that need support for verifying Sigstore bundles, but it does include a small verifier CLI that can be used for testing.
+For an example of how to use this library, see [cmd/sigstore-verifier](./cmd/sigstore-verifier/main.go).
 
-### Library
+## Examples
 
-TODO: Library usage example code. For now, see the code in [the CLI command](./cmd/sigstore-verifier/main.go) for a library usage example.
+```bash
+$ go run cmd/sigstore-verifier/main.go -trustedrootJSONpath examples/trusted-root-public-good.json examples/bundle-provenance.json
+Verification successful!
+```
 
-### CLI
-
-To use the example CLI, invoke with `go run` like so:
-
-```shell
-go run ./cmd/sigstore-verifier examples/bundle-provenance.json
+```bash
+$ go run cmd/sigstore-verifier/main.go -tufRootURL tuf-repo-cdn.sigstore.dev examples/bundle-provenance.json
+Verification successful!
 ```
 
 Alternatively, you can install a binary of the CLI like so:
 
 ```shell
-go install ./cmd/sigstore-verifier
-sigstore-verifier examples/bundle-provenance.json
+$ go install ./cmd/sigstore-verifier
+$ sigstore-verifier examples/bundle-provenance.json
 ```
 
 ## Testing
@@ -32,7 +32,7 @@ sigstore-verifier examples/bundle-provenance.json
 Tests are invoked using the standard Go testing framework. A helper exists in the Makefile also.
 
 ```shell
-    make test
+$ make test
 ```
 
 ## Example bundles
@@ -41,21 +41,11 @@ Tests are invoked using the standard Go testing framework. A helper exists in th
 
 This came from https://www.npmjs.com/package/sigstore/v/1.3.0/provenance, with the outermost "bundle" key stripped off.
 
-## examples/bundle-github-staging-sigstorejs1.3.0.json
+## License
 
-This bundle is created by sigstore-js by attesting the file `examples/statement-provenance-sigstorejs1.3.0.json` using the GitHub staging instances of Fulcio and TSA.
+This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE.txt) for the full terms.
 
-In case this needs to be regenerated (in the event of key rotation), the following command will produce the equivalent file:
+## Support
 
-```shell
-# Install sigstore-js CLI
-npm install -g @sigstore/cli
-# Sign an attestation. Note that you must be connected to the GitHub VPN in order to reach these services.
-sigstore attest --fulcio-url=https://fulcio-staging.service.iad.github.net --tsa-server-url=https://timestamp-authority-staging.service.iad.github.net --no-tlog-upload examples/statement-provenance-sigstorejs1.3.0.json | jq > examples/bundle-github-staging-sigstorejs1.3.0.json
-```
-
-To verify this attestation using the GitHub staging trusted root, issue the following command:
-
-```shell
-go run cmd/sigstore-verifier/main.go -requireTSA -trustedrootJSONpath examples/trusted-root-github-staging.json examples/bundle-github-staging-sigstorejs1.3.0.json
-```
+Bug reports are welcome via issues and questions are welcome via discussion. Please refer to [SUPPORT.md](./SUPPORT.md) for details.
+This project is provided as-is.
