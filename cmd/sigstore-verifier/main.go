@@ -71,14 +71,14 @@ func main() {
 	verifierConfig := []verifier.VerifierConfigurator{}
 	policyConfig := []verifier.PolicyOptionConfigurator{}
 
-	verifierConfig = append(verifierConfig, verifier.WithSignedCertificateTimestamps())
+	verifierConfig = append(verifierConfig, verifier.WithSignedCertificateTimestamps(1))
 
 	if *requireTSA {
-		verifierConfig = append(verifierConfig, verifier.WithSignedTimestamps())
+		verifierConfig = append(verifierConfig, verifier.WithSignedTimestamps(1))
 	}
 
 	if *requireTlog {
-		verifierConfig = append(verifierConfig, verifier.WithTransparencyLog())
+		verifierConfig = append(verifierConfig, verifier.WithTransparencyLog(1))
 	}
 
 	if *onlineTlog {

@@ -18,7 +18,7 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// can create a verifier with both of them
-	_, err = NewSignedEntityVerifier(tr, WithTransparencyLog(), WithSignedTimestamps())
+	_, err = NewSignedEntityVerifier(tr, WithTransparencyLog(1), WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
 	// unless we are really sure we want a verifier without either tlog or tsa
@@ -49,7 +49,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog())
+	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
@@ -92,7 +92,7 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(), WithSignedTimestamps())
+	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1), WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
@@ -109,7 +109,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	goodCI, _ := certIDForTesting("", "", SigstoreSanRegex, ActionsIssuerValue, "")
 	badCI, _ := certIDForTesting("BadSANValue", "", "", ActionsIssuerValue, "")
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog())
+	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1))
 
 	assert.Nil(t, err)
 
@@ -140,7 +140,7 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog())
+	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
