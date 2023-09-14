@@ -24,6 +24,7 @@ type VerifierConfig struct { // nolint: revive
 	weExpectTlogEntries                bool
 	tlogEntriesThreshold               int
 	weExpectSCTs                       bool
+	ctlogEntriesThreshold              int
 	weDoNotExpectAnyObserverTimestamps bool
 }
 
@@ -103,9 +104,18 @@ func WithTransparencyLog(thresholdArgs ...int) VerifierConfigurator {
 // WithSignedCertificateTimestamps configures the SignedEntityVerifier to
 // expect the Fulcio certificate to have a SignedCertificateTimestamp, and
 // verify it using the TrustedMaterial's CTLogAuthorities().
-func WithSignedCertificateTimestamps() VerifierConfigurator {
+func WithSignedCertificateTimestamps(thresholdArgs ...int) VerifierConfigurator {
 	return func(c *VerifierConfig) {
 		c.weExpectSCTs = true
+
+		if len(thresholdArgs) > 0 {
+			c.ctlogEntriesThreshold = thresholdArgs[0]
+		}
+
+		// can't enable tlogEntry checking with a threshold < 1
+		if c.ctlogEntriesThreshold < 1 {
+			c.ctlogEntriesThreshold = 1
+		}
 	}
 }
 
@@ -255,12 +265,11 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		// From spec:
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
-		if v.config.weExpectSCTs { // nolint:revive,staticcheck
-			if v.config.performOnlineVerification { // nolint:revive,staticcheck,gocritic
-			} else { // nolint:revive,staticcheck
+		if v.config.weExpectSCTs {
+			err = verificationContent.VerifySCT(v.config.ctlogEntriesThreshold, v.trustedMaterial)
+			if err != nil {
+				return nil, err
 			}
-			// TODO: extract SCT
-			// TODO: verify SCT
 		}
 
 		certSummary, err = certificate.SummarizeCertificate(leafCert)

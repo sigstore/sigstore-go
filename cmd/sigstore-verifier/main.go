@@ -71,6 +71,8 @@ func main() {
 	verifierConfig := []verifier.VerifierConfigurator{}
 	policyConfig := []verifier.PolicyOptionConfigurator{}
 
+	verifierConfig = append(verifierConfig, verifier.WithSignedCertificateTimestamps())
+
 	if *requireTSA {
 		verifierConfig = append(verifierConfig, verifier.WithSignedTimestamps())
 	}

@@ -198,7 +198,7 @@ func main() {
 		}
 
 		// Verify bundle
-		sev, err := verifier.NewSignedEntityVerifier(tr, verifier.WithTransparencyLog())
+		sev, err := verifier.NewSignedEntityVerifier(tr, verifier.WithTransparencyLog(), verifier.WithSignedCertificateTimestamps())
 		if err != nil {
 			log.Fatal(err)
 		}
