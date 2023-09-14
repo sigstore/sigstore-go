@@ -87,20 +87,6 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, tr
 			continue
 		}
 
-		// Check that the timestamp is valid for the provided certificate
-		verificationOptions := x509.VerifyOptions{
-			CurrentTime:   timestamp.Time,
-			Roots:         tsaRootCertPool,
-			Intermediates: tsaIntermediateCertPool,
-			KeyUsages: []x509.ExtKeyUsage{
-				x509.ExtKeyUsageTimeStamping,
-			},
-		}
-
-		_, err = ca.Leaf.Verify(verificationOptions)
-		if err != nil {
-			continue
-		}
 		if !ca.ValidityPeriodStart.IsZero() && timestamp.Time.Before(ca.ValidityPeriodStart) {
 			continue
 		}
