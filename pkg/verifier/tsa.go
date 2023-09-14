@@ -25,7 +25,15 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
 
 func (p *TimestampAuthorityVerifier) NewVerify(entity SignedEntity) ([]time.Time, error) {
 	signedTimestamps, err := entity.Timestamps()
-	// TODO: dedupe signed timestamps, since these can be maliciously repeated
+
+	// disallow duplicate timestamps, as a malicious actor could use duplicates to bypass the threshold
+	for i := 0; i < len(signedTimestamps); i++ {
+		for j := i + 1; j < len(signedTimestamps); j++ {
+			if bytes.Equal(signedTimestamps[i], signedTimestamps[j]) {
+				return nil, errors.New("duplicate timestamps found")
+			}
+		}
+	}
 
 	if err != nil || (len(signedTimestamps) < p.threshold) {
 		return nil, fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
