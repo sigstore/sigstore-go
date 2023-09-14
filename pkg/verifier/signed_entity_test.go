@@ -21,19 +21,23 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	_, err = NewSignedEntityVerifier(tr, WithTransparencyLog(), WithSignedTimestamps())
 	assert.Nil(t, err)
 
+	// unless we are really sure we want a verifier without either tlog or tsa
+	_, err = NewSignedEntityVerifier(tr, WithoutAnyObserverTimestampsInsecure())
+	assert.Nil(t, err)
+
 	// can configure the verifiers with thresholds
 	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(2), WithSignedTimestamps(10))
 
 	assert.Nil(t, err)
-	assert.Equal(t, 2, v.tlogEntriesThreshold)
-	assert.Equal(t, 10, v.signedTimestampThreshold)
+	assert.Equal(t, 2, v.config.tlogEntriesThreshold)
+	assert.Equal(t, 10, v.config.signedTimestampThreshold)
 
 	// can't configure them with < 1 thresholds
 	v, err = NewSignedEntityVerifier(tr, WithTransparencyLog(0), WithSignedTimestamps(-10))
 
 	assert.Nil(t, err)
-	assert.Equal(t, 1, v.tlogEntriesThreshold)
-	assert.Equal(t, 1, v.signedTimestampThreshold)
+	assert.Equal(t, 1, v.config.tlogEntriesThreshold)
+	assert.Equal(t, 1, v.config.signedTimestampThreshold)
 }
 
 // Testing a bundle:
@@ -60,6 +64,18 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	assert.NotEmpty(t, res.VerifiedTimestamps)
 }
 
+func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreJS200ProvenanceBundle(t)
+
+	v, err := NewSignedEntityVerifier(tr, WithoutAnyObserverTimestampsInsecure())
+	assert.Nil(t, err)
+
+	res, err := v.Verify(entity)
+	assert.Nil(t, err)
+	assert.NotNil(t, res)
+}
+
 func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
@@ -80,6 +96,33 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
+	assert.NotNil(t, err)
+	assert.Nil(t, res)
+}
+
+// Now we test policy:
+
+func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreJS200ProvenanceBundle(t)
+
+	goodCI, _ := certIDForTesting("", "", SigstoreSanRegex, ActionsIssuerValue, "")
+	badCI, _ := certIDForTesting("BadSANValue", "", "", ActionsIssuerValue, "")
+
+	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog())
+
+	assert.Nil(t, err)
+
+	res, err := v.Verify(entity,
+		WithCertificateIdentity(badCI),
+		WithCertificateIdentity(goodCI))
+	assert.Nil(t, err)
+
+	assert.Equal(t, res.VerifiedIdentity.Issuer, ActionsIssuerValue)
+
+	// but if only pass in the bad CI, it will fail:
+	res, err = v.Verify(entity,
+		WithCertificateIdentity(badCI))
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }

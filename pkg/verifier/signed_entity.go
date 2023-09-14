@@ -13,76 +13,117 @@ import (
 )
 
 type SignedEntityVerifier struct {
-	trustedMaterial           root.TrustedMaterial
-	performOnlineVerification bool
-	weExpectSignedTimestamps  bool
-	signedTimestampThreshold  int
-	weExpectTlogEntries       bool
-	tlogEntriesThreshold      int
-	weExpectSCTs              bool
+	trustedMaterial root.TrustedMaterial
+	config          VerifierConfig
 }
 
-func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...func(*SignedEntityVerifier)) (*SignedEntityVerifier, error) {
-	v := &SignedEntityVerifier{
-		trustedMaterial: trustedMaterial,
-	}
+type VerifierConfig struct { // nolint: revive
+	performOnlineVerification          bool
+	weExpectSignedTimestamps           bool
+	signedTimestampThreshold           int
+	weExpectTlogEntries                bool
+	tlogEntriesThreshold               int
+	weExpectSCTs                       bool
+	weDoNotExpectAnyObserverTimestamps bool
+}
+
+type VerifierConfigurator func(*VerifierConfig) // nolint: revive
+
+// NewSignedEntityVerifier creates a new SignedEntityVerifier. It takes a
+// root.TrustedMaterial, which contains a set of trusted public keys and
+// certificates, and a set of VerifierConfigurators, which set the config
+// that determines the behaviour of the Verify function.
+func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierConfigurator) (*SignedEntityVerifier, error) {
+	c := VerifierConfig{}
 
 	for _, opt := range options {
-		opt(v)
+		opt(&c)
 	}
 
-	err := v.ValidateObserverOptions()
+	err := c.Validate()
 	if err != nil {
 		return nil, err
+	}
+
+	v := &SignedEntityVerifier{
+		trustedMaterial: trustedMaterial,
+		config:          c,
 	}
 
 	return v, nil
 }
 
-func WithOnlineVerification() func(*SignedEntityVerifier) {
-	return func(v *SignedEntityVerifier) {
-		v.performOnlineVerification = true
+// WithOnlineVerification configures the SignedEntityVerifier to perform
+// online verification when verifying Transparency Log entries and
+// Signed Certificate Timestamps.
+func WithOnlineVerification() VerifierConfigurator {
+	return func(c *VerifierConfig) {
+		c.performOnlineVerification = true
 	}
 }
 
-func WithSignedTimestamps(thresholdArgs ...int) func(*SignedEntityVerifier) {
-	return func(v *SignedEntityVerifier) {
-		v.weExpectSignedTimestamps = true
+// WithSignedTimestamps configures the SignedEntityVerifier to expect RFC 3161
+// timestamps from a Timestamp Authority, verify them using the TrustedMaterial's
+// TSACertificateAuthorities(), and, if it exists, use the resulting timestamp(s)
+// to verify the Fulcio certificate.
+func WithSignedTimestamps(thresholdArgs ...int) VerifierConfigurator {
+	return func(c *VerifierConfig) {
+		c.weExpectSignedTimestamps = true
 
 		if len(thresholdArgs) > 0 {
-			v.signedTimestampThreshold = thresholdArgs[0]
+			c.signedTimestampThreshold = thresholdArgs[0]
 		}
 
 		// can't enable signed ts checking with a threshold < 1
-		if v.signedTimestampThreshold < 1 {
-			v.signedTimestampThreshold = 1
+		if c.signedTimestampThreshold < 1 {
+			c.signedTimestampThreshold = 1
 		}
 	}
 }
 
-func WithTransparencyLog(thresholdArgs ...int) func(*SignedEntityVerifier) {
-	return func(v *SignedEntityVerifier) {
-		v.weExpectTlogEntries = true
+// WithTransparencyLog configures the SignedEntityVerifier to expect
+// Transparency Log entries, verify them using the TrustedMaterial's
+// TlogAuthorities(), and, if it exists, use the resulting Inclusion timestamp(s)
+// to verify the Fulcio certificate.
+func WithTransparencyLog(thresholdArgs ...int) VerifierConfigurator {
+	return func(c *VerifierConfig) {
+		c.weExpectTlogEntries = true
 
 		if len(thresholdArgs) > 0 {
-			v.tlogEntriesThreshold = thresholdArgs[0]
+			c.tlogEntriesThreshold = thresholdArgs[0]
 		}
 
 		// can't enable tlogEntry checking with a threshold < 1
-		if v.tlogEntriesThreshold < 1 {
-			v.tlogEntriesThreshold = 1
+		if c.tlogEntriesThreshold < 1 {
+			c.tlogEntriesThreshold = 1
 		}
 	}
 }
 
-func WithSignedCertificateTimestamps() func(*SignedEntityVerifier) {
-	return func(v *SignedEntityVerifier) {
-		v.weExpectSCTs = true
+// WithSignedCertificateTimestamps configures the SignedEntityVerifier to
+// expect the Fulcio certificate to have a SignedCertificateTimestamp, and
+// verify it using the TrustedMaterial's CTLogAuthorities().
+func WithSignedCertificateTimestamps() VerifierConfigurator {
+	return func(c *VerifierConfig) {
+		c.weExpectSCTs = true
 	}
 }
 
-func (v *SignedEntityVerifier) ValidateObserverOptions() error {
-	if !v.weExpectSignedTimestamps && !v.weExpectTlogEntries {
+// WithoutAnyObserverTimestampsInsecure configures the SignedEntityVerifier to not expect
+// any timestamps from either a Timestamp Authority or a Transparency Log.
+//
+// A SignedEntity without a trusted "observer" timestamp to verify the attached
+// Fulcio certificate can't provide the same kind of integrity guarantee.
+//
+// Do not enable this if you don't know what you are doing.
+func WithoutAnyObserverTimestampsInsecure() VerifierConfigurator {
+	return func(c *VerifierConfig) {
+		c.weDoNotExpectAnyObserverTimestamps = true
+	}
+}
+
+func (c *VerifierConfig) Validate() error {
+	if !c.weExpectSignedTimestamps && !c.weExpectTlogEntries && !c.weDoNotExpectAnyObserverTimestamps {
 		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one, or both, of WithSignedTimestamps() or WithTransparencyLog()")
 	}
 
@@ -94,6 +135,7 @@ type VerificationResult struct {
 	Statement          *in_toto.Statement            `json:"statement,omitempty"`
 	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
 	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
+	VerifiedIdentity   *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
 }
 
 type SignatureVerificationResult struct {
@@ -113,19 +155,66 @@ func NewVerificationResult() *VerificationResult {
 	}
 }
 
+type PolicyOptionConfigurator func(*PolicyOptions)
+
+type PolicyOptions struct {
+	verifyIdentities      bool
+	CertificateIdentities CertificateIdentities
+	// TODO:
+	// verifyArtifact        bool
+	// Artifact              []byte
+}
+
+// WithCertificateIdentity allows the caller of Verify to enforce that the
+// SignedEntity being verified was created by a given identity, as defined by
+// the Fulcio certificate embedded in the entity. If this policy is enabled,
+// but the SignedEntity does not have a certificate, verification will fail.
+//
+// Providing this function multiple times will concatenate the provided
+// CertificateIdentity to the list of identities being checked.
+//
+// If all of the provided CertificateIdentities fail to match the Fulcio
+// certificate, then verification will fail. If *any* CertificateIdentity
+// matches, then verification will succeed. Therefore, each CertificateIdentity
+// provided to this function must define a "sufficient" identity.
+//
+// The CertificateIdentity struct allows callers to specify:
+// - The exact value, or Regexp, of the SubjectAlternativeName
+// - The exact value of any Fulcio OID X.509 extension, i.e. Issuer
+//
+// For convenience, consult the NewShortCertificateIdentity function.
+//
+// Enabling this policy is highly recommended, especially to assert that the
+// OID Issuer matches the expected value.
+func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigurator {
+	return func(v *PolicyOptions) {
+		v.verifyIdentities = true
+		v.CertificateIdentities = append(v.CertificateIdentities, identity)
+	}
+}
+
 // Verify checks the cryptographic integrity of a given SignedEntity according
 // to the options configured in the NewSignedEntityVerifier. Its purpose is to
 // determine whether the SignedEntity was created by a Sigstore deployment we
 // trust, as defined by keys in our TrustedMaterial.
 //
-// Verify then returns a VerificationResult struct whose contents' integrity
-// have been verified, and can be used by the caller to enforce additional
-// policy choices. For example, callers of this function SHOULD:
+// Verify then creates a VerificationResult struct whose contents' integrity
+// have been verified. At the function caller's discretion, Verify may then
+// verify the contents of the VerificationResults using supplied PolicyOptions.
+// See WithCertificateIdentity for more details.
+//
+// If no policy options are provided, callers of this function SHOULD:
 //   - (if the signed entity has a certificate) verify that its Subject Alternate
-//     Name matches a trusted identity.
+//     Name matches a trusted identity, and that its Issuer field matches an
+//     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
-func (v *SignedEntityVerifier) Verify(entity SignedEntity) (*VerificationResult, error) {
+func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOptionConfigurator) (*VerificationResult, error) {
+	policy := &PolicyOptions{}
+	for _, opt := range options {
+		opt(policy)
+	}
+
 	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.msyyz1cr5bcs
 	// > ## Establishing a Time for the Signature
 	// > First, establish a time for the signature. This timestamp is required to validate the certificate chain, so this step comes first.
@@ -166,7 +255,10 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity) (*VerificationResult,
 		// From spec:
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
-		if !v.performOnlineVerification && v.weExpectSCTs { // nolint:revive,staticcheck
+		if v.config.weExpectSCTs { // nolint:revive,staticcheck
+			if v.config.performOnlineVerification { // nolint:revive,staticcheck,gocritic
+			} else { // nolint:revive,staticcheck
+			}
 			// TODO: extract SCT
 			// TODO: verify SCT
 		}
@@ -219,11 +311,29 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity) (*VerificationResult,
 
 	result.VerifiedTimestamps = verifiedTimestamps
 
-	return result, nil
+	// Now that the signed entity's crypto material has been verified, and the
+	// result struct has been constructed, we can optionally enforce some
+	// additional policies:
+	// --------------------
 
 	// From ## Certificate section,
 	// >The Verifier MUST then check the certificate against the verification policy. Details on how to do this depend on the verification policy, but the Verifier SHOULD check the Issuer X.509 extension (OID 1.3.6.1.4.1.57264.1.1) at a minimum, and will in most cases check the SubjectAlternativeName as well. See  Spec: Fulcio §TODO for example checks on the certificate.
-	// Checking the X.509 OID Issuer and SubjectAlternativeName is left as an exercise for the caller of this function
+	if policy.verifyIdentities {
+		if !signedWithCertificate {
+			// We got asked to verify identities, but the entity was not signed with
+			// a certificate. That's a problem!
+			return nil, errors.New("can't verify certificate identities: entity was not signed with a certificate")
+		}
+
+		matchingCertID, err := policy.CertificateIdentities.Verify(certSummary)
+		if err != nil {
+			return nil, err
+		}
+
+		result.VerifiedIdentity = matchingCertID
+	}
+
+	return result, nil
 }
 
 // VerifyObserverTimestamps verifies TlogEntries and SignedTimestamps, if we
@@ -236,8 +346,8 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]
 
 	// From spec:
 	// > … if verification or timestamp parsing fails, the Verifier MUST abort
-	if v.weExpectSignedTimestamps {
-		tsaVerifier := NewTimestampAuthorityVerifier(v.trustedMaterial, v.signedTimestampThreshold)
+	if v.config.weExpectSignedTimestamps {
+		tsaVerifier := NewTimestampAuthorityVerifier(v.trustedMaterial, v.config.signedTimestampThreshold)
 		verifiedSignedTimestamps, err := tsaVerifier.NewVerify(entity)
 		if err != nil {
 			return nil, err
@@ -248,8 +358,8 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]
 		}
 	}
 
-	if v.weExpectTlogEntries {
-		tlogVerifier := NewArtifactTransparencyLogVerifier(v.trustedMaterial, v.tlogEntriesThreshold, v.performOnlineVerification)
+	if v.config.weExpectTlogEntries {
+		tlogVerifier := NewArtifactTransparencyLogVerifier(v.trustedMaterial, v.config.tlogEntriesThreshold, v.config.performOnlineVerification)
 		verifiedTlogTimestamps, err := tlogVerifier.NewVerify(entity)
 		if err != nil {
 			return nil, err
@@ -257,6 +367,22 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]
 
 		for _, vts := range verifiedTlogTimestamps {
 			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "Tlog", URI: "TODO", Timestamp: vts})
+		}
+	}
+
+	if v.config.weDoNotExpectAnyObserverTimestamps {
+		// if we have a cert, let's pop the leafcert's NotBefore
+		verificationContent, err := entity.VerificationContent()
+		if err != nil {
+			return nil, err
+		}
+
+		if cc, ok := verificationContent.(*bundle.CertificateChain); ok {
+			leafCert := cc.Certificates[0]
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "LeafCert.NotBefore", URI: "", Timestamp: leafCert.NotBefore})
+		} else {
+			// no cert? use current time
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "CurrentTime", URI: "", Timestamp: time.Now()})
 		}
 	}
 

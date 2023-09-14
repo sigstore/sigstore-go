@@ -88,3 +88,38 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 
 	assert.Equal(t, expected, cs)
 }
+
+func TestCompareExtensions(t *testing.T) {
+	// Test that the extensions are equal
+	actualExt := Extensions{
+		Issuer:                   "https://token.actions.githubusercontent.com",
+		GithubWorkflowTrigger:    "push",
+		GithubWorkflowSHA:        "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		GithubWorkflowName:       "Release",
+		GithubWorkflowRepository: "sigstore/sigstore-js",
+		GithubWorkflowRef:        "refs/heads/main",
+	}
+
+	expectedExt := Extensions{
+		Issuer: "https://token.actions.githubusercontent.com",
+	}
+
+	// Only the specified fields are expected to match
+	assert.True(t, CompareExtensions(expectedExt, actualExt))
+
+	// Blank fields are ignored
+	expectedExt = Extensions{
+		Issuer:             "https://token.actions.githubusercontent.com",
+		GithubWorkflowName: "",
+	}
+
+	assert.True(t, CompareExtensions(expectedExt, actualExt))
+
+	// but if any of the fields don't match, it should return false
+	expectedExt = Extensions{
+		Issuer:             "https://token.actions.githubusercontent.com",
+		GithubWorkflowName: "Final",
+	}
+
+	assert.False(t, CompareExtensions(expectedExt, actualExt))
+}

@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -17,8 +18,9 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
-var expectedOIDC *string
+var expectedOIDIssuer *string
 var expectedSAN *string
+var expectedSANRegex *string
 var requireTSA *bool
 var requireTlog *bool
 var minBundleVersion *string
@@ -29,8 +31,9 @@ var tufRootURL *string
 var tufDirectory *string
 
 func init() {
-	expectedOIDC = flag.String("expectedOIDC", "", "The expected OIDC issuer for the signing certificate")
+	expectedOIDIssuer = flag.String("expectedIssuer", "", "The expected OIDC issuer for the signing certificate")
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
+	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
 	requireTSA = flag.Bool("requireTSA", false, "Require RFC 3161 signed timestamp")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
@@ -65,15 +68,28 @@ func main() {
 		}
 	}
 
-	opts := verifier.GetDefaultOptions()
-	opts.TsaOptions.Disable = !*requireTSA
-	opts.TlogOptions.Disable = !*requireTlog
-	opts.TlogOptions.PerformOnlineVerification = *onlineTlog
-	if *expectedOIDC != "" {
-		verifier.SetExpectedOIDC(opts, *expectedOIDC)
+	verifierConfig := []verifier.VerifierConfigurator{}
+	policyConfig := []verifier.PolicyOptionConfigurator{}
+
+	if *requireTSA {
+		verifierConfig = append(verifierConfig, verifier.WithSignedTimestamps())
 	}
-	if *expectedSAN != "" {
-		verifier.SetExpectedSAN(opts, *expectedSAN)
+
+	if *requireTlog {
+		verifierConfig = append(verifierConfig, verifier.WithTransparencyLog())
+	}
+
+	if *onlineTlog {
+		verifierConfig = append(verifierConfig, verifier.WithOnlineVerification())
+	}
+
+	if *expectedOIDIssuer != "" || *expectedSAN != "" || *expectedSANRegex != "" {
+		certID, err := verifier.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, "", *expectedSANRegex)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		policyConfig = append(policyConfig, verifier.WithCertificateIdentity(certID))
 	}
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
@@ -126,14 +142,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	p := verifier.NewVerifier(trustedMaterial, opts)
-	err = p.Verify(b)
+	sev, err := verifier.NewSignedEntityVerifier(trustedMaterial, verifierConfig...)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Verification successful!")
+	res, err := sev.Verify(b, policyConfig...)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	fmt.Fprintf(os.Stderr, "Verification successful!\n")
+	marshaled, err := json.MarshalIndent(res, "", "   ")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println(string(marshaled))
 }
 
 type nonExpiringVerifier struct {

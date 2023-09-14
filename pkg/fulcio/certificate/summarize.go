@@ -3,6 +3,7 @@ package certificate
 import (
 	"crypto/x509"
 	"errors"
+	"reflect"
 )
 
 // Normally, we would make this an int and use iota to assign values. However,
@@ -19,8 +20,8 @@ const (
 )
 
 type SubjectAlternativeName struct {
-	Type  SubjectAlternativeNameType `json:"type"`
-	Value string                     `json:"value"`
+	Type  SubjectAlternativeNameType `json:"type,omitempty""`
+	Value string                     `json:"value,omitempty"`
 }
 
 type Summary struct {
@@ -50,4 +51,29 @@ func SummarizeCertificate(cert *x509.Certificate) (Summary, error) {
 	}
 
 	return Summary{Extensions: extensions, SubjectAlternativeName: san}, nil
+}
+
+// CompareExtensions compares two Extensions structs and returns true if their
+// public fields are equal. It returns false otherwise. Empty fields in the
+// expectedExt struct are ignored.
+func CompareExtensions(expectedExt, actualExt Extensions) bool {
+	expExtValue := reflect.ValueOf(expectedExt)
+	actExtValue := reflect.ValueOf(actualExt)
+
+	fields := reflect.VisibleFields(expExtValue.Type())
+	for _, field := range fields {
+		expectedFieldVal := expExtValue.FieldByName(field.Name)
+
+		// if the expected field is empty, skip it
+		if expectedFieldVal.IsValid() && !expectedFieldVal.IsZero() {
+			actualFieldVal := actExtValue.FieldByName(field.Name)
+			if actualFieldVal.IsValid() {
+				if expectedFieldVal.Interface() != actualFieldVal.Interface() {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }

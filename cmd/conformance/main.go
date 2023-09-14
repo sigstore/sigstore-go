@@ -105,17 +105,15 @@ func main() {
 			},
 		}
 
-		// Configure verification options
-		opts := verifier.GetDefaultOptions()
-		opts.TlogOptions.Disable = true
-		opts.CtlogOptions.Disable = true
-		opts.TsaOptions.Disable = true
+		policyConfig := []verifier.PolicyOptionConfigurator{}
+		if *certOIDC != "" || *certSAN != "" {
+			certID, err := verifier.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 
-		if *certOIDC != "" {
-			verifier.SetExpectedOIDC(opts, *certOIDC)
-		}
-		if *certSAN != "" {
-			verifier.SetExpectedSAN(opts, *certSAN)
+			policyConfig = append(policyConfig, verifier.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -137,12 +135,17 @@ func main() {
 		}
 
 		// Verify bundle
-		v := verifier.NewVerifier(tr, opts)
+		sev, err := verifier.NewSignedEntityVerifier(tr, verifier.WithoutAnyObserverTimestampsInsecure())
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		bun, err := bundle.NewProtobufBundle(&pb)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = v.Verify(bun)
+
+		_, err = sev.Verify(bun, policyConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -165,12 +168,15 @@ func main() {
 		}
 
 		// Configure verification options
-		opts := verifier.GetDefaultOptions()
-		if *certOIDC != "" {
-			verifier.SetExpectedOIDC(opts, *certOIDC)
-		}
-		if *certSAN != "" {
-			verifier.SetExpectedSAN(opts, *certSAN)
+		policyConfig := []verifier.PolicyOptionConfigurator{}
+		if *certOIDC != "" || *certSAN != "" {
+			certID, err := verifier.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+
+			policyConfig = append(policyConfig, verifier.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -192,8 +198,12 @@ func main() {
 		}
 
 		// Verify bundle
-		p := verifier.NewVerifier(tr, opts)
-		err = p.Verify(b)
+		sev, err := verifier.NewSignedEntityVerifier(tr, verifier.WithTransparencyLog())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = sev.Verify(b, policyConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}

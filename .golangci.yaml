@@ -21,3 +21,4 @@ linters:
   disable:
     - gofumpt
     - gci
+    - tagalign
