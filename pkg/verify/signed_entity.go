@@ -1,4 +1,4 @@
-package verifier
+package verify
 
 import (
 	"crypto/x509"
@@ -24,6 +24,7 @@ type VerifierConfig struct { // nolint: revive
 	weExpectTlogEntries                bool
 	tlogEntriesThreshold               int
 	weExpectSCTs                       bool
+	ctlogEntriesThreshold              int
 	weDoNotExpectAnyObserverTimestamps bool
 }
 
@@ -66,17 +67,13 @@ func WithOnlineVerification() VerifierConfigurator {
 // timestamps from a Timestamp Authority, verify them using the TrustedMaterial's
 // TSACertificateAuthorities(), and, if it exists, use the resulting timestamp(s)
 // to verify the Fulcio certificate.
-func WithSignedTimestamps(thresholdArgs ...int) VerifierConfigurator {
+func WithSignedTimestamps(threshold int) VerifierConfigurator {
 	return func(c *VerifierConfig) {
 		c.weExpectSignedTimestamps = true
-
-		if len(thresholdArgs) > 0 {
-			c.signedTimestampThreshold = thresholdArgs[0]
-		}
-
-		// can't enable signed ts checking with a threshold < 1
-		if c.signedTimestampThreshold < 1 {
+		if threshold < 1 {
 			c.signedTimestampThreshold = 1
+		} else {
+			c.signedTimestampThreshold = threshold
 		}
 	}
 }
@@ -85,17 +82,13 @@ func WithSignedTimestamps(thresholdArgs ...int) VerifierConfigurator {
 // Transparency Log entries, verify them using the TrustedMaterial's
 // TlogAuthorities(), and, if it exists, use the resulting Inclusion timestamp(s)
 // to verify the Fulcio certificate.
-func WithTransparencyLog(thresholdArgs ...int) VerifierConfigurator {
+func WithTransparencyLog(threshold int) VerifierConfigurator {
 	return func(c *VerifierConfig) {
 		c.weExpectTlogEntries = true
-
-		if len(thresholdArgs) > 0 {
-			c.tlogEntriesThreshold = thresholdArgs[0]
-		}
-
-		// can't enable tlogEntry checking with a threshold < 1
-		if c.tlogEntriesThreshold < 1 {
+		if threshold < 1 {
 			c.tlogEntriesThreshold = 1
+		} else {
+			c.tlogEntriesThreshold = threshold
 		}
 	}
 }
@@ -103,9 +96,14 @@ func WithTransparencyLog(thresholdArgs ...int) VerifierConfigurator {
 // WithSignedCertificateTimestamps configures the SignedEntityVerifier to
 // expect the Fulcio certificate to have a SignedCertificateTimestamp, and
 // verify it using the TrustedMaterial's CTLogAuthorities().
-func WithSignedCertificateTimestamps() VerifierConfigurator {
+func WithSignedCertificateTimestamps(threshold int) VerifierConfigurator {
 	return func(c *VerifierConfig) {
 		c.weExpectSCTs = true
+		if threshold < 1 {
+			c.ctlogEntriesThreshold = 1
+		} else {
+			c.ctlogEntriesThreshold = threshold
+		}
 	}
 }
 
@@ -255,12 +253,11 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		// From spec:
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
-		if v.config.weExpectSCTs { // nolint:revive,staticcheck
-			if v.config.performOnlineVerification { // nolint:revive,staticcheck,gocritic
-			} else { // nolint:revive,staticcheck
+		if v.config.weExpectSCTs {
+			err = verificationContent.VerifySCT(v.config.ctlogEntriesThreshold, v.trustedMaterial)
+			if err != nil {
+				return nil, err
 			}
-			// TODO: extract SCT
-			// TODO: verify SCT
 		}
 
 		certSummary, err = certificate.SummarizeCertificate(leafCert)
