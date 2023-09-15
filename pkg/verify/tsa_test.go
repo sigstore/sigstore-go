@@ -17,14 +17,14 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	err = verifier.Verify(entity)
+	_, err = verifier.Verify(entity)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
 	verifier2 := NewTimestampAuthorityVerifier(virtualSigstore2, 1)
-	err = verifier2.Verify(entity)
+	_, err = verifier2.Verify(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 }
 
@@ -49,7 +49,7 @@ func TestDuplicateTimestamps(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	err = verifier.Verify(&dupTimestampEntity{entity})
+	_, err = verifier.Verify(&dupTimestampEntity{entity})
 	assert.Error(t, err) // duplicate timestamps should fail to verify
 }
 
@@ -69,7 +69,7 @@ func TestBadTSASignature(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	err = verifier.Verify(&badTSASignatureEntity{entity})
+	_, err = verifier.Verify(&badTSASignatureEntity{entity})
 	assert.Error(t, err)
 }
 
@@ -103,7 +103,7 @@ func TestBadTSACertificateChain(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	err = verifier.Verify(entity)
+	_, err = verifier.Verify(entity)
 	assert.Error(t, err)
 }
 
@@ -154,7 +154,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 			entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 			assert.NoError(t, err)
 
-			err = verifier.Verify(entity)
+			_, err = verifier.Verify(entity)
 			if test.err {
 				assert.Error(t, err)
 			} else {

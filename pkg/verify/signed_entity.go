@@ -345,7 +345,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]
 	// > … if verification or timestamp parsing fails, the Verifier MUST abort
 	if v.config.weExpectSignedTimestamps {
 		tsaVerifier := NewTimestampAuthorityVerifier(v.trustedMaterial, v.config.signedTimestampThreshold)
-		verifiedSignedTimestamps, err := tsaVerifier.NewVerify(entity)
+		verifiedSignedTimestamps, err := tsaVerifier.Verify(entity)
 		if err != nil {
 			return nil, err
 		}

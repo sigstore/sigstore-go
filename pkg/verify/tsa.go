@@ -18,12 +18,7 @@ type TimestampAuthorityVerifier struct {
 	threshold       int
 }
 
-func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
-	_, err := p.NewVerify(entity)
-	return err
-}
-
-func (p *TimestampAuthorityVerifier) NewVerify(entity SignedEntity) ([]time.Time, error) {
+func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, error) {
 	signedTimestamps, err := entity.Timestamps()
 
 	// disallow duplicate timestamps, as a malicious actor could use duplicates to bypass the threshold
