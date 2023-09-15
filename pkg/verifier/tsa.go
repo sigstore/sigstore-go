@@ -73,14 +73,6 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, tr
 			TSACertificate: ca.Leaf,
 		}
 
-		tsaRootCertPool := x509.NewCertPool()
-		tsaRootCertPool.AddCert(ca.Root)
-
-		tsaIntermediateCertPool := x509.NewCertPool()
-		for _, intermediateCert := range ca.Intermediates {
-			tsaIntermediateCertPool.AddCert(intermediateCert)
-		}
-
 		// Ensure timestamp responses are from trusted sources
 		timestamp, err := tsaverification.VerifyTimestampResponse(signedTimestamp, bytes.NewReader(dsseSignatureBytes), trustedRootVerificationOptions)
 		if err != nil {
