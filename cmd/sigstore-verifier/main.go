@@ -14,7 +14,7 @@ import (
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tuf"
-	"github.com/github/sigstore-verifier/pkg/verifier"
+	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
@@ -68,30 +68,30 @@ func main() {
 		}
 	}
 
-	verifierConfig := []verifier.VerifierConfigurator{}
-	policyConfig := []verifier.PolicyOptionConfigurator{}
+	verifierConfig := []verify.VerifierConfigurator{}
+	policyConfig := []verify.PolicyOptionConfigurator{}
 
-	verifierConfig = append(verifierConfig, verifier.WithSignedCertificateTimestamps(1))
+	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 
 	if *requireTSA {
-		verifierConfig = append(verifierConfig, verifier.WithSignedTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
 	}
 
 	if *requireTlog {
-		verifierConfig = append(verifierConfig, verifier.WithTransparencyLog(1))
+		verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
 	}
 
 	if *onlineTlog {
-		verifierConfig = append(verifierConfig, verifier.WithOnlineVerification())
+		verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 	}
 
 	if *expectedOIDIssuer != "" || *expectedSAN != "" || *expectedSANRegex != "" {
-		certID, err := verifier.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, "", *expectedSANRegex)
+		certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, "", *expectedSANRegex)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		policyConfig = append(policyConfig, verifier.WithCertificateIdentity(certID))
+		policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
 	}
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
@@ -144,7 +144,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sev, err := verifier.NewSignedEntityVerifier(trustedMaterial, verifierConfig...)
+	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verifierConfig...)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

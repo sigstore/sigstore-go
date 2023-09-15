@@ -1,4 +1,4 @@
-package verifier
+package verify
 
 import (
 	"github.com/github/sigstore-verifier/pkg/root"

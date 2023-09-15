@@ -16,7 +16,7 @@ import (
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tuf"
-	"github.com/github/sigstore-verifier/pkg/verifier"
+	"github.com/github/sigstore-verifier/pkg/verify"
 )
 
 var bundlePath *string
@@ -105,15 +105,15 @@ func main() {
 			},
 		}
 
-		policyConfig := []verifier.PolicyOptionConfigurator{}
+		policyConfig := []verify.PolicyOptionConfigurator{}
 		if *certOIDC != "" || *certSAN != "" {
-			certID, err := verifier.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
+			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
 
-			policyConfig = append(policyConfig, verifier.WithCertificateIdentity(certID))
+			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -135,7 +135,7 @@ func main() {
 		}
 
 		// Verify bundle
-		sev, err := verifier.NewSignedEntityVerifier(tr, verifier.WithoutAnyObserverTimestampsInsecure())
+		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -168,15 +168,15 @@ func main() {
 		}
 
 		// Configure verification options
-		policyConfig := []verifier.PolicyOptionConfigurator{}
+		policyConfig := []verify.PolicyOptionConfigurator{}
 		if *certOIDC != "" || *certSAN != "" {
-			certID, err := verifier.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
+			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
 
-			policyConfig = append(policyConfig, verifier.WithCertificateIdentity(certID))
+			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -198,7 +198,7 @@ func main() {
 		}
 
 		// Verify bundle
-		sev, err := verifier.NewSignedEntityVerifier(tr, verifier.WithTransparencyLog(1), verifier.WithSignedCertificateTimestamps(1))
+		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedCertificateTimestamps(1))
 		if err != nil {
 			log.Fatal(err)
 		}
