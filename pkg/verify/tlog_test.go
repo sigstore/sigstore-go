@@ -17,14 +17,14 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	err = verifier.Verify(entity)
+	_, err = verifier.Verify(entity)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
 	verifier2 := NewArtifactTransparencyLogVerifier(virtualSigstore2, 1, false)
-	err = verifier2.Verify(entity)
+	_, err = verifier2.Verify(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 
 	// Attempt to use tlog with integrated time outside certificate validity.
@@ -34,6 +34,6 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err = virtualSigstore.AttestAtTime("foo@fighters.com", "issuer", statement, time.Now().Add(30*time.Minute))
 	assert.NoError(t, err)
 
-	err = verifier.Verify(entity)
+	_, err = verifier.Verify(entity)
 	assert.Error(t, err)
 }
