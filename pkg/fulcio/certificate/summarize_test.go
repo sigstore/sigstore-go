@@ -30,6 +30,7 @@ func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
 	}
 
 	expected := Summary{
+		CertificateIssuer:      "CN=sigstore-intermediate,O=sigstore.dev",
 		SubjectAlternativeName: SubjectAlternativeName{Type: "URI", Value: "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main"},
 		Extensions: Extensions{
 			Issuer:                              "https://token.actions.githubusercontent.com",
@@ -80,6 +81,7 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 	}
 
 	expected := Summary{
+		CertificateIssuer:      "CN=sigstore-intermediate,O=sigstore.dev",
 		SubjectAlternativeName: SubjectAlternativeName{Type: "Email", Value: "brian@dehamer.com"},
 		Extensions: Extensions{
 			Issuer: "https://github.com/login/oauth",
