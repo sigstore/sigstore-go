@@ -251,7 +251,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
 		if v.config.weExpectSCTs {
-			err = verificationContent.VerifySCT(v.config.ctlogEntriesThreshold, v.trustedMaterial)
+			err = VerifySignedCertificateTimestamp(&leafCert, v.config.ctlogEntriesThreshold, v.trustedMaterial)
 			if err != nil {
 				return nil, err
 			}

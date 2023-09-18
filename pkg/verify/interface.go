@@ -59,7 +59,6 @@ type SignedEntity interface {
 type VerificationContent interface {
 	CompareKey(any, root.TrustedMaterial) bool
 	ValidAtTime(time.Time, root.TrustedMaterial) bool
-	VerifySCT(int, root.TrustedMaterial) error
 	GetIssuer() string
 	GetSAN() string
 	HasCertificate() (x509.Certificate, bool)
