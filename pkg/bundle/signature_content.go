@@ -2,7 +2,6 @@ package bundle
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -10,14 +9,10 @@ import (
 
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"github.com/sigstore/sigstore/pkg/signature"
-	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
-	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
 type SignatureContent interface {
 	EnsureFileMatchesDigest([]byte) error
-	CheckSignature(signature.Verifier) error
 	GetSignature() []byte
 	HasEnvelope() (*Envelope, bool)
 	HasMessage() (*MessageSignature, bool)
@@ -81,30 +76,6 @@ func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {
 func (e *Envelope) EnsureFileMatchesDigest(fileBytes []byte) error {
 	if e.Payload != base64.StdEncoding.EncodeToString(fileBytes) {
 		return errors.New("Envelope payload does not match supplied file")
-	}
-	return nil
-}
-
-func (m *MessageSignature) CheckSignature(verifier signature.Verifier) error {
-	opts := options.WithDigest(m.Digest)
-	return verifier.VerifySignature(bytes.NewReader(m.Signature), bytes.NewReader([]byte{}), opts)
-}
-
-func (e *Envelope) CheckSignature(verifier signature.Verifier) error {
-	pub, err := verifier.PublicKey()
-	if err != nil {
-		return err
-	}
-	envVerifier, err := dsse.NewEnvelopeVerifier(&sigdsse.VerifierAdapter{
-		SignatureVerifier: verifier,
-		Pub:               pub,
-	})
-	if err != nil {
-		return err
-	}
-	_, err = envVerifier.Verify(context.TODO(), e.Envelope)
-	if err != nil {
-		return err
 	}
 	return nil
 }

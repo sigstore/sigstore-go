@@ -5,14 +5,12 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/certificate-transparency-go/ctutil"
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	"github.com/google/certificate-transparency-go/x509util"
-	"github.com/sigstore/sigstore/pkg/signature"
 
 	"github.com/github/sigstore-verifier/pkg/root"
 )
@@ -20,7 +18,6 @@ import (
 type VerificationContent interface {
 	CompareKey(any, root.TrustedMaterial) bool
 	ValidAtTime(time.Time, root.TrustedMaterial) bool
-	Verify(SignatureContent, root.TrustedMaterial) error
 	VerifySCT(int, root.TrustedMaterial) error
 	GetIssuer() string
 	GetSAN() string
@@ -63,55 +60,6 @@ func (cc *CertificateChain) HasPublicKey() (PublicKey, bool) {
 
 func (pk *PublicKey) HasPublicKey() (PublicKey, bool) {
 	return *pk, true
-}
-
-func (cc *CertificateChain) Verify(sigContent SignatureContent, trustedMaterial root.TrustedMaterial) error {
-	verifier, err := signature.LoadVerifier(cc.Certificates[0].PublicKey, crypto.SHA256)
-	if err != nil {
-		return fmt.Errorf("invalid key: %w", err)
-	}
-
-	err = sigContent.CheckSignature(verifier)
-	if err != nil {
-		return err
-	}
-
-	leafCert := cc.Certificates[0]
-
-	for _, ca := range trustedMaterial.FulcioCertificateAuthorities() {
-		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
-			continue
-		}
-		if !ca.ValidityPeriodEnd.IsZero() && leafCert.NotAfter.After(ca.ValidityPeriodEnd) {
-			continue
-		}
-
-		rootCertPool := x509.NewCertPool()
-		rootCertPool.AddCert(ca.Root)
-		intermediateCertPool := x509.NewCertPool()
-		for _, cert := range ca.Intermediates {
-			intermediateCertPool.AddCert(cert)
-		}
-
-		opts := x509.VerifyOptions{
-			// CurrentTime is intentionally set to the leaf certificate's
-			// NotBefore time to ensure that we can continue to verify
-			// old bundles after they expire.
-			CurrentTime:   leafCert.NotBefore,
-			Roots:         rootCertPool,
-			Intermediates: intermediateCertPool,
-			KeyUsages: []x509.ExtKeyUsage{
-				x509.ExtKeyUsageCodeSigning,
-			},
-		}
-
-		_, err = leafCert.Verify(opts)
-		if err == nil {
-			return nil
-		}
-	}
-
-	return errors.New("certificate verification failed")
 }
 
 func (cc *CertificateChain) VerifySCT(threshold int, trustedMaterial root.TrustedMaterial) error {
@@ -201,20 +149,6 @@ func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
 		return false
 	}
 	return verifier.ValidAtTime(t)
-}
-
-func (pk *PublicKey) Verify(sigContent SignatureContent, tm root.TrustedMaterial) error {
-	verifier, err := tm.PublicKeyVerifier(pk.Hint)
-	if err != nil {
-		return err
-	}
-
-	err = sigContent.CheckSignature(verifier)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (pk *PublicKey) VerifySCT(_ int, _ root.TrustedMaterial) error {
