@@ -47,7 +47,7 @@ func (e *Envelope) GetStatement() (*in_toto.Statement, error) {
 	return statement, nil
 }
 
-func (e *Envelope) HasEnvelope() (verify.EnvelopeProvider, bool) {
+func (e *Envelope) HasEnvelope() (verify.EnvelopeContent, bool) {
 	return e, true
 }
 
@@ -55,15 +55,15 @@ func (e *Envelope) GetRawEnvelope() *dsse.Envelope {
 	return e.Envelope
 }
 
-func (m *MessageSignature) HasEnvelope() (verify.EnvelopeProvider, bool) {
+func (m *MessageSignature) HasEnvelope() (verify.EnvelopeContent, bool) {
 	return nil, false
 }
 
-func (e *Envelope) HasMessage() (verify.MessageSignatureProvider, bool) {
+func (e *Envelope) HasMessage() (verify.MessageSignatureContent, bool) {
 	return nil, false
 }
 
-func (m *MessageSignature) HasMessage() (verify.MessageSignatureProvider, bool) {
+func (m *MessageSignature) HasMessage() (verify.MessageSignatureContent, bool) {
 	return m, true
 }
 

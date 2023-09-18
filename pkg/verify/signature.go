@@ -23,36 +23,14 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	}
 
 	if envelope, ok := sigContent.HasEnvelope(); ok {
-		pub, err := verifier.PublicKey()
-		if err != nil {
-			return fmt.Errorf("could not fetch verifier public key: %w", err)
-		}
-		envVerifier, err := dsse.NewEnvelopeVerifier(&sigdsse.VerifierAdapter{
-			SignatureVerifier: verifier,
-			Pub:               pub,
-		})
-		if err != nil {
-			return fmt.Errorf("could not load envelope verifier: %w", err)
-		}
-
-		_, err = envVerifier.Verify(context.TODO(), envelope.GetRawEnvelope())
-		if err != nil {
-			return fmt.Errorf("could not verify envelope: %w", err)
-		}
+		return verifyEnvelope(verifier, envelope)
 	} else if msg, ok := sigContent.HasMessage(); ok {
 		// TODO: add VerifySigWithArtifact, then error out here
-		opts := options.WithDigest(msg.GetDigest())
-		err = verifier.VerifySignature(bytes.NewReader(msg.GetSignature()), bytes.NewReader([]byte{}), opts)
-
-		if err != nil {
-			return fmt.Errorf("could not verify message: %w", err)
-		}
+		return verifyMessageSignature(verifier, msg)
 	} else {
 		// should never happen, but just in case:
 		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
-
-	return nil
 }
 
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
@@ -63,4 +41,36 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 	} else {
 		return nil, fmt.Errorf("no public key or certificate found")
 	}
+}
+
+func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {
+	pub, err := verifier.PublicKey()
+	if err != nil {
+		return fmt.Errorf("could not fetch verifier public key: %w", err)
+	}
+	envVerifier, err := dsse.NewEnvelopeVerifier(&sigdsse.VerifierAdapter{
+		SignatureVerifier: verifier,
+		Pub:               pub,
+	})
+	if err != nil {
+		return fmt.Errorf("could not load envelope verifier: %w", err)
+	}
+
+	_, err = envVerifier.Verify(context.TODO(), envelope.GetRawEnvelope())
+	if err != nil {
+		return fmt.Errorf("could not verify envelope: %w", err)
+	}
+
+	return nil
+}
+
+func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent) error {
+	opts := options.WithDigest(msg.GetDigest())
+	err := verifier.VerifySignature(bytes.NewReader(msg.GetSignature()), bytes.NewReader([]byte{}), opts)
+
+	if err != nil {
+		return fmt.Errorf("could not verify message: %w", err)
+	}
+
+	return nil
 }

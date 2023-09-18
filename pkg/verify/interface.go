@@ -69,21 +69,21 @@ type VerificationContent interface {
 type SignatureContent interface {
 	EnsureFileMatchesDigest([]byte) error
 	GetSignature() []byte
-	HasEnvelope() (EnvelopeProvider, bool)
-	HasMessage() (MessageSignatureProvider, bool)
+	HasEnvelope() (EnvelopeContent, bool)
+	HasMessage() (MessageSignatureContent, bool)
 }
 
 type PublicKeyProvider interface {
 	GetHint() string
 }
 
-type MessageSignatureProvider interface {
+type MessageSignatureContent interface {
 	GetDigest() []byte
 	GetDigestAlgorithm() string
 	GetSignature() []byte
 }
 
-type EnvelopeProvider interface {
+type EnvelopeContent interface {
 	GetRawEnvelope() *dsse.Envelope
 	GetStatement() (*in_toto.Statement, error)
 }
