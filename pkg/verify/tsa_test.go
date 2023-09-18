@@ -1,4 +1,4 @@
-package verify
+package verify_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/testing/ca"
+	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +14,7 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier := NewTimestampAuthorityVerifier(virtualSigstore, 1)
+	verifier := verify.NewTimestampAuthorityVerifier(virtualSigstore, 1)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
@@ -23,7 +24,7 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier2 := NewTimestampAuthorityVerifier(virtualSigstore2, 1)
+	verifier2 := verify.NewTimestampAuthorityVerifier(virtualSigstore2, 1)
 	_, err = verifier2.Verify(entity)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 }
@@ -45,7 +46,7 @@ func TestDuplicateTimestamps(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier := NewTimestampAuthorityVerifier(virtualSigstore, 1)
+	verifier := verify.NewTimestampAuthorityVerifier(virtualSigstore, 1)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
@@ -65,7 +66,7 @@ func TestBadTSASignature(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier := NewTimestampAuthorityVerifier(virtualSigstore, 1)
+	verifier := verify.NewTimestampAuthorityVerifier(virtualSigstore, 1)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
@@ -99,7 +100,7 @@ func TestBadTSACertificateChain(t *testing.T) {
 		ValidityPeriodEnd:   ca1.ValidityPeriodEnd,
 	}
 
-	verifier := NewTimestampAuthorityVerifier(&customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{badChain}}, 1)
+	verifier := verify.NewTimestampAuthorityVerifier(&customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{badChain}}, 1)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
@@ -150,7 +151,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			verifier := NewTimestampAuthorityVerifier(&customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{test.ca}}, 1)
+			verifier := verify.NewTimestampAuthorityVerifier(&customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{test.ca}}, 1)
 			entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 			assert.NoError(t, err)
 

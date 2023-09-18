@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/github/sigstore-verifier/pkg/tlog"
+	"github.com/github/sigstore-verifier/pkg/verify"
 )
 
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
@@ -115,7 +116,7 @@ func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
+func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, error) {
 	if b.VerificationMaterial == nil {
 		return nil, ErrMissingVerificationMaterial
 	}
@@ -196,7 +197,7 @@ func (b *ProtobufBundle) KeyID() (string, error) {
 	return "", nil
 }
 
-func (b *ProtobufBundle) SignatureContent() (SignatureContent, error) {
+func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		envelope, err := parseEnvelope(content.DsseEnvelope)
@@ -251,7 +252,7 @@ func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
 		return nil, err
 	}
 
-	statement, err := envelope.Statement()
+	statement, err := envelope.GetStatement()
 	if err != nil {
 		return nil, err
 	}

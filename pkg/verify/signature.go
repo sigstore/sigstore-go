@@ -6,7 +6,6 @@ import (
 	"crypto"
 	"fmt"
 
-	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -14,7 +13,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
-func VerifySignature(sigContent bundle.SignatureContent, verificationContent bundle.VerificationContent, trustedMaterial root.TrustedMaterial) error {
+func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error {
 	var verifier signature.Verifier
 	var err error
 
@@ -36,13 +35,13 @@ func VerifySignature(sigContent bundle.SignatureContent, verificationContent bun
 			return fmt.Errorf("could not load envelope verifier: %w", err)
 		}
 
-		_, err = envVerifier.Verify(context.TODO(), envelope.Envelope)
+		_, err = envVerifier.Verify(context.TODO(), envelope.GetRawEnvelope())
 		if err != nil {
 			return fmt.Errorf("could not verify envelope: %w", err)
 		}
 	} else if msg, ok := sigContent.HasMessage(); ok {
 		// TODO: add VerifySigWithArtifact, then error out here
-		opts := options.WithDigest(msg.Digest)
+		opts := options.WithDigest(msg.GetDigest())
 		err = verifier.VerifySignature(bytes.NewReader(msg.GetSignature()), bytes.NewReader([]byte{}), opts)
 
 		if err != nil {
@@ -56,11 +55,11 @@ func VerifySignature(sigContent bundle.SignatureContent, verificationContent bun
 	return nil
 }
 
-func getSignatureVerifier(verificationContent bundle.VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
+func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
 	if leafCert, ok := verificationContent.HasCertificate(); ok {
 		return signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
 	} else if pk, ok := verificationContent.HasPublicKey(); ok {
-		return tm.PublicKeyVerifier(pk.Hint)
+		return tm.PublicKeyVerifier(pk.GetHint())
 	} else {
 		return nil, fmt.Errorf("no public key or certificate found")
 	}

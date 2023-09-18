@@ -7,16 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
-
-type SignatureContent interface {
-	EnsureFileMatchesDigest([]byte) error
-	GetSignature() []byte
-	HasEnvelope() (*Envelope, bool)
-	HasMessage() (*MessageSignature, bool)
-}
 
 type MessageSignature struct {
 	Digest          []byte
@@ -24,11 +18,19 @@ type MessageSignature struct {
 	Signature       []byte
 }
 
+func (m *MessageSignature) GetDigest() []byte {
+	return m.Digest
+}
+
+func (m *MessageSignature) GetDigestAlgorithm() string {
+	return m.DigestAlgorithm
+}
+
 type Envelope struct {
 	*dsse.Envelope
 }
 
-func (e *Envelope) Statement() (*in_toto.Statement, error) {
+func (e *Envelope) GetStatement() (*in_toto.Statement, error) {
 	if e.PayloadType != IntotoMediaType {
 		return nil, ErrIncorrectMediaType
 	}
@@ -45,19 +47,23 @@ func (e *Envelope) Statement() (*in_toto.Statement, error) {
 	return statement, nil
 }
 
-func (e *Envelope) HasEnvelope() (*Envelope, bool) {
+func (e *Envelope) HasEnvelope() (verify.EnvelopeProvider, bool) {
 	return e, true
 }
 
-func (m *MessageSignature) HasEnvelope() (*Envelope, bool) {
+func (e *Envelope) GetRawEnvelope() *dsse.Envelope {
+	return e.Envelope
+}
+
+func (m *MessageSignature) HasEnvelope() (verify.EnvelopeProvider, bool) {
 	return nil, false
 }
 
-func (e *Envelope) HasMessage() (*MessageSignature, bool) {
+func (e *Envelope) HasMessage() (verify.MessageSignatureProvider, bool) {
 	return nil, false
 }
 
-func (m *MessageSignature) HasMessage() (*MessageSignature, bool) {
+func (m *MessageSignature) HasMessage() (verify.MessageSignatureProvider, bool) {
 	return m, true
 }
 

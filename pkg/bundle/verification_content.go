@@ -13,17 +13,8 @@ import (
 	"github.com/google/certificate-transparency-go/x509util"
 
 	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/github/sigstore-verifier/pkg/verify"
 )
-
-type VerificationContent interface {
-	CompareKey(any, root.TrustedMaterial) bool
-	ValidAtTime(time.Time, root.TrustedMaterial) bool
-	VerifySCT(int, root.TrustedMaterial) error
-	GetIssuer() string
-	GetSAN() string
-	HasCertificate() (x509.Certificate, bool)
-	HasPublicKey() (PublicKey, bool)
-}
 
 type CertificateChain struct {
 	Certificates []*x509.Certificate
@@ -31,6 +22,10 @@ type CertificateChain struct {
 
 type PublicKey struct {
 	Hint string
+}
+
+func (pk PublicKey) GetHint() string {
+	return pk.Hint
 }
 
 func (cc *CertificateChain) CompareKey(key any, _ root.TrustedMaterial) bool {
@@ -54,11 +49,11 @@ func (pk *PublicKey) HasCertificate() (x509.Certificate, bool) {
 	return x509.Certificate{}, false
 }
 
-func (cc *CertificateChain) HasPublicKey() (PublicKey, bool) {
+func (cc *CertificateChain) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return PublicKey{}, false
 }
 
-func (pk *PublicKey) HasPublicKey() (PublicKey, bool) {
+func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return *pk, true
 }
 

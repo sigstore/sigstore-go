@@ -24,6 +24,7 @@ import (
 	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/github/sigstore-verifier/pkg/tlog"
+	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/go-openapi/runtime"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/rekor/pkg/generated/models"
@@ -385,7 +386,7 @@ type TestEntity struct {
 	keyID       string
 }
 
-func (e *TestEntity) VerificationContent() (bundle.VerificationContent, error) {
+func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
 	return &bundle.CertificateChain{Certificates: e.certChain}, nil
 }
 
@@ -397,7 +398,7 @@ func (e *TestEntity) HasInclusionProof() bool {
 	return false
 }
 
-func (e *TestEntity) SignatureContent() (bundle.SignatureContent, error) {
+func (e *TestEntity) SignatureContent() (verify.SignatureContent, error) {
 	return &bundle.Envelope{Envelope: e.envelope}, nil
 }
 

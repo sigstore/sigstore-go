@@ -1,9 +1,9 @@
-package certificate
+package certificate_test
 
 import (
 	"testing"
 
-	"github.com/github/sigstore-verifier/pkg/bundle"
+	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
 	"github.com/github/sigstore-verifier/pkg/testing/data"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,22 +16,20 @@ func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
 		t.Fatalf("failed to get verification content: %v", err)
 	}
 
-	cc, ok := vc.(*bundle.CertificateChain)
+	leaf, ok := vc.HasCertificate()
 
 	if !ok {
 		t.Fatalf("expected verification content to be a certificate chain")
 	}
 
-	leaf := cc.Certificates[0]
-
-	cs, err := SummarizeCertificate(leaf)
+	cs, err := certificate.SummarizeCertificate(&leaf)
 	if err != nil {
 		t.Fatalf("failed to summarize: %v", err)
 	}
 
-	expected := Summary{
-		SubjectAlternativeName: SubjectAlternativeName{Type: "URI", Value: "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main"},
-		Extensions: Extensions{
+	expected := certificate.Summary{
+		SubjectAlternativeName: certificate.SubjectAlternativeName{Type: "URI", Value: "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main"},
+		Extensions: certificate.Extensions{
 			Issuer:                              "https://token.actions.githubusercontent.com",
 			GithubWorkflowTrigger:               "push",
 			GithubWorkflowSHA:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
@@ -66,22 +64,20 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 		t.Fatalf("failed to get verification content: %v", err)
 	}
 
-	cc, ok := vc.(*bundle.CertificateChain)
+	leaf, ok := vc.HasCertificate()
 
 	if !ok {
 		t.Fatalf("expected verification content to be a certificate chain")
 	}
 
-	leaf := cc.Certificates[0]
-
-	cs, err := SummarizeCertificate(leaf)
+	cs, err := certificate.SummarizeCertificate(&leaf)
 	if err != nil {
 		t.Fatalf("failed to summarize: %v", err)
 	}
 
-	expected := Summary{
-		SubjectAlternativeName: SubjectAlternativeName{Type: "Email", Value: "brian@dehamer.com"},
-		Extensions: Extensions{
+	expected := certificate.Summary{
+		SubjectAlternativeName: certificate.SubjectAlternativeName{Type: "Email", Value: "brian@dehamer.com"},
+		Extensions: certificate.Extensions{
 			Issuer: "https://github.com/login/oauth",
 		},
 	}
@@ -91,7 +87,7 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 
 func TestCompareExtensions(t *testing.T) {
 	// Test that the extensions are equal
-	actualExt := Extensions{
+	actualExt := certificate.Extensions{
 		Issuer:                   "https://token.actions.githubusercontent.com",
 		GithubWorkflowTrigger:    "push",
 		GithubWorkflowSHA:        "f0b49a04e5a62250e0f60fb128004a73110fe311",
@@ -100,26 +96,26 @@ func TestCompareExtensions(t *testing.T) {
 		GithubWorkflowRef:        "refs/heads/main",
 	}
 
-	expectedExt := Extensions{
+	expectedExt := certificate.Extensions{
 		Issuer: "https://token.actions.githubusercontent.com",
 	}
 
 	// Only the specified fields are expected to match
-	assert.True(t, CompareExtensions(expectedExt, actualExt))
+	assert.True(t, certificate.CompareExtensions(expectedExt, actualExt))
 
 	// Blank fields are ignored
-	expectedExt = Extensions{
+	expectedExt = certificate.Extensions{
 		Issuer:             "https://token.actions.githubusercontent.com",
 		GithubWorkflowName: "",
 	}
 
-	assert.True(t, CompareExtensions(expectedExt, actualExt))
+	assert.True(t, certificate.CompareExtensions(expectedExt, actualExt))
 
 	// but if any of the fields don't match, it should return false
-	expectedExt = Extensions{
+	expectedExt = certificate.Extensions{
 		Issuer:             "https://token.actions.githubusercontent.com",
 		GithubWorkflowName: "Final",
 	}
 
-	assert.False(t, CompareExtensions(expectedExt, actualExt))
+	assert.False(t, certificate.CompareExtensions(expectedExt, actualExt))
 }

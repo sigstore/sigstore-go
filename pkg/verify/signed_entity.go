@@ -295,7 +295,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 	// SignatureContent can be either an Envelope or a MessageSignature.
 	// If it's an Envelope, let's pop the Statement for our results:
 	if envelope, ok := sigContent.HasEnvelope(); ok {
-		stmt, err := envelope.Statement()
+		stmt, err := envelope.GetStatement()
 		if err != nil {
 			return nil, err
 		}

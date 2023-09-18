@@ -9,7 +9,6 @@ import (
 
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
-	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
@@ -57,7 +56,7 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, e
 	return verifiedTimestamps, nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent bundle.VerificationContent) (time.Time, error) {
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent VerificationContent) (time.Time, error) {
 	certAuthorities := trustedMaterial.TSACertificateAuthorities()
 
 	// Iterate through TSA certificate authorities to find one that verifies
