@@ -24,6 +24,8 @@ type VerificationContent interface {
 	VerifySCT(int, root.TrustedMaterial) error
 	GetIssuer() string
 	GetSAN() string
+	HasCertificate() (x509.Certificate, bool)
+	HasPublicKey() (PublicKey, bool)
 }
 
 type CertificateChain struct {
@@ -45,6 +47,22 @@ func (cc *CertificateChain) CompareKey(key any, _ root.TrustedMaterial) bool {
 
 func (cc *CertificateChain) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
 	return !(cc.Certificates[0].NotAfter.Before(t) || cc.Certificates[0].NotBefore.After(t))
+}
+
+func (cc *CertificateChain) HasCertificate() (x509.Certificate, bool) {
+	return *cc.Certificates[0], true
+}
+
+func (pk *PublicKey) HasCertificate() (x509.Certificate, bool) {
+	return x509.Certificate{}, false
+}
+
+func (cc *CertificateChain) HasPublicKey() (PublicKey, bool) {
+	return PublicKey{}, false
+}
+
+func (pk *PublicKey) HasPublicKey() (PublicKey, bool) {
+	return *pk, true
 }
 
 func (cc *CertificateChain) Verify(sigContent SignatureContent, trustedMaterial root.TrustedMaterial) error {

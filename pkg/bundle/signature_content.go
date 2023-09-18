@@ -19,6 +19,8 @@ type SignatureContent interface {
 	EnsureFileMatchesDigest([]byte) error
 	CheckSignature(signature.Verifier) error
 	GetSignature() []byte
+	HasEnvelope() (*Envelope, bool)
+	HasMessage() (*MessageSignature, bool)
 }
 
 type MessageSignature struct {
@@ -46,6 +48,22 @@ func (e *Envelope) Statement() (*in_toto.Statement, error) {
 		return nil, ErrDecodingJSON
 	}
 	return statement, nil
+}
+
+func (e *Envelope) HasEnvelope() (*Envelope, bool) {
+	return e, true
+}
+
+func (m *MessageSignature) HasEnvelope() (*Envelope, bool) {
+	return nil, false
+}
+
+func (e *Envelope) HasMessage() (*MessageSignature, bool) {
+	return nil, false
+}
+
+func (m *MessageSignature) HasMessage() (*MessageSignature, bool) {
+	return m, true
 }
 
 func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {
