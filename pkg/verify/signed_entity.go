@@ -217,12 +217,12 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 
 	verifiedTimestamps, err := v.VerifyObserverTimestamps(entity)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to verify timestamps: %w", err)
 	}
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch verification content: %w", err)
 	}
 
 	var signedWithCertificate bool
@@ -242,7 +242,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 			// verify the leaf certificate against the root
 			err = VerifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to verify leaf certificate: %w", err)
 			}
 		}
 
@@ -252,13 +252,13 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		if v.config.weExpectSCTs {
 			err = VerifySignedCertificateTimestamp(&leafCert, v.config.ctlogEntriesThreshold, v.trustedMaterial)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to verify signed certificate timestamp: %w", err)
 			}
 		}
 
 		certSummary, err = certificate.SummarizeCertificate(&leafCert)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to summarize certificate: %w", err)
 		}
 	}
 
@@ -274,12 +274,12 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 
 	sigContent, err := entity.SignatureContent()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
 	err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to verify signature: %w", err)
 	}
 
 	// Hooray! We've verified all of the entity's constituent parts! 🎉 🥳
@@ -296,7 +296,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 	if envelope, ok := sigContent.HasEnvelope(); ok {
 		stmt, err := envelope.GetStatement()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to fetch envelope statement: %w", err)
 		}
 
 		result.Statement = stmt
@@ -320,7 +320,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 
 		matchingCertID, err := policy.CertificateIdentities.Verify(certSummary)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to verify certificate identity: %w", err)
 		}
 
 		result.VerifiedIdentity = matchingCertID
