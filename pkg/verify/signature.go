@@ -13,7 +13,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
-func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error {
+func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	var verifier signature.Verifier
 	var err error
 
