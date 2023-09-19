@@ -26,12 +26,7 @@ type ArtifactTransparencyLogVerifier struct {
 	online          bool
 }
 
-func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) error {
-	_, err := p.NewVerify(entity)
-	return err
-}
-
-func (p *ArtifactTransparencyLogVerifier) NewVerify(entity SignedEntity) ([]time.Time, error) {
+func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Time, error) {
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -47,7 +42,7 @@ func (p *ArtifactTransparencyLogVerifier) NewVerify(entity SignedEntity) ([]time
 		return nil, err
 	}
 
-	entitySignature := sigContent.GetSignature()
+	entitySignature := sigContent.Signature()
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {

@@ -9,7 +9,6 @@ import (
 
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
-	"github.com/github/sigstore-verifier/pkg/bundle"
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
@@ -18,12 +17,7 @@ type TimestampAuthorityVerifier struct {
 	threshold       int
 }
 
-func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) error {
-	_, err := p.NewVerify(entity)
-	return err
-}
-
-func (p *TimestampAuthorityVerifier) NewVerify(entity SignedEntity) ([]time.Time, error) {
+func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, error) {
 	signedTimestamps, err := entity.Timestamps()
 
 	// disallow duplicate timestamps, as a malicious actor could use duplicates to bypass the threshold
@@ -44,7 +38,7 @@ func (p *TimestampAuthorityVerifier) NewVerify(entity SignedEntity) ([]time.Time
 		return nil, err
 	}
 
-	signatureBytes := sigContent.GetSignature()
+	signatureBytes := sigContent.Signature()
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {
@@ -62,7 +56,7 @@ func (p *TimestampAuthorityVerifier) NewVerify(entity SignedEntity) ([]time.Time
 	return verifiedTimestamps, nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent bundle.VerificationContent) (time.Time, error) {
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent VerificationContent) (time.Time, error) {
 	certAuthorities := trustedMaterial.TSACertificateAuthorities()
 
 	// Iterate through TSA certificate authorities to find one that verifies

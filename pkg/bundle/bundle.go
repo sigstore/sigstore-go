@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -17,6 +16,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/github/sigstore-verifier/pkg/tlog"
+	"github.com/github/sigstore-verifier/pkg/verify"
 )
 
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
@@ -115,7 +115,7 @@ func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
+func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, error) {
 	if b.VerificationMaterial == nil {
 		return nil, ErrMissingVerificationMaterial
 	}
@@ -140,7 +140,7 @@ func (b *ProtobufBundle) VerificationContent() (VerificationContent, error) {
 		return certChain, nil
 	case *protobundle.VerificationMaterial_PublicKey:
 		pk := &PublicKey{
-			Hint: content.PublicKey.Hint,
+			hint: content.PublicKey.Hint,
 		}
 		return pk, nil
 
@@ -196,7 +196,7 @@ func (b *ProtobufBundle) KeyID() (string, error) {
 	return "", nil
 }
 
-func (b *ProtobufBundle) SignatureContent() (SignatureContent, error) {
+func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		envelope, err := parseEnvelope(content.DsseEnvelope)
@@ -206,9 +206,9 @@ func (b *ProtobufBundle) SignatureContent() (SignatureContent, error) {
 		return envelope, nil
 	case *protobundle.Bundle_MessageSignature:
 		messageSignature := MessageSignature{
-			Digest:          content.MessageSignature.MessageDigest.Digest,
-			DigestAlgorithm: protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
-			Signature:       content.MessageSignature.Signature,
+			digest:          content.MessageSignature.MessageDigest.Digest,
+			digestAlgorithm: protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
+			signature:       content.MessageSignature.Signature,
 		}
 		return &messageSignature, nil
 	}
@@ -243,20 +243,6 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 	}
 
 	return signedTimestamps, nil
-}
-
-func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
-	envelope, err := b.Envelope()
-	if err != nil {
-		return nil, err
-	}
-
-	statement, err := envelope.Statement()
-	if err != nil {
-		return nil, err
-	}
-
-	return statement, nil
 }
 
 func (b *ProtobufBundle) MinVersion(version string) bool {

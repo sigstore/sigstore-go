@@ -2,29 +2,28 @@ package bundle
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 
+	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"github.com/sigstore/sigstore/pkg/signature"
-	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
-	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
-type SignatureContent interface {
-	EnsureFileMatchesDigest([]byte) error
-	CheckSignature(signature.Verifier) error
-	GetSignature() []byte
+type MessageSignature struct {
+	digest          []byte
+	digestAlgorithm string
+	signature       []byte
 }
 
-type MessageSignature struct {
-	Digest          []byte
-	DigestAlgorithm string
-	Signature       []byte
+func (m *MessageSignature) Digest() []byte {
+	return m.digest
+}
+
+func (m *MessageSignature) DigestAlgorithm() string {
+	return m.digestAlgorithm
 }
 
 type Envelope struct {
@@ -48,13 +47,33 @@ func (e *Envelope) Statement() (*in_toto.Statement, error) {
 	return statement, nil
 }
 
+func (e *Envelope) EnvelopeContent() verify.EnvelopeContent {
+	return e
+}
+
+func (e *Envelope) RawEnvelope() *dsse.Envelope {
+	return e.Envelope
+}
+
+func (m *MessageSignature) EnvelopeContent() verify.EnvelopeContent {
+	return nil
+}
+
+func (e *Envelope) MessageSignatureContent() verify.MessageSignatureContent {
+	return nil
+}
+
+func (m *MessageSignature) MessageSignatureContent() verify.MessageSignatureContent {
+	return m
+}
+
 func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {
-	if m.DigestAlgorithm != "SHA2_256" {
+	if m.digestAlgorithm != "SHA2_256" {
 		return errors.New("Message has unsupported hash algorithm")
 	}
 
 	fileDigest := sha256.Sum256(fileBytes)
-	if !bytes.Equal(m.Digest, fileDigest[:]) {
+	if !bytes.Equal(m.digest, fileDigest[:]) {
 		return errors.New("Message signature does not match supplied file")
 	}
 	return nil
@@ -67,35 +86,11 @@ func (e *Envelope) EnsureFileMatchesDigest(fileBytes []byte) error {
 	return nil
 }
 
-func (m *MessageSignature) CheckSignature(verifier signature.Verifier) error {
-	opts := options.WithDigest(m.Digest)
-	return verifier.VerifySignature(bytes.NewReader(m.Signature), bytes.NewReader([]byte{}), opts)
+func (m *MessageSignature) Signature() []byte {
+	return m.signature
 }
 
-func (e *Envelope) CheckSignature(verifier signature.Verifier) error {
-	pub, err := verifier.PublicKey()
-	if err != nil {
-		return err
-	}
-	envVerifier, err := dsse.NewEnvelopeVerifier(&sigdsse.VerifierAdapter{
-		SignatureVerifier: verifier,
-		Pub:               pub,
-	})
-	if err != nil {
-		return err
-	}
-	_, err = envVerifier.Verify(context.TODO(), e.Envelope)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *MessageSignature) GetSignature() []byte {
-	return m.Signature
-}
-
-func (e *Envelope) GetSignature() []byte {
+func (e *Envelope) Signature() []byte {
 	if len(e.Envelope.Signatures) == 0 {
 		return []byte{}
 	}

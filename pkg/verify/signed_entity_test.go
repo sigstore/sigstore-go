@@ -1,4 +1,4 @@
-package verify
+package verify_test
 
 import (
 	"testing"
@@ -6,7 +6,9 @@ import (
 
 	"encoding/json"
 
+	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
 	"github.com/github/sigstore-verifier/pkg/testing/data"
+	v "github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,30 +16,28 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 
 	// can't create a verifier without specifying either tlog or tsa
-	_, err := NewSignedEntityVerifier(tr)
+	_, err := v.NewSignedEntityVerifier(tr)
 	assert.NotNil(t, err)
 
 	// can create a verifier with both of them
-	_, err = NewSignedEntityVerifier(tr, WithTransparencyLog(1), WithSignedTimestamps(1))
+	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1), v.WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
 	// unless we are really sure we want a verifier without either tlog or tsa
-	_, err = NewSignedEntityVerifier(tr, WithoutAnyObserverTimestampsInsecure())
+	_, err = v.NewSignedEntityVerifier(tr, v.WithoutAnyObserverTimestampsInsecure())
 	assert.Nil(t, err)
 
 	// can configure the verifiers with thresholds
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(2), WithSignedTimestamps(10))
+	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(2), v.WithSignedTimestamps(10))
 
 	assert.Nil(t, err)
-	assert.Equal(t, 2, v.config.tlogEntriesThreshold)
-	assert.Equal(t, 10, v.config.signedTimestampThreshold)
 
 	// can't configure them with < 1 thresholds
-	v, err = NewSignedEntityVerifier(tr, WithTransparencyLog(0), WithSignedTimestamps(-10))
+	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(0), v.WithSignedTimestamps(-10))
 
 	assert.Nil(t, err)
-	assert.Equal(t, 1, v.config.tlogEntriesThreshold)
-	assert.Equal(t, 1, v.config.signedTimestampThreshold)
+	// TODO: throw error
+	// assert.Equal(t, 1, verifier.config.signedTimestampThreshold)
 }
 
 // Testing a bundle:
@@ -49,7 +49,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1))
+	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
@@ -68,7 +68,7 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithoutAnyObserverTimestampsInsecure())
+	v, err := v.NewSignedEntityVerifier(tr, v.WithoutAnyObserverTimestampsInsecure())
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
@@ -80,7 +80,7 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(2))
+	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(2))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
@@ -92,7 +92,7 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1), WithSignedTimestamps(1))
+	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1), v.WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity)
@@ -106,23 +106,23 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	goodCI, _ := certIDForTesting("", "", SigstoreSanRegex, ActionsIssuerValue, "")
-	badCI, _ := certIDForTesting("BadSANValue", "", "", ActionsIssuerValue, "")
+	goodCI, _ := certIDForTesting("", "", v.SigstoreSanRegex, v.ActionsIssuerValue, "")
+	badCI, _ := certIDForTesting("BadSANValue", "", "", v.ActionsIssuerValue, "")
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1))
+	verifier, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
 
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity,
-		WithCertificateIdentity(badCI),
-		WithCertificateIdentity(goodCI))
+	res, err := verifier.Verify(entity,
+		v.WithCertificateIdentity(badCI),
+		v.WithCertificateIdentity(goodCI))
 	assert.Nil(t, err)
 
-	assert.Equal(t, res.VerifiedIdentity.Issuer, ActionsIssuerValue)
+	assert.Equal(t, res.VerifiedIdentity.Issuer, v.ActionsIssuerValue)
 
 	// but if only pass in the bad CI, it will fail:
-	res, err = v.Verify(entity,
-		WithCertificateIdentity(badCI))
+	res, err = verifier.Verify(entity,
+		v.WithCertificateIdentity(badCI))
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -140,10 +140,10 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := NewSignedEntityVerifier(tr, WithTransparencyLog(1))
+	verifier, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := verifier.Verify(entity)
 	assert.Nil(t, err)
 
 	rawJSON, err := json.Marshal(res)
@@ -171,4 +171,14 @@ func ensureKeysBeginWithLowercase(t *testing.T, obj interface{}) {
 			ensureKeysBeginWithLowercase(t, val)
 		}
 	}
+}
+
+// copied from verify/certificate_identity_test.go
+func certIDForTesting(sanValue, sanType, sanRegex, issuer, runnerEnv string) (v.CertificateIdentity, error) {
+	san, err := v.NewSANMatcher(sanValue, sanType, sanRegex)
+	if err != nil {
+		return v.CertificateIdentity{}, err
+	}
+
+	return v.CertificateIdentity{SubjectAlternativeName: san, Extensions: certificate.Extensions{Issuer: issuer, RunnerEnvironment: runnerEnv}}, nil
 }
