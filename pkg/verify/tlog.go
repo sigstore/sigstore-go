@@ -42,7 +42,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Ti
 		return nil, err
 	}
 
-	entitySignature := sigContent.GetSignature()
+	entitySignature := sigContent.Signature()
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {

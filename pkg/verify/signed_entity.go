@@ -293,8 +293,8 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 
 	// SignatureContent can be either an Envelope or a MessageSignature.
 	// If it's an Envelope, let's pop the Statement for our results:
-	if envelope, ok := sigContent.HasEnvelope(); ok {
-		stmt, err := envelope.GetStatement()
+	if envelope := sigContent.EnvelopeContent(); envelope != nil {
+		stmt, err := envelope.Statement()
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch envelope statement: %w", err)
 		}

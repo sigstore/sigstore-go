@@ -66,24 +66,24 @@ type VerificationContent interface {
 
 type SignatureContent interface {
 	EnsureFileMatchesDigest([]byte) error
-	GetSignature() []byte
-	HasEnvelope() (EnvelopeContent, bool)
-	HasMessage() (MessageSignatureContent, bool)
+	Signature() []byte
+	EnvelopeContent() EnvelopeContent
+	MessageSignatureContent() MessageSignatureContent
 }
 
 type PublicKeyProvider interface {
-	GetHint() string
+	Hint() string
 }
 
 type MessageSignatureContent interface {
-	GetDigest() []byte
-	GetDigestAlgorithm() string
-	GetSignature() []byte
+	Digest() []byte
+	DigestAlgorithm() string
+	Signature() []byte
 }
 
 type EnvelopeContent interface {
-	GetRawEnvelope() *dsse.Envelope
-	GetStatement() (*in_toto.Statement, error)
+	RawEnvelope() *dsse.Envelope
+	Statement() (*in_toto.Statement, error)
 }
 
 // BaseSignedEntity is a helper struct that implements all the interfaces

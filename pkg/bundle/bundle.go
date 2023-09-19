@@ -140,7 +140,7 @@ func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, erro
 		return certChain, nil
 	case *protobundle.VerificationMaterial_PublicKey:
 		pk := &PublicKey{
-			Hint: content.PublicKey.Hint,
+			hint: content.PublicKey.Hint,
 		}
 		return pk, nil
 
@@ -206,9 +206,9 @@ func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
 		return envelope, nil
 	case *protobundle.Bundle_MessageSignature:
 		messageSignature := MessageSignature{
-			Digest:          content.MessageSignature.MessageDigest.Digest,
-			DigestAlgorithm: protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
-			Signature:       content.MessageSignature.Signature,
+			digest:          content.MessageSignature.MessageDigest.Digest,
+			digestAlgorithm: protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
+			signature:       content.MessageSignature.Signature,
 		}
 		return &messageSignature, nil
 	}

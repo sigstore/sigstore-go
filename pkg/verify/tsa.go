@@ -38,7 +38,7 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, e
 		return nil, err
 	}
 
-	signatureBytes := sigContent.GetSignature()
+	signatureBytes := sigContent.Signature()
 
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {

@@ -13,24 +13,24 @@ import (
 )
 
 type MessageSignature struct {
-	Digest          []byte
-	DigestAlgorithm string
-	Signature       []byte
+	digest          []byte
+	digestAlgorithm string
+	signature       []byte
 }
 
-func (m *MessageSignature) GetDigest() []byte {
-	return m.Digest
+func (m *MessageSignature) Digest() []byte {
+	return m.digest
 }
 
-func (m *MessageSignature) GetDigestAlgorithm() string {
-	return m.DigestAlgorithm
+func (m *MessageSignature) DigestAlgorithm() string {
+	return m.digestAlgorithm
 }
 
 type Envelope struct {
 	*dsse.Envelope
 }
 
-func (e *Envelope) GetStatement() (*in_toto.Statement, error) {
+func (e *Envelope) Statement() (*in_toto.Statement, error) {
 	if e.PayloadType != IntotoMediaType {
 		return nil, ErrIncorrectMediaType
 	}
@@ -47,33 +47,33 @@ func (e *Envelope) GetStatement() (*in_toto.Statement, error) {
 	return statement, nil
 }
 
-func (e *Envelope) HasEnvelope() (verify.EnvelopeContent, bool) {
-	return e, true
+func (e *Envelope) EnvelopeContent() verify.EnvelopeContent {
+	return e
 }
 
-func (e *Envelope) GetRawEnvelope() *dsse.Envelope {
+func (e *Envelope) RawEnvelope() *dsse.Envelope {
 	return e.Envelope
 }
 
-func (m *MessageSignature) HasEnvelope() (verify.EnvelopeContent, bool) {
-	return nil, false
+func (m *MessageSignature) EnvelopeContent() verify.EnvelopeContent {
+	return nil
 }
 
-func (e *Envelope) HasMessage() (verify.MessageSignatureContent, bool) {
-	return nil, false
+func (e *Envelope) MessageSignatureContent() verify.MessageSignatureContent {
+	return nil
 }
 
-func (m *MessageSignature) HasMessage() (verify.MessageSignatureContent, bool) {
-	return m, true
+func (m *MessageSignature) MessageSignatureContent() verify.MessageSignatureContent {
+	return m
 }
 
 func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {
-	if m.DigestAlgorithm != "SHA2_256" {
+	if m.digestAlgorithm != "SHA2_256" {
 		return errors.New("Message has unsupported hash algorithm")
 	}
 
 	fileDigest := sha256.Sum256(fileBytes)
-	if !bytes.Equal(m.Digest, fileDigest[:]) {
+	if !bytes.Equal(m.digest, fileDigest[:]) {
 		return errors.New("Message signature does not match supplied file")
 	}
 	return nil
@@ -86,11 +86,11 @@ func (e *Envelope) EnsureFileMatchesDigest(fileBytes []byte) error {
 	return nil
 }
 
-func (m *MessageSignature) GetSignature() []byte {
-	return m.Signature
+func (m *MessageSignature) Signature() []byte {
+	return m.signature
 }
 
-func (e *Envelope) GetSignature() []byte {
+func (e *Envelope) Signature() []byte {
 	if len(e.Envelope.Signatures) == 0 {
 		return []byte{}
 	}

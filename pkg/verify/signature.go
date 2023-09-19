@@ -22,9 +22,9 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
 
-	if envelope, ok := sigContent.HasEnvelope(); ok {
+	if envelope := sigContent.EnvelopeContent(); envelope != nil {
 		return verifyEnvelope(verifier, envelope)
-	} else if msg, ok := sigContent.HasMessage(); ok {
+	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		// TODO: add VerifySigWithArtifact, then error out here
 		return verifyMessageSignature(verifier, msg)
 	} else {
@@ -37,7 +37,7 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 	if leafCert, ok := verificationContent.HasCertificate(); ok {
 		return signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
 	} else if pk, ok := verificationContent.HasPublicKey(); ok {
-		return tm.PublicKeyVerifier(pk.GetHint())
+		return tm.PublicKeyVerifier(pk.Hint())
 	} else {
 		return nil, fmt.Errorf("no public key or certificate found")
 	}
@@ -56,7 +56,7 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 		return fmt.Errorf("could not load envelope verifier: %w", err)
 	}
 
-	_, err = envVerifier.Verify(context.TODO(), envelope.GetRawEnvelope())
+	_, err = envVerifier.Verify(context.TODO(), envelope.RawEnvelope())
 	if err != nil {
 		return fmt.Errorf("could not verify envelope: %w", err)
 	}
@@ -65,8 +65,8 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 }
 
 func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent) error {
-	opts := options.WithDigest(msg.GetDigest())
-	err := verifier.VerifySignature(bytes.NewReader(msg.GetSignature()), bytes.NewReader([]byte{}), opts)
+	opts := options.WithDigest(msg.Digest())
+	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader([]byte{}), opts)
 
 	if err != nil {
 		return fmt.Errorf("could not verify message: %w", err)
