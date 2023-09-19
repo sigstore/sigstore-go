@@ -70,7 +70,7 @@ func run() error {
 
 	if *minBundleVersion != "" {
 		if !b.MinVersion(*minBundleVersion) {
-			return fmt.Errorf("bundle is not of minimum version %s\n", *minBundleVersion)
+			return fmt.Errorf("bundle is not of minimum version %s", *minBundleVersion)
 		}
 	}
 
@@ -155,6 +155,7 @@ func run() error {
 		return err
 	}
 	fmt.Println(string(marshaled))
+	return nil
 }
 
 type nonExpiringVerifier struct {
