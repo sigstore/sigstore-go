@@ -25,6 +25,7 @@ type SubjectAlternativeName struct {
 }
 
 type Summary struct {
+	CertificateIssuer      string                 `json:"certificateIssuer"`
 	SubjectAlternativeName SubjectAlternativeName `json:"subjectAlternativeName"`
 	Extensions
 }
@@ -50,7 +51,7 @@ func SummarizeCertificate(cert *x509.Certificate) (Summary, error) {
 		return Summary{}, errors.New("No Subject Alternative Name found")
 	}
 
-	return Summary{Extensions: extensions, SubjectAlternativeName: san}, nil
+	return Summary{CertificateIssuer: cert.Issuer.String(), SubjectAlternativeName: san, Extensions: extensions}, nil
 }
 
 // CompareExtensions compares two Extensions structs and returns true if their
