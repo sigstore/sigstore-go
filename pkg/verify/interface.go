@@ -22,6 +22,7 @@ type HasInclusionProof interface {
 	HasInclusionProof() bool
 }
 
+// TODO: Do we need this?
 type KeyIDProvider interface {
 	KeyID() (string, error)
 }
@@ -59,8 +60,6 @@ type SignedEntity interface {
 type VerificationContent interface {
 	CompareKey(any, root.TrustedMaterial) bool
 	ValidAtTime(time.Time, root.TrustedMaterial) bool
-	GetIssuer() string
-	GetSAN() string
 	HasCertificate() (x509.Certificate, bool)
 	HasPublicKey() (PublicKeyProvider, bool)
 }

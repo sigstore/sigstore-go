@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -244,20 +243,6 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 	}
 
 	return signedTimestamps, nil
-}
-
-func (b *ProtobufBundle) Statement() (*in_toto.Statement, error) {
-	envelope, err := b.Envelope()
-	if err != nil {
-		return nil, err
-	}
-
-	statement, err := envelope.GetStatement()
-	if err != nil {
-		return nil, err
-	}
-
-	return statement, nil
 }
 
 func (b *ProtobufBundle) MinVersion(version string) bool {

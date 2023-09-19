@@ -3,7 +3,6 @@ package bundle
 import (
 	"crypto"
 	"crypto/x509"
-	"encoding/asn1"
 	"time"
 
 	"github.com/github/sigstore-verifier/pkg/root"
@@ -51,23 +50,6 @@ func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return *pk, true
 }
 
-func (cc *CertificateChain) GetIssuer() string {
-	for _, extension := range cc.Certificates[0].Extensions {
-		if extension.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 57264, 1, 1}) {
-			return string(extension.Value)
-		}
-	}
-	return ""
-}
-
-func (cc *CertificateChain) GetSAN() string {
-	if len(cc.Certificates[0].URIs) == 0 {
-		return ""
-	}
-
-	return cc.Certificates[0].URIs[0].String()
-}
-
 func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
 	verifier, err := tm.PublicKeyVerifier(pk.Hint)
 	if err != nil {
@@ -89,12 +71,4 @@ func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
 		return false
 	}
 	return verifier.ValidAtTime(t)
-}
-
-func (pk *PublicKey) GetIssuer() string {
-	return ""
-}
-
-func (pk *PublicKey) GetSAN() string {
-	return ""
 }
