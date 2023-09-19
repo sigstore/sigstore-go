@@ -181,21 +181,6 @@ func (b *ProtobufBundle) TlogEntries() ([]*tlog.Entry, error) {
 	return tlogEntries, nil
 }
 
-func (b *ProtobufBundle) KeyID() (string, error) {
-	if b.VerificationMaterial == nil {
-		return "", ErrMissingVerificationMaterial
-	}
-
-	switch content := b.VerificationMaterial.Content.(type) { //nolint:gocritic
-	case *protobundle.VerificationMaterial_PublicKey:
-		if content.PublicKey == nil {
-			return "", ErrMissingVerificationMaterial
-		}
-		return content.PublicKey.GetHint(), nil
-	}
-	return "", nil
-}
-
 func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
