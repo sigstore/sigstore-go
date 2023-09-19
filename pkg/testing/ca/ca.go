@@ -383,7 +383,6 @@ type TestEntity struct {
 	envelope    *dsse.Envelope
 	timestamps  [][]byte
 	tlogEntries []*tlog.Entry
-	keyID       string
 }
 
 func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
@@ -408,10 +407,6 @@ func (e *TestEntity) Timestamps() ([][]byte, error) {
 
 func (e *TestEntity) TlogEntries() ([]*tlog.Entry, error) {
 	return e.tlogEntries, nil
-}
-
-func (e *TestEntity) KeyID() (string, error) {
-	return e.keyID, nil
 }
 
 // Much of the following code is adapted from cosign/test/cert_utils.go

@@ -22,11 +22,6 @@ type HasInclusionProof interface {
 	HasInclusionProof() bool
 }
 
-// TODO: Do we need this?
-type KeyIDProvider interface {
-	KeyID() (string, error)
-}
-
 type SignatureProvider interface {
 	SignatureContent() (SignatureContent, error)
 }
@@ -50,7 +45,6 @@ type Verifier interface {
 type SignedEntity interface {
 	HasInclusionPromise
 	HasInclusionProof
-	KeyIDProvider
 	SignatureProvider
 	SignedTimestampProvider
 	TlogEntryProvider
@@ -102,10 +96,6 @@ func (b *BaseSignedEntity) Envelope() (*dsse.Envelope, error) {
 
 func (b *BaseSignedEntity) MessageSignature() (*protocommon.MessageSignature, error) {
 	return nil, errNotImplemented
-}
-
-func (b *BaseSignedEntity) KeyID() (string, error) {
-	return "", errNotImplemented
 }
 
 func (b *BaseSignedEntity) Signature() ([]byte, error) {
