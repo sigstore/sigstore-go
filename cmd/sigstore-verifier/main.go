@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -55,16 +56,21 @@ func usage() {
 }
 
 func main() {
+	if err := run(); err != nil {
+		os.Stderr.WriteString(err.Error() + "\n")
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	b, err := bundle.LoadJSONFromPath(flag.Arg(0))
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	if *minBundleVersion != "" {
 		if !b.MinVersion(*minBundleVersion) {
-			fmt.Printf("bundle is not of minimum version %s\n", *minBundleVersion)
-			os.Exit(1)
+			return fmt.Errorf("bundle is not of minimum version %s\n", *minBundleVersion)
 		}
 	}
 
@@ -88,8 +94,7 @@ func main() {
 	if *expectedOIDIssuer != "" || *expectedSAN != "" || *expectedSANRegex != "" {
 		certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, "", *expectedSANRegex)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 		policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
 	}
@@ -99,68 +104,55 @@ func main() {
 
 	if *tufRootURL != "" {
 		trustedrootJSON, err = tuf.GetTrustedrootJSON(*tufRootURL, *tufDirectory)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
 	} else if *trustedrootJSONpath != "" {
 		trustedrootJSON, err = os.ReadFile(*trustedrootJSONpath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	if len(trustedrootJSON) > 0 {
 		var trustedRoot *root.TrustedRoot
 		trustedRoot, err = root.NewTrustedRootFromJSON(trustedrootJSON)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 		trustedMaterial = append(trustedMaterial, trustedRoot)
 	}
 	if *trustedPublicKey != "" {
 		pemBytes, err := os.ReadFile(*trustedPublicKey)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 		pemBlock, _ := pem.Decode(pemBytes)
 		if pemBlock == nil {
-			fmt.Println("failed to decode pem block")
-			os.Exit(1)
+			return errors.New("failed to decode pem block")
 		}
 		pubKey, err := x509.ParsePKIXPublicKey(pemBlock.Bytes)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 		trustedMaterial = append(trustedMaterial, trustedPublicKeyMaterial(pubKey))
 	}
 
 	if len(trustedMaterial) == 0 {
-		fmt.Println("no trusted material provided")
-		os.Exit(1)
+		return errors.New("no trusted material provided")
 	}
 
 	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verifierConfig...)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	res, err := sev.Verify(b, policyConfig...)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	fmt.Fprintf(os.Stderr, "Verification successful!\n")
 	marshaled, err := json.MarshalIndent(res, "", "   ")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	fmt.Println(string(marshaled))
 }
