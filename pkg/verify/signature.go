@@ -52,6 +52,7 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 		SignatureVerifier: verifier,
 		Pub:               pub,
 	})
+
 	if err != nil {
 		return fmt.Errorf("could not load envelope verifier: %w", err)
 	}
