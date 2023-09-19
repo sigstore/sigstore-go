@@ -1,7 +1,6 @@
 package verify
 
 import (
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"time"
@@ -241,7 +240,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 
 		for _, verifiedTs := range verifiedTimestamps {
 			// verify the leaf certificate against the root
-			err = v.VerifyLeafCertificate(verifiedTs.Timestamp, leafCert)
+			err = VerifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial)
 			if err != nil {
 				return nil, err
 			}
@@ -384,46 +383,4 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]
 	}
 
 	return verifiedTimestamps, nil
-}
-
-// this function is copied from CertificateChain.Verify but it is modified to:
-// - only concern itself with certificate verification
-// - accept an observerTimestamp
-// TODO: move this refactor to the original function
-func (v *SignedEntityVerifier) VerifyLeafCertificate(observerTimestamp time.Time, leafCert x509.Certificate) error {
-	for _, ca := range v.trustedMaterial.FulcioCertificateAuthorities() {
-		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
-			continue
-		}
-		if !ca.ValidityPeriodEnd.IsZero() && leafCert.NotAfter.After(ca.ValidityPeriodEnd) {
-			continue
-		}
-
-		rootCertPool := x509.NewCertPool()
-		rootCertPool.AddCert(ca.Root)
-		intermediateCertPool := x509.NewCertPool()
-		for _, cert := range ca.Intermediates {
-			intermediateCertPool.AddCert(cert)
-		}
-
-		// From spec:
-		// > ## Certificate
-		// > For a signature with a given certificate to be considered valid, it must have a timestamp while every certificate in the chain up to the root is valid (the so-called “hybrid model” of certificate verification per Braun et al. (2013)).
-
-		opts := x509.VerifyOptions{
-			CurrentTime:   observerTimestamp,
-			Roots:         rootCertPool,
-			Intermediates: intermediateCertPool,
-			KeyUsages: []x509.ExtKeyUsage{
-				x509.ExtKeyUsageCodeSigning,
-			},
-		}
-
-		_, err := leafCert.Verify(opts)
-		if err == nil {
-			return nil
-		}
-	}
-
-	return errors.New("leaf certificate verification failed")
 }
