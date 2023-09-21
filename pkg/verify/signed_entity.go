@@ -189,7 +189,7 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 }
 
 // WithArtifact allows the caller of Verify to enforce that the SignedEntity
-// being verified was created for a given artifact.
+// being verified was created from, or references, a given artifact.
 //
 // If the SignedEntity contains a MessageSignature, then the artifact must be
 // provided to the Verify function, as it is required to verify the signature.
