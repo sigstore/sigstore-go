@@ -151,13 +151,15 @@ func NewVerificationResult() *VerificationResult {
 	}
 }
 
-type PolicyOptionConfigurator func(*PolicyOptions)
+type PolicyOptionConfigurator func(*PolicyOptions) error
 
 type PolicyOptions struct {
-	verifyIdentities      bool
-	CertificateIdentities CertificateIdentities
-	verifyArtifact        bool
-	Artifact              []byte
+	verifyIdentities        bool
+	certificateIdentities   CertificateIdentities
+	verifyArtifact          bool
+	artifact                []byte
+	artifactDigest          []byte
+	artifactDigestAlgorithm string
 }
 
 // WithCertificateIdentity allows the caller of Verify to enforce that the
@@ -182,25 +184,52 @@ type PolicyOptions struct {
 // Enabling this policy is highly recommended, especially to assert that the
 // OID Issuer matches the expected value.
 func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigurator {
-	return func(v *PolicyOptions) {
+	return func(v *PolicyOptions) error {
 		v.verifyIdentities = true
-		v.CertificateIdentities = append(v.CertificateIdentities, identity)
+		v.certificateIdentities = append(v.certificateIdentities, identity)
+		return nil
 	}
 }
 
 // WithArtifact allows the caller of Verify to enforce that the SignedEntity
 // being verified was created from, or references, a given artifact.
 //
-// If the SignedEntity contains a MessageSignature, then the artifact must be
-// provided to the Verify function, as it is required to verify the signature.
+// If the SignedEntity contains a MessageSignature, then the artifact or its
+// digest must be provided to the Verify function, as it is required to verify
+// the signature.
 //
-// If the SignedEntity contains a DSSE envelope, then the artifact is ignored,
-// as the artifact is embedded in the envelope.
-// TODO: Should we verify that the envelope's subject matches the artifact?
+// If the SignedEntity contains a DSSE envelope, then the artifact digest is
+// calculated from the given artifact, and compared to the digest in the
+// envelope's statement.
 func WithArtifact(artifact []byte) PolicyOptionConfigurator {
-	return func(v *PolicyOptions) {
+	return func(v *PolicyOptions) error {
+		if v.verifyArtifact {
+			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
+		}
 		v.verifyArtifact = true
-		v.Artifact = artifact
+		v.artifact = artifact
+		return nil
+	}
+}
+
+// WithArtifactDigest allows the caller of Verify to enforce that the SignedEntity
+// being verified was created for a given artifact digest.
+//
+// If the SignedEntity contains a MessageSignature, then the artifact or its
+// digest must be provided to the Verify function, as it is required to verify
+// the signature.
+//
+// If the SignedEntity contains a DSSE envelope, then the artifact digest is
+// compared to the digest in the envelope's statement.
+func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionConfigurator {
+	return func(v *PolicyOptions) error {
+		if v.verifyArtifact {
+			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
+		}
+		v.verifyArtifact = true
+		v.artifactDigestAlgorithm = algorithm
+		v.artifactDigest = artifactDigest
+		return nil
 	}
 }
 
@@ -221,9 +250,13 @@ func WithArtifact(artifact []byte) PolicyOptionConfigurator {
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
 func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOptionConfigurator) (*VerificationResult, error) {
+	var err error
 	policy := &PolicyOptions{}
 	for _, opt := range options {
-		opt(policy)
+		err = opt(policy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure policy: %w", err)
+		}
 	}
 
 	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.msyyz1cr5bcs
@@ -293,7 +326,11 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 	}
 
 	if policy.verifyArtifact {
-		err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.Artifact)
+		if policy.artifact != nil {
+			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
+		} else {
+			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
+		}
 	} else {
 		err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
 	}
@@ -337,7 +374,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 			return nil, errors.New("can't verify certificate identities: entity was not signed with a certificate")
 		}
 
-		matchingCertID, err := policy.CertificateIdentities.Verify(certSummary)
+		matchingCertID, err := policy.certificateIdentities.Verify(certSummary)
 		if err != nil {
 			return nil, fmt.Errorf("failed to verify certificate identity: %w", err)
 		}

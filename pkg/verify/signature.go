@@ -27,10 +27,7 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
 		return verifyEnvelope(verifier, envelope)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		if _, ok := verifier.(*signature.ED25519Verifier); ok {
-			return errors.New("unable to verify ED25519 signatures without providing an artifact")
-		}
-		return verifyMessageSignature(verifier, msg)
+		return errors.New("artifact must be provided to verify message signature")
 	} else {
 		// should never happen, but just in case:
 		return fmt.Errorf("signature content has neither an envelope or a message")
@@ -47,10 +44,28 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 	}
 
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		// TODO: should envelope verification be supported with artifacts?
-		return verifyEnvelope(verifier, envelope)
+		return verifyEnvelopeWithArtifact(verifier, envelope, artifact)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		return verifyMessageSignatureWithArtifact(verifier, msg, artifact)
+		return verifyMessageSignature(verifier, msg, artifact)
+	} else {
+		// should never happen, but just in case:
+		return fmt.Errorf("signature content has neither an envelope or a message")
+	}
+}
+
+func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifactDigest []byte, artifactDigestAlgorithm string) error { // nolint: revive
+	var verifier signature.Verifier
+	var err error
+
+	verifier, err = getSignatureVerifier(verificationContent, trustedMaterial)
+	if err != nil {
+		return fmt.Errorf("could not load signature verifier: %w", err)
+	}
+
+	if envelope := sigContent.EnvelopeContent(); envelope != nil {
+		return verifyEnvelopeWithArtifactDigest(verifier, envelope, artifactDigest, artifactDigestAlgorithm)
+	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
+		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
 	} else {
 		// should never happen, but just in case:
 		return fmt.Errorf("signature content has neither an envelope or a message")
@@ -90,18 +105,33 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 	return nil
 }
 
-func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent) error {
-	opts := options.WithDigest(msg.Digest())
-	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader([]byte{}), opts)
-
-	if err != nil {
-		return fmt.Errorf("could not verify message: %w", err)
-	}
-
-	return nil
+func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeContent, artifact []byte) error {
+	calcDigest := sha256.Sum256(artifact) // TODO: allow other digest algorithms
+	return verifyEnvelopeWithArtifactDigest(verifier, envelope, calcDigest[:], "sha256")
 }
 
-func verifyMessageSignatureWithArtifact(verifier signature.Verifier, msg MessageSignatureContent, artifact []byte) error {
+func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope EnvelopeContent, artifactDigest []byte, artifactDigestAlgorithm string) error {
+	err := verifyEnvelope(verifier, envelope)
+	if err != nil {
+		return err
+	}
+	statement, err := envelope.Statement()
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
+	}
+	for _, subject := range statement.Subject {
+		for alg, digest := range subject.Digest {
+			if alg == artifactDigestAlgorithm {
+				if bytes.Equal([]byte(digest), artifactDigest) {
+					return nil
+				}
+			}
+		}
+	}
+	return errors.New("provided artifact digest does not match any digest in statement")
+}
+
+func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent, artifact []byte) error {
 	// Ensure artifact matches digest
 	switch msg.DigestAlgorithm() {
 	case "SHA2_256":
@@ -114,6 +144,22 @@ func verifyMessageSignatureWithArtifact(verifier signature.Verifier, msg Message
 	}
 
 	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader(artifact))
+	if err != nil {
+		return fmt.Errorf("could not verify message: %w", err)
+	}
+
+	return nil
+}
+
+func verifyMessageSignatureWithArtifactDigest(verifier signature.Verifier, msg MessageSignatureContent, artifactDigest []byte) error {
+	if !bytes.Equal(artifactDigest, msg.Digest()) {
+		return errors.New("artifact does not match digest")
+	}
+	if _, ok := verifier.(*signature.ED25519Verifier); ok {
+		return errors.New("unable to verify message signature with artifact digest for ed25519 signatures")
+	}
+	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader([]byte{}), options.WithDigest(artifactDigest))
+
 	if err != nil {
 		return fmt.Errorf("could not verify message: %w", err)
 	}

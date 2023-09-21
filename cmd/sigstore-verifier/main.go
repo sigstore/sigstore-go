@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -20,6 +21,8 @@ import (
 )
 
 var artifact *string
+var artifactDigest *string
+var artifactDigestAlgorithm *string
 var expectedOIDIssuer *string
 var expectedSAN *string
 var expectedSANRegex *string
@@ -34,6 +37,8 @@ var tufDirectory *string
 
 func init() {
 	artifact = flag.String("artifact", "", "Path to artifact to verify")
+	artifactDigest = flag.String("artifact-digest", "", "Hex-encoded digest of artifact to verify")
+	artifactDigestAlgorithm = flag.String("artifact-digest-algorithm", "sha256", "Digest algorithm")
 	expectedOIDIssuer = flag.String("expectedIssuer", "", "The expected OIDC issuer for the signing certificate")
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
@@ -146,6 +151,13 @@ func run() error {
 		return err
 	}
 
+	if *artifactDigest != "" {
+		artifactDigestBytes, err := hex.DecodeString(*artifactDigest)
+		if err != nil {
+			return err
+		}
+		policyConfig = append(policyConfig, verify.WithArtifactDigest(*artifactDigestAlgorithm, artifactDigestBytes))
+	}
 	if *artifact != "" {
 		fileBytes, err := os.ReadFile(*artifact)
 		if err != nil {
