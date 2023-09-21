@@ -167,8 +167,14 @@ func main() {
 			log.Fatal(err)
 		}
 
+		// Load artifact
+		fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		// Configure verification options
-		policyConfig := []verify.PolicyOptionConfigurator{}
+		policyConfig := []verify.PolicyOptionConfigurator{verify.WithArtifact(fileBytes)}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
@@ -204,22 +210,6 @@ func main() {
 		}
 
 		_, err = sev.Verify(b, policyConfig...)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Check file against bundle
-		fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		sigContent, err := b.SignatureContent()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = sigContent.EnsureFileMatchesDigest(fileBytes)
 		if err != nil {
 			log.Fatal(err)
 		}

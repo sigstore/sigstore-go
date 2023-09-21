@@ -19,6 +19,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
+var artifact *string
 var expectedOIDIssuer *string
 var expectedSAN *string
 var expectedSANRegex *string
@@ -32,6 +33,7 @@ var tufRootURL *string
 var tufDirectory *string
 
 func init() {
+	artifact = flag.String("artifact", "", "Path to artifact to verify")
 	expectedOIDIssuer = flag.String("expectedIssuer", "", "The expected OIDC issuer for the signing certificate")
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
@@ -142,6 +144,14 @@ func run() error {
 	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verifierConfig...)
 	if err != nil {
 		return err
+	}
+
+	if *artifact != "" {
+		fileBytes, err := os.ReadFile(*artifact)
+		if err != nil {
+			return err
+		}
+		policyConfig = append(policyConfig, verify.WithArtifact(fileBytes))
 	}
 
 	res, err := sev.Verify(b, policyConfig...)

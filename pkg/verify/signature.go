@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/sha256"
+	"errors"
 	"fmt"
 
 	"github.com/github/sigstore-verifier/pkg/root"
@@ -25,8 +27,30 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
 		return verifyEnvelope(verifier, envelope)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		// TODO: add VerifySigWithArtifact, then error out here
+		if _, ok := verifier.(*signature.ED25519Verifier); ok {
+			return errors.New("unable to verify ED25519 signatures without providing an artifact")
+		}
 		return verifyMessageSignature(verifier, msg)
+	} else {
+		// should never happen, but just in case:
+		return fmt.Errorf("signature content has neither an envelope or a message")
+	}
+}
+
+func VerifySignatureWithArtifact(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifact []byte) error { // nolint: revive
+	var verifier signature.Verifier
+	var err error
+
+	verifier, err = getSignatureVerifier(verificationContent, trustedMaterial)
+	if err != nil {
+		return fmt.Errorf("could not load signature verifier: %w", err)
+	}
+
+	if envelope := sigContent.EnvelopeContent(); envelope != nil {
+		// TODO: should envelope verification be supported with artifacts?
+		return verifyEnvelope(verifier, envelope)
+	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
+		return verifyMessageSignatureWithArtifact(verifier, msg, artifact)
 	} else {
 		// should never happen, but just in case:
 		return fmt.Errorf("signature content has neither an envelope or a message")
@@ -35,6 +59,7 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
 	if leafCert, ok := verificationContent.HasCertificate(); ok {
+		// TODO: Inspect certificate's SignatureAlgorithm to determine hash function
 		return signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
 	} else if pk, ok := verificationContent.HasPublicKey(); ok {
 		return tm.PublicKeyVerifier(pk.Hint())
@@ -69,6 +94,26 @@ func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureCon
 	opts := options.WithDigest(msg.Digest())
 	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader([]byte{}), opts)
 
+	if err != nil {
+		return fmt.Errorf("could not verify message: %w", err)
+	}
+
+	return nil
+}
+
+func verifyMessageSignatureWithArtifact(verifier signature.Verifier, msg MessageSignatureContent, artifact []byte) error {
+	// Ensure artifact matches digest
+	switch msg.DigestAlgorithm() {
+	case "SHA2_256":
+		digest := sha256.Sum256(artifact)
+		if !bytes.Equal(digest[:], msg.Digest()) {
+			return errors.New("artifact does not match digest")
+		}
+	default:
+		return fmt.Errorf("unsupported digest algorithm: %s", msg.DigestAlgorithm())
+	}
+
+	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader(artifact))
 	if err != nil {
 		return fmt.Errorf("could not verify message: %w", err)
 	}

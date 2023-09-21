@@ -1,11 +1,8 @@
 package bundle
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 
 	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/in-toto/in-toto-golang/in_toto"
@@ -65,25 +62,6 @@ func (e *Envelope) MessageSignatureContent() verify.MessageSignatureContent {
 
 func (m *MessageSignature) MessageSignatureContent() verify.MessageSignatureContent {
 	return m
-}
-
-func (m *MessageSignature) EnsureFileMatchesDigest(fileBytes []byte) error {
-	if m.digestAlgorithm != "SHA2_256" {
-		return errors.New("Message has unsupported hash algorithm")
-	}
-
-	fileDigest := sha256.Sum256(fileBytes)
-	if !bytes.Equal(m.digest, fileDigest[:]) {
-		return errors.New("Message signature does not match supplied file")
-	}
-	return nil
-}
-
-func (e *Envelope) EnsureFileMatchesDigest(fileBytes []byte) error {
-	if e.Payload != base64.StdEncoding.EncodeToString(fileBytes) {
-		return errors.New("Envelope payload does not match supplied file")
-	}
-	return nil
 }
 
 func (m *MessageSignature) Signature() []byte {

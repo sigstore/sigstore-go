@@ -156,9 +156,8 @@ type PolicyOptionConfigurator func(*PolicyOptions)
 type PolicyOptions struct {
 	verifyIdentities      bool
 	CertificateIdentities CertificateIdentities
-	// TODO:
-	// verifyArtifact        bool
-	// Artifact              []byte
+	verifyArtifact        bool
+	Artifact              []byte
 }
 
 // WithCertificateIdentity allows the caller of Verify to enforce that the
@@ -186,6 +185,22 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 	return func(v *PolicyOptions) {
 		v.verifyIdentities = true
 		v.CertificateIdentities = append(v.CertificateIdentities, identity)
+	}
+}
+
+// WithArtifact allows the caller of Verify to enforce that the SignedEntity
+// being verified was created for a given artifact.
+//
+// If the SignedEntity contains a MessageSignature, then the artifact must be
+// provided to the Verify function, as it is required to verify the signature.
+//
+// If the SignedEntity contains a DSSE envelope, then the artifact is ignored,
+// as the artifact is embedded in the envelope.
+// TODO: Should we verify that the envelope's subject matches the artifact?
+func WithArtifact(artifact []byte) PolicyOptionConfigurator {
+	return func(v *PolicyOptions) {
+		v.verifyArtifact = true
+		v.Artifact = artifact
 	}
 }
 
@@ -277,7 +292,11 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
-	err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
+	if policy.verifyArtifact {
+		err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.Artifact)
+	} else {
+		err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify signature: %w", err)
 	}
