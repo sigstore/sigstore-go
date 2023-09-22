@@ -159,6 +159,7 @@ type PolicyOptions struct {
 	certificateIdentities   CertificateIdentities
 	verifyArtifact          bool
 	artifact                io.Reader
+	verifyArtifactDigest    bool
 	artifactDigest          []byte
 	artifactDigestAlgorithm string
 }
@@ -200,7 +201,7 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 // envelope's statement.
 func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
 	return func(v *PolicyOptions) error {
-		if v.verifyArtifact {
+		if v.verifyArtifact || v.verifyArtifactDigest {
 			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
 		}
 		v.verifyArtifact = true
@@ -220,10 +221,10 @@ func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
 // compared to the digest in the envelope's statement.
 func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionConfigurator {
 	return func(v *PolicyOptions) error {
-		if v.verifyArtifact {
+		if v.verifyArtifact || v.verifyArtifactDigest {
 			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
 		}
-		v.verifyArtifact = true
+		v.verifyArtifactDigest = true
 		v.artifactDigestAlgorithm = algorithm
 		v.artifactDigest = artifactDigest
 		return nil
@@ -320,13 +321,12 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
-	if policy.verifyArtifact {
-		if policy.artifact != nil {
-			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
-		} else {
-			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
-		}
-	} else {
+	switch {
+	case policy.verifyArtifact:
+		err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
+	case policy.verifyArtifactDigest:
+		err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
+	default:
 		err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
 	}
 	if err != nil {
