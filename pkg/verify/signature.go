@@ -137,27 +137,9 @@ func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope Enve
 }
 
 func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent, artifact io.Reader) error {
-	var buf bytes.Buffer
-	tee := io.TeeReader(artifact, &buf)
-	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), tee)
+	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), artifact)
 	if err != nil {
 		return fmt.Errorf("could not verify message: %w", err)
-	}
-
-	// Ensure artifact matches digest
-	switch msg.DigestAlgorithm() {
-	case "SHA2_256":
-		hasher := sha256.New()
-		_, err := io.Copy(hasher, &buf)
-		if err != nil {
-			return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
-		}
-		digest := hasher.Sum(nil)
-		if !bytes.Equal(digest, msg.Digest()) {
-			return errors.New("artifact does not match digest")
-		}
-	default:
-		return fmt.Errorf("unsupported digest algorithm: %s", msg.DigestAlgorithm())
 	}
 
 	return nil
