@@ -164,7 +164,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	envelope, err := dsseSigner.SignPayload(context.TODO(), "application/json", envelopeBody)
+	envelope, err := dsseSigner.SignPayload(context.TODO(), "application/vnd.in-toto+json", envelopeBody)
 	if err != nil {
 		return nil, err
 	}
