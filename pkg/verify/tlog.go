@@ -33,7 +33,14 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		return nil, err
 	}
 
-	// TODO: dedupe tlog entries, since these can be maliciously repeated
+	// disallow duplicate entries, as a malicious actor could use duplicates to bypass the threshold
+	for i := 0; i < len(entries); i++ {
+		for j := i + 1; j < len(entries); j++ {
+			if entries[i].LogKeyID() == entries[j].LogKeyID() && entries[i].LogIndex() == entries[j].LogIndex() {
+				return nil, errors.New("duplicate tlog entries found")
+			}
+		}
+	}
 	if len(entries) < threshold {
 		return nil, fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), threshold)
 	}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/github/sigstore-verifier/pkg/testing/ca"
+	"github.com/github/sigstore-verifier/pkg/tlog"
 	"github.com/github/sigstore-verifier/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,4 +36,29 @@ func TestTlogVerifier(t *testing.T) {
 
 	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false)
 	assert.Error(t, err)
+}
+
+type dupTlogEntity struct {
+	*ca.TestEntity
+}
+
+func (e *dupTlogEntity) TlogEntries() ([]*tlog.Entry, error) {
+	entries, err := e.TestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(entries, entries[0]), nil
+}
+
+func TestDuplicateTlogEntries(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+	entity, err := virtualSigstore.Attest("foofighters@example.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyArtifactTransparencyLog(&dupTlogEntity{entity}, virtualSigstore, 1, false)
+	assert.Error(t, err) // duplicate tlog entries should fail to verify
 }
