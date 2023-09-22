@@ -168,7 +168,7 @@ func verifyMessageSignatureWithArtifactDigest(verifier signature.Verifier, msg M
 		return errors.New("artifact does not match digest")
 	}
 	if _, ok := verifier.(*signature.ED25519Verifier); ok {
-		return errors.New("unable to verify message signature with artifact digest for ed25519 signatures")
+		return errors.New("message signatures with ed25519 signatures can only be verified with artifacts, and not just their digest")
 	}
 	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader([]byte{}), options.WithDigest(artifactDigest))
 
