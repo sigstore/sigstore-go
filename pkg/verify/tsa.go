@@ -12,12 +12,12 @@ import (
 	"github.com/github/sigstore-verifier/pkg/root"
 )
 
-type TimestampAuthorityVerifier struct {
-	trustedMaterial root.TrustedMaterial
-	threshold       int
-}
-
-func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, error) {
+// VerifyTimestampAuthority verifies that the given entity has been timestamped
+// by a trusted timestamp authority and that the timestamp is valid.
+//
+// The threshold parameter is the number of unique timestamps that must be
+// verified.
+func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]time.Time, error) { //nolint:revive
 	signedTimestamps, err := entity.Timestamps()
 
 	// disallow duplicate timestamps, as a malicious actor could use duplicates to bypass the threshold
@@ -29,8 +29,8 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, e
 		}
 	}
 
-	if err != nil || (len(signedTimestamps) < p.threshold) {
-		return nil, fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), p.threshold)
+	if err != nil || (len(signedTimestamps) < threshold) {
+		return nil, fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), threshold)
 	}
 
 	sigContent, err := entity.SignatureContent()
@@ -47,7 +47,7 @@ func (p *TimestampAuthorityVerifier) Verify(entity SignedEntity) ([]time.Time, e
 
 	verifiedTimestamps := []time.Time{}
 	for _, timestamp := range signedTimestamps {
-		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, p.trustedMaterial, verificationContent)
+		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial, verificationContent)
 		if err != nil {
 			return nil, errors.New("unable to verify timestamp")
 		}
@@ -91,11 +91,4 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, tr
 	}
 
 	return time.Time{}, errors.New("Unable to verify signed timestamps")
-}
-
-func NewTimestampAuthorityVerifier(trustedMaterial root.TrustedMaterial, threshold int) *TimestampAuthorityVerifier {
-	return &TimestampAuthorityVerifier{
-		trustedMaterial: trustedMaterial,
-		threshold:       threshold,
-	}
 }
