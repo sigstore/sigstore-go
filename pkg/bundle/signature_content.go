@@ -23,6 +23,14 @@ func (m *MessageSignature) DigestAlgorithm() string {
 	return m.digestAlgorithm
 }
 
+func NewMessageSignature(digest []byte, digestAlgorithm string, signature []byte) *MessageSignature {
+	return &MessageSignature{
+		digest:          digest,
+		digestAlgorithm: digestAlgorithm,
+		signature:       signature,
+	}
+}
+
 type Envelope struct {
 	*dsse.Envelope
 }
