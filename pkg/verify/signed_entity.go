@@ -358,8 +358,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]
 	}
 
 	if v.config.weExpectTlogEntries {
-		tlogVerifier := NewArtifactTransparencyLogVerifier(v.trustedMaterial, v.config.tlogEntriesThreshold, v.config.performOnlineVerification)
-		verifiedTlogTimestamps, err := tlogVerifier.Verify(entity)
+		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold, v.config.performOnlineVerification)
 		if err != nil {
 			return nil, err
 		}

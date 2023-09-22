@@ -38,10 +38,6 @@ type VerificationProvider interface {
 	VerificationContent() (VerificationContent, error)
 }
 
-type Verifier interface {
-	Verify(SignedEntity) error
-}
-
 type SignedEntity interface {
 	HasInclusionPromise
 	HasInclusionProof
