@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/github/sigstore-verifier/pkg/root"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -34,7 +35,7 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	}
 }
 
-func VerifySignatureWithArtifact(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifact []byte) error { // nolint: revive
+func VerifySignatureWithArtifact(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifact io.Reader) error { // nolint: revive
 	var verifier signature.Verifier
 	var err error
 
@@ -105,9 +106,13 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 	return nil
 }
 
-func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeContent, artifact []byte) error {
-	calcDigest := sha256.Sum256(artifact) // TODO: allow other digest algorithms
-	return verifyEnvelopeWithArtifactDigest(verifier, envelope, calcDigest[:], "sha256")
+func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeContent, artifact io.Reader) error {
+	hasher := sha256.New() // TODO: allow other digest algorithms
+	_, err := io.Copy(hasher, artifact)
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
+	}
+	return verifyEnvelopeWithArtifactDigest(verifier, envelope, hasher.Sum(nil), "sha256")
 }
 
 func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope EnvelopeContent, artifactDigest []byte, artifactDigestAlgorithm string) error {
@@ -131,21 +136,28 @@ func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope Enve
 	return errors.New("provided artifact digest does not match any digest in statement")
 }
 
-func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent, artifact []byte) error {
+func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent, artifact io.Reader) error {
+	var buf bytes.Buffer
+	tee := io.TeeReader(artifact, &buf)
+	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), tee)
+	if err != nil {
+		return fmt.Errorf("could not verify message: %w", err)
+	}
+
 	// Ensure artifact matches digest
 	switch msg.DigestAlgorithm() {
 	case "SHA2_256":
-		digest := sha256.Sum256(artifact)
-		if !bytes.Equal(digest[:], msg.Digest()) {
+		hasher := sha256.New()
+		_, err := io.Copy(hasher, &buf)
+		if err != nil {
+			return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
+		}
+		digest := hasher.Sum(nil)
+		if !bytes.Equal(digest, msg.Digest()) {
 			return errors.New("artifact does not match digest")
 		}
 	default:
 		return fmt.Errorf("unsupported digest algorithm: %s", msg.DigestAlgorithm())
-	}
-
-	err := verifier.VerifySignature(bytes.NewReader(msg.Signature()), bytes.NewReader(artifact))
-	if err != nil {
-		return fmt.Errorf("could not verify message: %w", err)
 	}
 
 	return nil

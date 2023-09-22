@@ -3,6 +3,7 @@ package verify
 import (
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
@@ -157,7 +158,7 @@ type PolicyOptions struct {
 	verifyIdentities        bool
 	certificateIdentities   CertificateIdentities
 	verifyArtifact          bool
-	artifact                []byte
+	artifact                io.Reader
 	artifactDigest          []byte
 	artifactDigestAlgorithm string
 }
@@ -201,7 +202,7 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
 // calculated from the given artifact, and compared to the digest in the
 // envelope's statement.
-func WithArtifact(artifact []byte) PolicyOptionConfigurator {
+func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
 	return func(v *PolicyOptions) error {
 		if v.verifyArtifact {
 			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
@@ -313,12 +314,6 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 	// From spec:
 	// > ## Signature Verification
 	// > The Verifier MUST verify the provided signature for the constructed payload against the key in the leaf of the certificate chain.
-
-	// TODO: if the SignatureContent is a MessageSignature, then we MUST provide the artifact []byte
-	// to its Verify function, because if it was signed with the ed25519 algo it won't work otherwise.
-	// At present we have punted figuring that out; we can't _always_ require the artifact, because
-	// in certain contexts we may not have access to the artifact. Something in this func signature
-	// will have to change, but what exactly is not clear yet.
 
 	sigContent, err := entity.SignatureContent()
 	if err != nil {

@@ -168,13 +168,13 @@ func main() {
 		}
 
 		// Load artifact
-		fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
+		file, err := os.Open(os.Args[len(os.Args)-1])
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		// Configure verification options
-		policyConfig := []verify.PolicyOptionConfigurator{verify.WithArtifact(fileBytes)}
+		policyConfig := []verify.PolicyOptionConfigurator{verify.WithArtifact(file)}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {

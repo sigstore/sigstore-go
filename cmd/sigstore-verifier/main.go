@@ -159,11 +159,11 @@ func run() error {
 		policyConfig = append(policyConfig, verify.WithArtifactDigest(*artifactDigestAlgorithm, artifactDigestBytes))
 	}
 	if *artifact != "" {
-		fileBytes, err := os.ReadFile(*artifact)
+		file, err := os.Open(*artifact)
 		if err != nil {
 			return err
 		}
-		policyConfig = append(policyConfig, verify.WithArtifact(fileBytes))
+		policyConfig = append(policyConfig, verify.WithArtifact(file))
 	}
 
 	res, err := sev.Verify(b, policyConfig...)
