@@ -195,10 +195,6 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 // WithArtifact allows the caller of Verify to enforce that the SignedEntity
 // being verified was created from, or references, a given artifact.
 //
-// If the SignedEntity contains a MessageSignature, then the artifact or its
-// digest must be provided to the Verify function, as it is required to verify
-// the signature.
-//
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
 // calculated from the given artifact, and compared to the digest in the
 // envelope's statement.
@@ -213,12 +209,12 @@ func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
 	}
 }
 
-// WithArtifactDigest allows the caller of Verify to enforce that the SignedEntity
-// being verified was created for a given artifact digest.
+// WithArtifactDigest allows the caller of Verify to enforce that the
+// SignedEntity being verified was created for a given artifact digest.
 //
-// If the SignedEntity contains a MessageSignature, then the artifact or its
-// digest must be provided to the Verify function, as it is required to verify
-// the signature.
+// If the SignedEntity contains a MessageSignature that was signed using the
+// ED25519 algorithm, then providing only an artifactDigest will fail; the
+// whole artifact must be provided. Use WithArtifact instead.
 //
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
 // compared to the digest in the envelope's statement.
@@ -243,6 +239,10 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionCon
 // have been verified. At the function caller's discretion, Verify may then
 // verify the contents of the VerificationResults using supplied PolicyOptions.
 // See WithCertificateIdentity for more details.
+//
+// If the SignedEntity contains a MessageSignature, then the artifact or its
+// digest must be provided to the Verify function, as it is required to verify
+// the signature. See WithArtifact and WithArtifactDigest for more details.
 //
 // If no policy options are provided, callers of this function SHOULD:
 //   - (if the signed entity has a certificate) verify that its Subject Alternate
