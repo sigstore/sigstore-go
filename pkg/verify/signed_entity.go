@@ -26,20 +26,24 @@ type VerifierConfig struct { // nolint: revive
 	weDoNotExpectAnyObserverTimestamps bool
 }
 
-type VerifierConfigurator func(*VerifierConfig) // nolint: revive
+type VerifierConfigurator func(*VerifierConfig) error
 
 // NewSignedEntityVerifier creates a new SignedEntityVerifier. It takes a
 // root.TrustedMaterial, which contains a set of trusted public keys and
 // certificates, and a set of VerifierConfigurators, which set the config
 // that determines the behaviour of the Verify function.
 func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierConfigurator) (*SignedEntityVerifier, error) {
+	var err error
 	c := VerifierConfig{}
 
 	for _, opt := range options {
-		opt(&c)
+		err = opt(&c)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure verifier: %w", err)
+		}
 	}
 
-	err := c.Validate()
+	err = c.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +60,9 @@ func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...Ve
 // online verification when verifying Transparency Log entries and
 // Signed Certificate Timestamps.
 func WithOnlineVerification() VerifierConfigurator {
-	return func(c *VerifierConfig) {
+	return func(c *VerifierConfig) error {
 		c.performOnlineVerification = true
+		return nil
 	}
 }
 
@@ -66,13 +71,13 @@ func WithOnlineVerification() VerifierConfigurator {
 // TSACertificateAuthorities(), and, if it exists, use the resulting timestamp(s)
 // to verify the Fulcio certificate.
 func WithSignedTimestamps(threshold int) VerifierConfigurator {
-	return func(c *VerifierConfig) {
-		c.weExpectSignedTimestamps = true
+	return func(c *VerifierConfig) error {
 		if threshold < 1 {
-			c.signedTimestampThreshold = 1
-		} else {
-			c.signedTimestampThreshold = threshold
+			return errors.New("signed timestamp threshold must be at least 1")
 		}
+		c.weExpectSignedTimestamps = true
+		c.signedTimestampThreshold = threshold
+		return nil
 	}
 }
 
@@ -81,13 +86,13 @@ func WithSignedTimestamps(threshold int) VerifierConfigurator {
 // TlogAuthorities(), and, if it exists, use the resulting Inclusion timestamp(s)
 // to verify the Fulcio certificate.
 func WithTransparencyLog(threshold int) VerifierConfigurator {
-	return func(c *VerifierConfig) {
-		c.weExpectTlogEntries = true
+	return func(c *VerifierConfig) error {
 		if threshold < 1 {
-			c.tlogEntriesThreshold = 1
-		} else {
-			c.tlogEntriesThreshold = threshold
+			return errors.New("transparency log entry threshold must be at least 1")
 		}
+		c.weExpectTlogEntries = true
+		c.tlogEntriesThreshold = threshold
+		return nil
 	}
 }
 
@@ -95,13 +100,13 @@ func WithTransparencyLog(threshold int) VerifierConfigurator {
 // expect the Fulcio certificate to have a SignedCertificateTimestamp, and
 // verify it using the TrustedMaterial's CTLogAuthorities().
 func WithSignedCertificateTimestamps(threshold int) VerifierConfigurator {
-	return func(c *VerifierConfig) {
-		c.weExpectSCTs = true
+	return func(c *VerifierConfig) error {
 		if threshold < 1 {
-			c.ctlogEntriesThreshold = 1
-		} else {
-			c.ctlogEntriesThreshold = threshold
+			return errors.New("ctlog entry threshold must be at least 1")
 		}
+		c.weExpectSCTs = true
+		c.ctlogEntriesThreshold = threshold
+		return nil
 	}
 }
 
@@ -113,8 +118,9 @@ func WithSignedCertificateTimestamps(threshold int) VerifierConfigurator {
 //
 // Do not enable this if you don't know what you are doing.
 func WithoutAnyObserverTimestampsInsecure() VerifierConfigurator {
-	return func(c *VerifierConfig) {
+	return func(c *VerifierConfig) error {
 		c.weDoNotExpectAnyObserverTimestamps = true
+		return nil
 	}
 }
 
