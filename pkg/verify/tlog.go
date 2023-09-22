@@ -20,21 +20,22 @@ import (
 	"github.com/github/sigstore-verifier/pkg/tlog"
 )
 
-type ArtifactTransparencyLogVerifier struct {
-	trustedMaterial root.TrustedMaterial
-	threshold       int
-	online          bool
-}
-
-func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Time, error) {
+// VerifyArtifactTransparencyLog verifies that the given entity has been logged
+// in the transparency log and that the log entry is valid.
+//
+// The threshold parameter is the number of unique transparency log entries
+// that must be verified.
+//
+// If online is true, the log entry is verified against the Rekor server.
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int, online bool) ([]time.Time, error) { //nolint:revive
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: dedupe tlog entries, since these can be maliciously repeated
-	if len(entries) < p.threshold {
-		return nil, fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), p.threshold)
+	if len(entries) < threshold {
+		return nil, fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), threshold)
 	}
 
 	sigContent, err := entity.SignatureContent()
@@ -57,11 +58,11 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Ti
 			return nil, err
 		}
 
-		if !p.online {
+		if !online {
 			var inclusionVerified bool
 			// TODO: do we validate that an entry has EITHER a promise OR a proof?
 			if entry.HasInclusionPromise() {
-				err = tlog.VerifySET(entry, p.trustedMaterial.TlogAuthorities())
+				err = tlog.VerifySET(entry, trustedMaterial.TlogAuthorities())
 				if err != nil {
 					return nil, err
 				}
@@ -70,7 +71,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Ti
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
 				hex64Key := hex.EncodeToString([]byte(keyID))
-				tlogVerifier, ok := p.trustedMaterial.TlogAuthorities()[hex64Key]
+				tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
 				if !ok {
 					return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 				}
@@ -94,7 +95,7 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Ti
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
-			tlogVerifier, ok := p.trustedMaterial.TlogAuthorities()[hex64Key]
+			tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
 			if !ok {
 				return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
 			}
@@ -144,27 +145,19 @@ func (p *ArtifactTransparencyLogVerifier) Verify(entity SignedEntity) ([]time.Ti
 		}
 
 		// Ensure entry certificate matches bundle certificate
-		if !verificationContent.CompareKey(entry.PublicKey(), p.trustedMaterial) {
+		if !verificationContent.CompareKey(entry.PublicKey(), trustedMaterial) {
 			return nil, errors.New("transparency log certificate does not match")
 		}
 
 		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
-		if !verificationContent.ValidAtTime(entry.IntegratedTime(), p.trustedMaterial) {
+		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
 			return nil, errors.New("Integrated time outside certificate validity")
 		}
 	}
 
 	return verifiedTimestamps, nil
-}
-
-func NewArtifactTransparencyLogVerifier(trustedMaterial root.TrustedMaterial, threshold int, online bool) *ArtifactTransparencyLogVerifier {
-	return &ArtifactTransparencyLogVerifier{
-		trustedMaterial: trustedMaterial,
-		threshold:       threshold,
-		online:          online,
-	}
 }
 
 func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.Verifier, error) {

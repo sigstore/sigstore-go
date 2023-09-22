@@ -13,19 +13,17 @@ func TestTlogVerifier(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier := verify.NewArtifactTransparencyLogVerifier(virtualSigstore, 1, false)
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity)
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	verifier2 := verify.NewArtifactTransparencyLogVerifier(virtualSigstore2, 1, false)
-	_, err = verifier2.Verify(entity)
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore2, 1, false)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 
 	// Attempt to use tlog with integrated time outside certificate validity.
@@ -35,6 +33,6 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err = virtualSigstore.AttestAtTime("foo@fighters.com", "issuer", statement, time.Now().Add(30*time.Minute))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity)
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false)
 	assert.Error(t, err)
 }
