@@ -34,10 +34,7 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 
 	// can't configure them with < 1 thresholds
 	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(0), v.WithSignedTimestamps(-10))
-
-	assert.Nil(t, err)
-	// TODO: throw error
-	// assert.Equal(t, 1, verifier.config.signedTimestampThreshold)
+	assert.Error(t, err)
 }
 
 // Testing a bundle:
