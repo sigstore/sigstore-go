@@ -164,7 +164,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	envelope, err := dsseSigner.SignPayload(context.TODO(), "application/json", envelopeBody)
+	envelope, err := dsseSigner.SignPayload(context.TODO(), "application/vnd.in-toto+json", envelopeBody)
 	if err != nil {
 		return nil, err
 	}
@@ -192,6 +192,45 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 	}, nil
 }
 
+func (ca *VirtualSigstore) Sign(identity, issuer string, artifact []byte) (*TestEntity, error) {
+	return ca.SignAtTime(identity, issuer, artifact, time.Now().Add(5*time.Minute))
+}
+
+func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, integratedTime time.Time) (*TestEntity, error) {
+	leafCert, leafPrivKey, err := ca.GenerateLeafCert(identity, issuer)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := signature.LoadECDSASignerVerifier(leafPrivKey, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+
+	digest := sha256.Sum256(artifact)
+	sig, err := signer.SignMessage(bytes.NewReader(artifact))
+	if err != nil {
+		return nil, err
+	}
+
+	tsr, err := generateTimestampingResponse(sig, ca.tsaCA.Leaf, ca.tsaLeafKey)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := ca.generateTlogEntryHashedRekord(leafCert, artifact, sig, integratedTime.Unix())
+	if err != nil {
+		return nil, err
+	}
+
+	return &TestEntity{
+		certChain:        []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
+		timestamps:       [][]byte{tsr},
+		messageSignature: bundle.NewMessageSignature(digest[:], "SHA2_256", sig),
+		tlogEntries:      []*tlog.Entry{entry},
+	}, nil
+}
+
 func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
@@ -204,6 +243,43 @@ func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelop
 	}
 
 	rekorBody, err := generateRekorEntry(intoto.KIND, intoto.New().DefaultVersion(), envelopeBytes, leafCertPem, sig)
+	if err != nil {
+		return nil, err
+	}
+
+	rekorLogID, err := getLogID(ca.rekorKey.Public())
+	if err != nil {
+		return nil, err
+	}
+
+	rekorLogIDRaw, err := hex.DecodeString(rekorLogID)
+	if err != nil {
+		return nil, err
+	}
+
+	logIndex := int64(1000)
+
+	b := createRekorBundle(rekorLogID, integratedTime, logIndex, rekorBody)
+	set, err := ca.rekorSignPayload(*b)
+	if err != nil {
+		return nil, err
+	}
+
+	rekorBodyRaw, err := base64.StdEncoding.DecodeString(rekorBody)
+	if err != nil {
+		return nil, err
+	}
+
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil)
+}
+
+func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certificate, artifact []byte, sig []byte, integratedTime int64) (*tlog.Entry, error) {
+	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
+	if err != nil {
+		return nil, err
+	}
+
+	rekorBody, err := generateRekorEntry(hashedrekord.KIND, hashedrekord.New().DefaultVersion(), artifact, leafCertPem, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -379,10 +455,11 @@ func (ca *VirtualSigstore) CTlogAuthorities() map[string]*root.TlogAuthority {
 }
 
 type TestEntity struct {
-	certChain   []*x509.Certificate
-	envelope    *dsse.Envelope
-	timestamps  [][]byte
-	tlogEntries []*tlog.Entry
+	certChain        []*x509.Certificate
+	envelope         *dsse.Envelope
+	messageSignature *bundle.MessageSignature
+	timestamps       [][]byte
+	tlogEntries      []*tlog.Entry
 }
 
 func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
@@ -398,7 +475,10 @@ func (e *TestEntity) HasInclusionProof() bool {
 }
 
 func (e *TestEntity) SignatureContent() (verify.SignatureContent, error) {
-	return &bundle.Envelope{Envelope: e.envelope}, nil
+	if e.envelope != nil {
+		return &bundle.Envelope{Envelope: e.envelope}, nil
+	}
+	return e.messageSignature, nil
 }
 
 func (e *TestEntity) Timestamps() ([][]byte, error) {

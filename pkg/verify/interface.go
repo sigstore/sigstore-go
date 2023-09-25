@@ -55,7 +55,6 @@ type VerificationContent interface {
 }
 
 type SignatureContent interface {
-	EnsureFileMatchesDigest([]byte) error
 	Signature() []byte
 	EnvelopeContent() EnvelopeContent
 	MessageSignatureContent() MessageSignatureContent

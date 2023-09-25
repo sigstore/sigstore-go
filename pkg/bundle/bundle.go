@@ -190,12 +190,11 @@ func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
 		}
 		return envelope, nil
 	case *protobundle.Bundle_MessageSignature:
-		messageSignature := MessageSignature{
-			digest:          content.MessageSignature.MessageDigest.Digest,
-			digestAlgorithm: protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
-			signature:       content.MessageSignature.Signature,
-		}
-		return &messageSignature, nil
+		return NewMessageSignature(
+			content.MessageSignature.MessageDigest.Digest,
+			protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
+			content.MessageSignature.Signature,
+		), nil
 	}
 	return nil, ErrMissingVerificationMaterial
 }
