@@ -46,7 +46,8 @@ func TestEnvelopeSubject(t *testing.T) {
 
 	subjectBody := "Hi, I am a subject!"
 	digest256 := sha256.Sum256([]byte(subjectBody))
-	digest256hex := []byte(hex.EncodeToString(digest256[:]))
+	digest := digest256[:]
+	digest256hex := hex.EncodeToString(digest)
 
 	statement := []byte(fmt.Sprintf(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"%s"}}],"predicate":{}}`, digest256hex))
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
@@ -61,7 +62,7 @@ func TestEnvelopeSubject(t *testing.T) {
 	_, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(subjectBody)))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha256", digest256hex))
+	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha256", digest))
 	assert.NoError(t, err)
 
 	// Error: incorrect artifact
@@ -69,7 +70,7 @@ func TestEnvelopeSubject(t *testing.T) {
 	assert.Error(t, err)
 
 	// Error: incorrect digest algorithm
-	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha512", digest256hex))
+	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha512", digest))
 	assert.Error(t, err)
 }
 

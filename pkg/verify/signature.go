@@ -183,7 +183,11 @@ func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope Enve
 	for _, subject := range statement.Subject {
 		for alg, digest := range subject.Digest {
 			if alg == artifactDigestAlgorithm {
-				if bytes.Equal([]byte(digest), artifactDigest) {
+				hexdigest, err := hex.DecodeString(digest)
+				if err != nil {
+					return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
+				}
+				if bytes.Equal(hexdigest, artifactDigest) {
 					return nil
 				}
 			}
