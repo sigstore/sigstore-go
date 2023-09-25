@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 
 	"github.com/github/sigstore-verifier/pkg/root"
@@ -115,64 +116,59 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 	if err != nil {
 		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
 	}
-	// Load all subject digests into a map
-	subjectDigests := make(map[string][][]byte)
+	var artifactDigestAlgorithm string
+	var artifactDigest []byte
+
+	// Determine artifact digest algorithm by looking at the first subject's
+	// digests. This assumes that if a statement contains multiple subjects,
+	// they all use the same digest algorithm(s).
+	if len(statement.Subject) == 0 {
+		return errors.New("no subjects found in statement")
+	}
+	if len(statement.Subject[0].Digest) == 0 {
+		return errors.New("no digests found in statement")
+	}
+
+	// Select the strongest digest algorithm available.
+	for _, alg := range []string{"sha512", "sha384", "sha256"} {
+		if _, ok := statement.Subject[0].Digest[alg]; ok {
+			artifactDigestAlgorithm = alg
+			continue
+		}
+	}
+	if artifactDigestAlgorithm == "" {
+		return errors.New("could not verify artifact: unsupported digest algorithm")
+	}
+
+	// Compute digest of the artifact.
+	var hasher hash.Hash
+	switch artifactDigestAlgorithm {
+	case "sha512":
+		hasher = crypto.SHA512.New()
+	case "sha384":
+		hasher = crypto.SHA384.New()
+	case "sha256":
+		hasher = crypto.SHA256.New()
+	}
+	_, err = io.Copy(hasher, artifact)
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
+	}
+	artifactDigest = hasher.Sum(nil)
+
+	// Look for artifact digest in statement
 	for _, subject := range statement.Subject {
 		for alg, digest := range subject.Digest {
 			hexdigest, err := hex.DecodeString(digest)
 			if err != nil {
 				return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
 			}
-			subjectDigests[alg] = append(subjectDigests[alg], hexdigest)
-		}
-	}
-	if len(subjectDigests) == 0 {
-		return errors.New("no digests found in statement")
-	}
-	// Create cache of computed artifact digests, then check if any of them match the subject digests
-	artifactDigests := make(map[string][]byte)
-	for _, hashfunc := range []crypto.Hash{crypto.SHA512, crypto.SHA384, crypto.SHA256} {
-		err = checkSubjectDigests(subjectDigests, artifactDigests, artifact, hashfunc)
-		if err == nil {
-			return nil
-		}
-	}
-	return fmt.Errorf("could not verify artifact: unable to confirm artifact digest is present in subject digests: %w", err)
-}
-
-func checkSubjectDigests(subjectDigests map[string][][]byte, artifactDigests map[string][]byte, artifact io.Reader, hash crypto.Hash) error {
-	var alg string
-	switch hash {
-	case crypto.SHA512:
-		alg = "sha512"
-	case crypto.SHA384:
-		alg = "sha384"
-	case crypto.SHA256:
-		alg = "sha256"
-	}
-	if _, ok := subjectDigests[alg]; ok {
-		hasher := hash.New()
-		_, err := io.Copy(hasher, artifact)
-		if err != nil {
-			return fmt.Errorf("could not verify artifact: unable to hash artifact: %w", err)
-		}
-		artifactDigests[alg] = hasher.Sum(nil)
-		for _, digest := range subjectDigests[alg] {
-			if bytes.Equal(artifactDigests[alg], digest) {
+			if alg == artifactDigestAlgorithm && bytes.Equal(artifactDigest, hexdigest) {
 				return nil
 			}
 		}
-		// None of the digests matched, so we must seek back to the start of the artifact so we can calculate the other digests
-		if seeker, ok := artifact.(io.Seeker); ok {
-			_, err = seeker.Seek(0, io.SeekStart)
-			if err != nil {
-				return fmt.Errorf("could not verify artifact: unable to seek to start of artifact: %w", err)
-			}
-		} else {
-			return errors.New("could not verify artifact: statement contains multiple digests, so artifact must implement io.Seeker to calculate all digests")
-		}
 	}
-	return errors.New("provided artifact digest does not match any digest in statement")
+	return fmt.Errorf("could not verify artifact: unable to confirm artifact digest is present in subject digests: %w", err)
 }
 
 func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope EnvelopeContent, artifactDigest []byte, artifactDigestAlgorithm string) error {
