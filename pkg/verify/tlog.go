@@ -16,8 +16,8 @@ import (
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 
-	"github.com/github/sigstore-verifier/pkg/root"
-	"github.com/github/sigstore-verifier/pkg/tlog"
+	"github.com/github/sigstore-go/pkg/root"
+	"github.com/github/sigstore-go/pkg/tlog"
 )
 
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged

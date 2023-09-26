@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/github/sigstore-verifier/pkg/testing/ca"
-	"github.com/github/sigstore-verifier/pkg/verify"
+	"github.com/github/sigstore-go/pkg/testing/ca"
+	"github.com/github/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 

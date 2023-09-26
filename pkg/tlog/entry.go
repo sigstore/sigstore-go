@@ -27,7 +27,7 @@ import (
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 
-	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/github/sigstore-go/pkg/root"
 )
 
 type Entry struct {
