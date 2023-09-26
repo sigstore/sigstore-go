@@ -5,7 +5,7 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
+	"github.com/github/sigstore-go/pkg/fulcio/certificate"
 )
 
 type SubjectAlternativeNameMatcher struct {

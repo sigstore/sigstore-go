@@ -10,7 +10,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/github/sigstore-go/pkg/root"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"

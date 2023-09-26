@@ -9,7 +9,7 @@ import (
 
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
-	"github.com/github/sigstore-verifier/pkg/root"
+	"github.com/github/sigstore-go/pkg/root"
 )
 
 // VerifyTimestampAuthority verifies that the given entity has been timestamped

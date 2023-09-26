@@ -3,7 +3,7 @@ package verify
 import (
 	"testing"
 
-	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
+	"github.com/github/sigstore-go/pkg/fulcio/certificate"
 	"github.com/stretchr/testify/assert"
 )
 

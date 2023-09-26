@@ -12,7 +12,7 @@ Features:
 - Support for custom [trusted root](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_trustroot.proto)
 - Basic CLI
 
-For an example of how to use this library, see [cmd/sigstore-verifier](./cmd/sigstore-verifier/main.go), or see the CLI examples below.
+For an example of how to use this library, see [cmd/sigstore-go](./cmd/sigstore-go/main.go), or see the CLI examples below.
 
 ## Background
 
@@ -25,7 +25,7 @@ Sigstore already has a canonical Go client implementation, [cosign](https://gith
 
 ## Installation
 
-You can use the CLI with `go run` as in the below examples, or compile/install the `sigstore-verifier` CLI:
+You can use the CLI with `go run` as in the below examples, or compile/install the `sigstore-go` CLI:
 
 ```bash
 $ make install
@@ -33,20 +33,20 @@ $ make install
 ## Examples
 
 ```bash
-$ go run cmd/sigstore-verifier/main.go -trustedrootJSONpath examples/trusted-root-public-good.json examples/bundle-provenance.json
+$ go run cmd/sigstore-go/main.go -trustedrootJSONpath examples/trusted-root-public-good.json examples/bundle-provenance.json
 Verification successful!
 ```
 
 ```bash
-$ go run cmd/sigstore-verifier/main.go -tufRootURL tuf-repo-cdn.sigstore.dev examples/bundle-provenance.json
+$ go run cmd/sigstore-go/main.go -tufRootURL tuf-repo-cdn.sigstore.dev examples/bundle-provenance.json
 Verification successful!
 ```
 
 Alternatively, you can install a binary of the CLI like so:
 
 ```shell
-$ go install ./cmd/sigstore-verifier
-$ sigstore-verifier examples/bundle-provenance.json
+$ go install ./cmd/sigstore-go
+$ sigstore-go examples/bundle-provenance.json
 ```
 
 ## Testing

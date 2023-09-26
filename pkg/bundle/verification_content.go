@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"time"
 
-	"github.com/github/sigstore-verifier/pkg/root"
-	"github.com/github/sigstore-verifier/pkg/verify"
+	"github.com/github/sigstore-go/pkg/root"
+	"github.com/github/sigstore-go/pkg/verify"
 )
 
 type CertificateChain struct {

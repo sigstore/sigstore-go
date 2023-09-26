@@ -3,8 +3,8 @@ package certificate_test
 import (
 	"testing"
 
-	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
-	"github.com/github/sigstore-verifier/pkg/testing/data"
+	"github.com/github/sigstore-go/pkg/fulcio/certificate"
+	"github.com/github/sigstore-go/pkg/testing/data"
 	"github.com/stretchr/testify/assert"
 )
 

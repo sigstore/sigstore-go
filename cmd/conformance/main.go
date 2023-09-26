@@ -13,10 +13,10 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
-	"github.com/github/sigstore-verifier/pkg/bundle"
-	"github.com/github/sigstore-verifier/pkg/root"
-	"github.com/github/sigstore-verifier/pkg/tuf"
-	"github.com/github/sigstore-verifier/pkg/verify"
+	"github.com/github/sigstore-go/pkg/bundle"
+	"github.com/github/sigstore-go/pkg/root"
+	"github.com/github/sigstore-go/pkg/tuf"
+	"github.com/github/sigstore-go/pkg/verify"
 )
 
 var bundlePath *string

@@ -6,9 +6,9 @@ import (
 
 	"encoding/json"
 
-	"github.com/github/sigstore-verifier/pkg/fulcio/certificate"
-	"github.com/github/sigstore-verifier/pkg/testing/data"
-	v "github.com/github/sigstore-verifier/pkg/verify"
+	"github.com/github/sigstore-go/pkg/fulcio/certificate"
+	"github.com/github/sigstore-go/pkg/testing/data"
+	v "github.com/github/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 

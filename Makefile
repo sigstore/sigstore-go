@@ -1,6 +1,6 @@
 .PHONY: build
 build:
-	go build ./cmd/sigstore-verifier
+	go build ./cmd/sigstore-go
 	go build -o conformance ./cmd/conformance
 
 .PHONY: test

@@ -1,4 +1,4 @@
-module github.com/github/sigstore-verifier
+module github.com/github/sigstore-go
 
 go 1.21
 
