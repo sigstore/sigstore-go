@@ -30,3 +30,4 @@ jobs:
         with:
           entrypoint: ${{ github.workspace }}/conformance
           skip-signing: true
+          supports-trusted-root: true
