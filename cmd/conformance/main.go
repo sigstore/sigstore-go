@@ -24,11 +24,12 @@ var certPath *string
 var certOIDC *string
 var certSAN *string
 var signaturePath *string
+var trustedRootPath *string
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL FILE\n", os.Args[0])
-	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL FILE\n", os.Args[0])
+	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] FILE\n", os.Args[0])
+	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] FILE\n", os.Args[0])
 }
 
 func main() {
@@ -49,6 +50,8 @@ func main() {
 				certSAN = &os.Args[i+1]
 			case "--signature":
 				signaturePath = &os.Args[i+1]
+			case "--trusted-root":
+				trustedRootPath = &os.Args[i+1]
 			}
 		}
 
@@ -116,20 +119,31 @@ func main() {
 			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
 		}
 
+		policyConfig = append(policyConfig, verify.WithArtifactDigest("sha256", fileDigest[:]))
+
 		// Load trust root
-		_, filename, _, ok := runtime.Caller(1)
-		if !ok {
-			log.Fatal("unable to get path")
+		var trustedRootJSON []byte
+
+		if trustedRootPath != nil {
+			trustedRootJSON, err = os.ReadFile(*trustedRootPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			_, filename, _, ok := runtime.Caller(1)
+			if !ok {
+				log.Fatal("unable to get path")
+			}
+
+			tufDir := path.Join(path.Dir(filename), "tufdata")
+
+			trustedRootJSON, err = tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
-		tufDir := path.Join(path.Dir(filename), "tufdata")
-
-		trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		tr, err := root.NewTrustedRootFromJSON(trustedrootJSON)
+		tr, err := root.NewTrustedRootFromJSON(trustedRootJSON)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -158,6 +172,8 @@ func main() {
 				certOIDC = &os.Args[i+1]
 			case "--certificate-identity":
 				certSAN = &os.Args[i+1]
+			case "--trusted-root":
+				trustedRootPath = &os.Args[i+1]
 			}
 		}
 
@@ -186,19 +202,28 @@ func main() {
 		}
 
 		// Load trust root
-		_, filename, _, ok := runtime.Caller(1)
-		if !ok {
-			log.Fatal("unable to get path")
+		var trustedRootJSON []byte
+
+		if trustedRootPath != nil {
+			trustedRootJSON, err = os.ReadFile(*trustedRootPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			_, filename, _, ok := runtime.Caller(1)
+			if !ok {
+				log.Fatal("unable to get path")
+			}
+
+			tufDir := path.Join(path.Dir(filename), "tufdata")
+
+			trustedRootJSON, err = tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
-		tufDir := path.Join(path.Dir(filename), "tufdata")
-
-		trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		tr, err := root.NewTrustedRootFromJSON(trustedrootJSON)
+		tr, err := root.NewTrustedRootFromJSON(trustedRootJSON)
 		if err != nil {
 			log.Fatal(err)
 		}
