@@ -49,7 +49,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.VerifyUnsafe(entity)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
 
@@ -68,7 +68,7 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 	v, err := v.NewSignedEntityVerifier(tr, v.WithoutAnyObserverTimestampsInsecure())
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.VerifyUnsafe(entity)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
 }
@@ -80,7 +80,7 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(2))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.VerifyUnsafe(entity)
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -92,7 +92,7 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1), v.WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.VerifyUnsafe(entity)
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -110,7 +110,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 
 	assert.Nil(t, err)
 
-	res, err := verifier.Verify(entity,
+	res, err := verifier.VerifyUnsafe(entity,
 		v.WithCertificateIdentity(badCI),
 		v.WithCertificateIdentity(goodCI))
 	assert.Nil(t, err)
@@ -118,7 +118,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	assert.Equal(t, res.VerifiedIdentity.Issuer, v.ActionsIssuerValue)
 
 	// but if only pass in the bad CI, it will fail:
-	res, err = verifier.Verify(entity,
+	res, err = verifier.VerifyUnsafe(entity,
 		v.WithCertificateIdentity(badCI))
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
@@ -140,7 +140,7 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	verifier, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
 	assert.Nil(t, err)
 
-	res, err := verifier.Verify(entity)
+	res, err := verifier.VerifyUnsafe(entity)
 	assert.Nil(t, err)
 
 	rawJSON, err := json.Marshal(res)

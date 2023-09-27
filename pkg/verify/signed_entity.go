@@ -32,7 +32,11 @@ type VerifierConfigurator func(*VerifierConfig) error
 // NewSignedEntityVerifier creates a new SignedEntityVerifier. It takes a
 // root.TrustedMaterial, which contains a set of trusted public keys and
 // certificates, and a set of VerifierConfigurators, which set the config
-// that determines the behaviour of the Verify function.
+// that determines the behaviour of the Verify... functions.
+//
+// VerifierConfig's set of options should match the properties of a given
+// Sigstore deployment, i.e. whether to expect SCTs, Tlog entries, or signed
+// timestamps.
 func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierConfigurator) (*SignedEntityVerifier, error) {
 	var err error
 	c := VerifierConfig{}
@@ -170,7 +174,7 @@ type PolicyOptions struct {
 	artifactDigestAlgorithm string
 }
 
-// WithCertificateIdentity allows the caller of Verify to enforce that the
+// WithCertificateIdentity allows the caller of VerifyUnsafe to enforce that the
 // SignedEntity being verified was created by a given identity, as defined by
 // the Fulcio certificate embedded in the entity. If this policy is enabled,
 // but the SignedEntity does not have a certificate, verification will fail.
@@ -199,7 +203,7 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 	}
 }
 
-// WithArtifact allows the caller of Verify to enforce that the SignedEntity
+// WithArtifact allows the caller of VerifyUnsafe to enforce that the SignedEntity
 // being verified was created from, or references, a given artifact.
 //
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
@@ -216,7 +220,7 @@ func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
 	}
 }
 
-// WithArtifactDigest allows the caller of Verify to enforce that the
+// WithArtifactDigest allows the caller of VerifyUnsafe to enforce that the
 // SignedEntity being verified was created for a given artifact digest.
 //
 // If the SignedEntity contains a MessageSignature that was signed using the
@@ -237,19 +241,82 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionCon
 	}
 }
 
-// Verify checks the cryptographic integrity of a given SignedEntity according
+// VerifyWithArtifact checks the cryptographic integrity of a given SignedEntity,
+// and enforces that the SignedEntity being verified:
+// 1. was created from, or references, the provided artifact, and
+// 2. was created by one of the provided CertificateIdentities.
+//
+// Verification will fail if the SignedEntity:
+// - does not have a certificate,
+// - does not have a valid signature, or was signed outside of the cert's
+//	 validity period
+//
+// If and only if the verification is successful, this function returns a
+// VerificationResult whose contents have been verified and which can be used
+// for additional policy enforcement (i.e. enforcing the presence of a given
+// provenance predicate).
+//
+// For a more convenient way to initialize a CertificateIdentity, consult the
+// NewShortCertificateIdentity function.
+//
+// For more information, consult: VerifyUnsafe, WithArtifact, WithCertificateIdentity
+func (v *SignedEntityVerifier) VerifyWithArtifact(entity SignedEntity, artifact io.Reader, identities ...CertificateIdentity) (*VerificationResult, error) {
+	policies := []PolicyOptionConfigurator{WithArtifact(artifact)}
+
+	for _, certID := range identities {
+		policies = append(policies, WithCertificateIdentity(certID))
+	}
+	return v.VerifyUnsafe(entity, policies...)
+}
+
+// VerifyWithArtifactDigest checks the cryptographic integrity of a given
+// SignedEntity, and enforces that the SignedEntity being verified:
+// 1. was created for, or references, the provided artifact digest, and
+// 2. was created by one of the provided CertificateIdentities.
+//
+// Verification will fail if the SignedEntity:
+// - does not have a certificate,
+// - does not have a valid signature, or was signed outside of the cert's
+//	 validity period
+//
+// If and only if the verification is successful, this function returns a
+// VerificationResult whose contents have been verified and which can be used
+// for additional policy enforcement (i.e. enforcing the presence of a given
+// provenance predicate).
+//
+// For a more convenient way to initialize a CertificateIdentity, consult the
+// NewShortCertificateIdentity function.
+//
+// For more information, consult: VerifyUnsafe, WithArtifactDigest, and
+// WithCertificateIdentity
+func (v *SignedEntityVerifier) VerifyWithArtifactDigest(entity SignedEntity, algorithm string, artifactDigest []byte, identities ...CertificateIdentity) (*VerificationResult, error) {
+	policies := []PolicyOptionConfigurator{WithArtifactDigest(algorithm, artifactDigest)}
+
+	for _, certID := range identities {
+		policies = append(policies, WithCertificateIdentity(certID))
+	}
+	return v.VerifyUnsafe(entity, policies...)
+}
+
+// VerifyUnsafe checks the cryptographic integrity of a given SignedEntity according
 // to the options configured in the NewSignedEntityVerifier. Its purpose is to
 // determine whether the SignedEntity was created by a Sigstore deployment we
 // trust, as defined by keys in our TrustedMaterial.
 //
-// Verify then creates a VerificationResult struct whose contents' integrity
-// have been verified. At the function caller's discretion, Verify may then
-// verify the contents of the VerificationResults using supplied PolicyOptions.
+// If and only if verification is successful, VerifyUnsafe will return a
+// VerificationResult struct whose contents' integrity have been verified. At
+// the function caller's discretion, VerifyUnsafe may then verify the contents
+// of the VerificationResults using supplied PolicyOptions.
 // See WithCertificateIdentity for more details.
 //
 // If the SignedEntity contains a MessageSignature, then the artifact or its
-// digest must be provided to the Verify function, as it is required to verify
+// digest must be provided to the VerifyUnsafe function, as it is required to verify
 // the signature. See WithArtifact and WithArtifactDigest for more details.
+//
+// DO NOT USE THIS FUNCTION, unless you know what you are doing. As the name
+// implies, this function is **not safe**: the semantics for what constitutes an
+// appropriate level of verification and policy enforcement are subtle, and
+// complex. Use VerifyWithArtifact or VerifyWithArtifactDigest instead.
 //
 // If no policy options are provided, callers of this function SHOULD:
 //   - (if the signed entity has a certificate) verify that its Subject Alternate
@@ -257,7 +324,7 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionCon
 //     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
-func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOptionConfigurator) (*VerificationResult, error) {
+func (v *SignedEntityVerifier) VerifyUnsafe(entity SignedEntity, options ...PolicyOptionConfigurator) (*VerificationResult, error) {
 	var err error
 	policy := &PolicyOptions{}
 	for _, opt := range options {
