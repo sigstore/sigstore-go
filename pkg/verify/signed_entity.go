@@ -247,9 +247,9 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionCon
 // 2. was created by one of the provided CertificateIdentities.
 //
 // Verification will fail if the SignedEntity:
-// - does not have a certificate,
-// - does not have a valid signature, or was signed outside of the cert's
-//	 validity period
+//   - does not have a certificate,
+//   - does not have a valid signature, or was signed outside of the cert's
+//     validity period
 //
 // If and only if the verification is successful, this function returns a
 // VerificationResult whose contents have been verified and which can be used
@@ -275,9 +275,9 @@ func (v *SignedEntityVerifier) VerifyWithArtifact(entity SignedEntity, artifact 
 // 2. was created by one of the provided CertificateIdentities.
 //
 // Verification will fail if the SignedEntity:
-// - does not have a certificate,
-// - does not have a valid signature, or was signed outside of the cert's
-//	 validity period
+//   - does not have a certificate,
+//   - does not have a valid signature, or was signed outside of the cert's
+//     validity period
 //
 // If and only if the verification is successful, this function returns a
 // VerificationResult whose contents have been verified and which can be used
