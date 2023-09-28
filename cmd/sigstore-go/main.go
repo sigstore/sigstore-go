@@ -166,7 +166,7 @@ func run() error {
 		policyConfig = append(policyConfig, verify.WithArtifact(file))
 	}
 
-	res, err := sev.VerifyUnsafe(b, policyConfig...)
+	res, err := sev.Verify(b, policyConfig...)
 	if err != nil {
 		return err
 	}

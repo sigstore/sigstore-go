@@ -145,7 +145,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.VerifyUnsafe(bun, policyConfig...)
+		_, err = sev.Verify(bun, policyConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -209,7 +209,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.VerifyUnsafe(b, policyConfig...)
+		_, err = sev.Verify(b, policyConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}

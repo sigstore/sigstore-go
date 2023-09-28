@@ -56,21 +56,21 @@ func TestEnvelopeSubject(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1))
 	assert.NoError(t, err)
 
-	_, err = verifier.VerifyUnsafe(entity)
+	_, err = verifier.Verify(entity)
 	assert.NoError(t, err)
 
-	_, err = verifier.VerifyUnsafe(entity, verify.WithArtifact(bytes.NewBufferString(subjectBody)))
+	_, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(subjectBody)))
 	assert.NoError(t, err)
 
-	_, err = verifier.VerifyUnsafe(entity, verify.WithArtifactDigest("sha256", digest))
+	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha256", digest))
 	assert.NoError(t, err)
 
 	// Error: incorrect artifact
-	_, err = verifier.VerifyUnsafe(entity, verify.WithArtifact(bytes.NewBufferString("Hi, I am a different subject!")))
+	_, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString("Hi, I am a different subject!")))
 	assert.Error(t, err)
 
 	// Error: incorrect digest algorithm
-	_, err = verifier.VerifyUnsafe(entity, verify.WithArtifactDigest("sha512", digest))
+	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha512", digest))
 	assert.Error(t, err)
 }
 
@@ -85,7 +85,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1))
 	assert.NoError(t, err)
 
-	result, err := verifier.VerifyUnsafe(entity, verify.WithArtifact(bytes.NewBufferString(artifact)))
+	result, err := verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(artifact)))
 	assert.NoError(t, err)
 
 	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName.Value, "foofighters@example.com")
@@ -93,7 +93,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 
 	// should fail to verify with a different artifact
 	artifact2 := "Hi, I am a different artifact!"
-	result, err = verifier.VerifyUnsafe(entity, verify.WithArtifact(bytes.NewBufferString(artifact2)))
+	result, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(artifact2)))
 	assert.Error(t, err)
 	assert.Nil(t, result)
 }
