@@ -46,7 +46,7 @@ type VerifierConfigurator func(*VerifierConfig) error
 // NewSignedEntityVerifier creates a new SignedEntityVerifier. It takes a
 // root.TrustedMaterial, which contains a set of trusted public keys and
 // certificates, and a set of VerifierConfigurators, which set the config
-// that determines the behaviour of the Verify... functions.
+// that determines the behaviour of the Verify function.
 //
 // VerifierConfig's set of options should match the properties of a given
 // Sigstore deployment, i.e. whether to expect SCTs, Tlog entries, or signed
@@ -337,19 +337,18 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 // determine whether the SignedEntity was created by a Sigstore deployment we
 // trust, as defined by keys in our TrustedMaterial.
 //
-// If and only if verification is successful, Verify will return a
-// VerificationResult struct whose contents' integrity have been verified. At
-// the function caller's discretion, Verify may then verify the contents
-// of the VerificationResults using supplied PolicyOptions.
-// See WithCertificateIdentity for more details.
-//
 // If the SignedEntity contains a MessageSignature, then the artifact or its
 // digest must be provided to the Verify function, as it is required to verify
 // the signature. See WithArtifact and WithArtifactDigest for more details.
 //
-// If no policy options are provided, callers of this function SHOULD:
+// If and only if verification is successful, Verify will return a
+// VerificationResult struct whose contents' integrity have been verified.
+// Verify may then verify the contents of the VerificationResults using supplied
+// PolicyOptions. See WithCertificateIdentity for more details.
+//
+// Callers of this function SHOULD ALWAYS:
 //   - (if the signed entity has a certificate) verify that its Subject Alternate
-//     Name matches a trusted identity, and that its Issuer field matches an
+//     Name matches a trusted identity, and that its OID Issuer field matches an
 //     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
