@@ -298,12 +298,12 @@ func WithoutIdentitiesUnsafe() PolicyOption {
 //
 // For convenience, consult the NewShortCertificateIdentity function.
 func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
-	return func(v *PolicyConfig) error {
-		if v.weDoNotExpectIdentities {
+	return func(p *PolicyConfig) error {
+		if p.weDoNotExpectIdentities {
 			return errors.New("can't use WithCertificateIdentity while using WithoutIdentitiesUnsafe")
 		}
 
-		v.certificateIdentities = append(v.certificateIdentities, identity)
+		p.certificateIdentities = append(p.certificateIdentities, identity)
 		return nil
 	}
 }
@@ -338,17 +338,17 @@ func WithoutArtifactUnsafe() ArtifactPolicyOption {
 // calculated from the given artifact, and compared to the digest in the
 // envelope's statement.
 func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
-	return func(v *PolicyConfig) error {
-		if v.verifyArtifact || v.verifyArtifactDigest {
+	return func(p *PolicyConfig) error {
+		if p.verifyArtifact || p.verifyArtifactDigest {
 			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
 		}
 
-		if v.weDoNotExpectAnArtifact {
+		if p.weDoNotExpectAnArtifact {
 			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
 		}
 
-		v.verifyArtifact = true
-		v.artifact = artifact
+		p.verifyArtifact = true
+		p.artifact = artifact
 		return nil
 	}
 }
@@ -363,18 +363,18 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
 // compared to the digest in the envelope's statement.
 func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyOption {
-	return func(v *PolicyConfig) error {
-		if v.verifyArtifact || v.verifyArtifactDigest {
+	return func(p *PolicyConfig) error {
+		if p.verifyArtifact || p.verifyArtifactDigest {
 			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
 		}
 
-		if v.weDoNotExpectAnArtifact {
+		if p.weDoNotExpectAnArtifact {
 			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
 		}
 
-		v.verifyArtifactDigest = true
-		v.artifactDigestAlgorithm = algorithm
-		v.artifactDigest = artifactDigest
+		p.verifyArtifactDigest = true
+		p.artifactDigestAlgorithm = algorithm
+		p.artifactDigest = artifactDigest
 		return nil
 	}
 }
