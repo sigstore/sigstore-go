@@ -63,14 +63,6 @@ $ make test
 
 This came from https://www.npmjs.com/package/sigstore/v/1.3.0/provenance, with the outermost "bundle" key stripped off.
 
-## License
-
-This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE.txt) for the full terms.
-
-## Maintainers
-
-This library is maintained by the Package Security team and Sigstore members, including @codysoyland, @steiza, @phillmv, and others. See [CODEOWNERS](./CODEOWNERS) for current reviewers.
-
 ## Support
 
 Bug reports are welcome via issues and questions are welcome via discussion. Please refer to [SUPPORT.md](./SUPPORT.md) for details.
