@@ -1,4 +1,4 @@
-module github.com/github/sigstore-go
+module github.com/sigstore/sigstore-go
 
 go 1.21
 

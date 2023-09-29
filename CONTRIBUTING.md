@@ -1,42 +1,117 @@
-## Contributing
+# Contributing
 
-[fork]: https://github.com/github/sigstore-go/fork
-[pr]: https://github.com/github/sigstore-go/compare
-[style]: https://github.com/github/sigstore-go/blob/main/.golangci.yaml
-[code-of-conduct]: CODE_OF_CONDUCT.md
+When contributing to a repository in the Sigstore organization, please first discuss the change you wish
+to make via an issue in the repository.
 
-Hi there! We're thrilled that you'd like to contribute to this project. Your help is essential for keeping it great.
+## Pull Request Process
 
-Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [project's open source license](LICENSE.txt).
+1. Create an issue in the repository outlining the fix or feature.
+2. Fork the repository to your own GitHub account and clone it locally.
+3. Complete and test the change.
+4. If relevant, update documentation with details of the change. This includes updates to an API, new environment
+   variables, exposed ports, useful file locations, CLI parameters and
+   new or changed configuration values.
+5. Correctly format your commit message - See [Commit Messages](#Commit Message Guidelines)
+   below.
+6. Sign off your commit.
+7. Ensure that CI passes. If it fails, fix the failures.
+8. Every pull request requires a review from the Sigstore subprojects MAINTAINERS.
+9. If your pull request consists of more than one commit, please squash your
+   commits as described in [Squash Commits](#Squash Commits), or the commits
+   will be squashed on merge.
 
-Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
+## Commit Message Guidelines
 
-## Prerequisites for running and testing code
+We follow the commit formatting recommendations found on [Chris Beams' How to Write a Git Commit Message article]((https://chris.beams.io/posts/git-commit/).
 
-These are one time installations required to be able to test your changes locally as part of the pull request (PR) submission process.
+Well formed commit messages not only help reviewers understand the nature of
+the Pull Request, but also assists the release process where commit messages
+are used to generate release notes.
 
-1. install Go [through download](https://go.dev/doc/install) | [through Homebrew](https://formulae.brew.sh/formula/go)
-1. [install golangci-lint](https://golangci-lint.run/usage/install/#local-installation)
+A good example of a commit message would be as follows:
 
-## Submitting a pull request
+```
+Summarize changes in around 50 characters or less
 
-1. [Fork][fork] and clone the repository
-1. Make sure the tests pass on your machine: `go test -v ./...`
-1. Make sure linter passes on your machine: `golangci-lint run`
-1. Create a new branch: `git checkout -b my-branch-name`
-1. Make your change, add tests, and make sure the tests and linter still pass
-1. Push to your fork and [submit a pull request][pr]
-1. Pat yourself on the back and wait for your pull request to be reviewed and merged.
+More detailed explanatory text, if necessary. Wrap it to about 72
+characters or so. In some contexts, the first line is treated as the
+subject of the commit and the rest of the text as the body. The
+blank line separating the summary from the body is critical (unless
+you omit the body entirely); various tools like `log`, `shortlog`
+and `rebase` can get confused if you run the two together.
 
-Here are a few things you can do that will increase the likelihood of your pull request being accepted:
+Explain the problem that this commit is solving. Focus on why you
+are making this change as opposed to how (the code explains that).
+Are there side effects or other unintuitive consequences of this
+change? Here's the place to explain them.
 
-- Follow the [style guide][style].
-- Write tests.
-- Keep your change as focused as possible. If there are multiple changes you would like to make that are not dependent upon each other, consider submitting them as separate pull requests.
-- Write a [good commit message](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
+Further paragraphs come after blank lines.
 
-## Resources
+ - Bullet points are okay, too
 
-- [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/)
-- [Using Pull Requests](https://help.github.com/articles/about-pull-requests/)
-- [GitHub Help](https://help.github.com)
+ - Typically a hyphen or asterisk is used for the bullet, preceded
+   by a single space, with blank lines in between, but conventions
+   vary here
+
+If you use an issue tracker, put references to them at the bottom,
+like this:
+
+Resolves: #123
+See also: #456, #789
+```
+
+Note the `Resolves #123` tag, this references the issue raised and allows us to
+ensure issues are associated and closed when a pull request is merged.
+
+Please refer to [the GitHub help page on message types](https://help.github.com/articles/closing-issues-using-keywords/)
+for a complete list of issue references.
+
+## Squash Commits
+
+Should your pull request consist of more than one commit (perhaps due to
+a change being requested during the review cycle), please perform a git squash
+once a reviewer has approved your pull request.
+
+A squash can be performed as follows. Let's say you have the following commits:
+
+    initial commit
+    second commit
+    final commit
+
+Run the command below with the number set to the total commits you wish to
+squash (in our case 3 commits):
+
+    git rebase -i HEAD~3
+
+You default text editor will then open up and you will see the following::
+
+    pick eb36612 initial commit
+    pick 9ac8968 second commit
+    pick a760569 final commit
+
+    # Rebase eb1429f..a760569 onto eb1429f (3 commands)
+
+We want to rebase on top of our first commit, so we change the other two commits
+to `squash`:
+
+    pick eb36612 initial commit
+    squash 9ac8968 second commit
+    squash a760569 final commit
+
+After this, should you wish to update your commit message to better summarise
+all of your pull request, run:
+
+    git commit --amend
+
+You will then need to force push (assuming your initial commit(s) were posted
+to GitHub):
+
+    git push origin your-branch --force
+
+Alternatively, a core member can squash your commits within GitHub.
+
+## Code of Conduct
+
+Sigstore adheres to and enforces the [Contributor Covenant](http://contributor-covenant.org/version/1/4/) Code of Conduct.
+Please take a moment to read the [CODE_OF_CONDUCT.md](https://github.com/sigstore/community/blob/main/CODE_OF_CONDUCT.md) document.
+

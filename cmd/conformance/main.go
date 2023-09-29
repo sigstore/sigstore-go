@@ -1,3 +1,17 @@
+// Copyright 2023 The Sigstore Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -13,10 +27,10 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
-	"github.com/github/sigstore-go/pkg/bundle"
-	"github.com/github/sigstore-go/pkg/root"
-	"github.com/github/sigstore-go/pkg/tuf"
-	"github.com/github/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 var bundlePath *string
@@ -24,11 +38,41 @@ var certPath *string
 var certOIDC *string
 var certSAN *string
 var signaturePath *string
+var trustedRootPath *string
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL FILE\n", os.Args[0])
-	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL FILE\n", os.Args[0])
+	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] FILE\n", os.Args[0])
+	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] FILE\n", os.Args[0])
+}
+
+func getTrustedRoot() root.TrustedMaterial {
+	var trustedRootJSON []byte
+	var err error
+
+	if trustedRootPath != nil {
+		trustedRootJSON, err = os.ReadFile(*trustedRootPath)
+	} else {
+		_, filename, _, ok := runtime.Caller(1)
+		if !ok {
+			log.Fatal("unable to get path")
+		}
+
+		tufDir := path.Join(path.Dir(filename), "tufdata")
+
+		trustedRootJSON, err = tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tr, err := root.NewTrustedRootFromJSON(trustedRootJSON)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return tr
 }
 
 func main() {
@@ -49,6 +93,8 @@ func main() {
 				certSAN = &os.Args[i+1]
 			case "--signature":
 				signaturePath = &os.Args[i+1]
+			case "--trusted-root":
+				trustedRootPath = &os.Args[i+1]
 			}
 		}
 
@@ -117,22 +163,7 @@ func main() {
 		}
 
 		// Load trust root
-		_, filename, _, ok := runtime.Caller(1)
-		if !ok {
-			log.Fatal("unable to get path")
-		}
-
-		tufDir := path.Join(path.Dir(filename), "tufdata")
-
-		trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		tr, err := root.NewTrustedRootFromJSON(trustedrootJSON)
-		if err != nil {
-			log.Fatal(err)
-		}
+		tr := getTrustedRoot()
 
 		// Verify bundle
 		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
@@ -145,7 +176,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.Verify(bun, verify.NewPolicy(verify.WithoutArtifactUnsafe(), identityPolicies...))
+		_, err = sev.Verify(bun, verify.NewPolicy(verify.WithArtifactDigest("sha256", fileDigest[:]), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -158,6 +189,8 @@ func main() {
 				certOIDC = &os.Args[i+1]
 			case "--certificate-identity":
 				certSAN = &os.Args[i+1]
+			case "--trusted-root":
+				trustedRootPath = &os.Args[i+1]
 			}
 		}
 
@@ -186,22 +219,7 @@ func main() {
 		}
 
 		// Load trust root
-		_, filename, _, ok := runtime.Caller(1)
-		if !ok {
-			log.Fatal("unable to get path")
-		}
-
-		tufDir := path.Join(path.Dir(filename), "tufdata")
-
-		trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		tr, err := root.NewTrustedRootFromJSON(trustedrootJSON)
-		if err != nil {
-			log.Fatal(err)
-		}
+		tr := getTrustedRoot()
 
 		// Verify bundle
 		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedCertificateTimestamps(1))

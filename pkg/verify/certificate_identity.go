@@ -1,3 +1,17 @@
+// Copyright 2023 The Sigstore Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package verify
 
 import (
@@ -5,7 +19,7 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/github/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 )
 
 type SubjectAlternativeNameMatcher struct {
@@ -80,7 +94,7 @@ func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, extensions
 	certID := CertificateIdentity{SubjectAlternativeName: sanMatcher, Extensions: extensions}
 
 	if certID.Issuer == "" {
-		return CertificateIdentity{}, errors.New("When verifying a certificate identity, the Issuer field can't be empty")
+		return CertificateIdentity{}, errors.New("when verifying a certificate identity, the Issuer field can't be empty")
 	}
 
 	return certID, nil
@@ -105,7 +119,7 @@ func (i CertificateIdentities) Verify(cert certificate.Summary) (*CertificateIde
 		}
 	}
 
-	return nil, errors.New("No matching certificate identity found")
+	return nil, errors.New("no matching certificate identity found")
 }
 
 // Verify checks if the actualCert matches the CertificateIdentity's SAN and
