@@ -20,9 +20,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/github/sigstore-go/pkg/bundle"
-	"github.com/github/sigstore-go/pkg/root"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
 )

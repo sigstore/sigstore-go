@@ -20,9 +20,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/github/sigstore-go/pkg/fulcio/certificate"
-	"github.com/github/sigstore-go/pkg/root"
 	"github.com/in-toto/in-toto-golang/in_toto"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
 type SignedEntityVerifier struct {

@@ -19,10 +19,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/github/sigstore-go/pkg/root"
 	"github.com/google/certificate-transparency-go/ctutil"
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	"github.com/google/certificate-transparency-go/x509util"
+	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
 // VerifySignedCertificateTimestamp, given a threshold, TrustedMaterial, and a
@@ -48,7 +48,7 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 		encodedKeyID := hex.EncodeToString(sct.LogID.KeyID[:])
 		key, ok := ctlogs[encodedKeyID]
 		if !ok {
-			return fmt.Errorf("Unable to find ctlogs key for %s", encodedKeyID)
+			return fmt.Errorf("unable to find ctlogs key for %s", encodedKeyID)
 		}
 
 		for _, fulcioCa := range fulcioCerts {
@@ -72,7 +72,7 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 	}
 
 	if verified < threshold {
-		return fmt.Errorf("Only able to verify %d SCT entries; unable to meet threshold of %d", verified, threshold)
+		return fmt.Errorf("only able to verify %d SCT entries; unable to meet threshold of %d", verified, threshold)
 	}
 
 	return nil

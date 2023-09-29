@@ -19,7 +19,7 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/github/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 )
 
 type SubjectAlternativeNameMatcher struct {
@@ -94,7 +94,7 @@ func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, extensions
 	certID := CertificateIdentity{SubjectAlternativeName: sanMatcher, Extensions: extensions}
 
 	if certID.Issuer == "" {
-		return CertificateIdentity{}, errors.New("When verifying a certificate identity, the Issuer field can't be empty")
+		return CertificateIdentity{}, errors.New("when verifying a certificate identity, the Issuer field can't be empty")
 	}
 
 	return certID, nil
@@ -119,7 +119,7 @@ func (i CertificateIdentities) Verify(cert certificate.Summary) (*CertificateIde
 		}
 	}
 
-	return nil, errors.New("No matching certificate identity found")
+	return nil, errors.New("no matching certificate identity found")
 }
 
 // Verify checks if the actualCert matches the CertificateIdentity's SAN and

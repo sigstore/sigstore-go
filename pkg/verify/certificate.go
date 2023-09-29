@@ -19,7 +19,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/github/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
 func VerifyLeafCertificate(observerTimestamp time.Time, leafCert x509.Certificate, trustedMaterial root.TrustedMaterial) error { // nolint: revive

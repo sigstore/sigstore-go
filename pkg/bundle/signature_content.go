@@ -18,9 +18,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/github/sigstore-go/pkg/verify"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 type MessageSignature struct {

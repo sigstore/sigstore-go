@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/github/sigstore-go/pkg/testing/ca"
-	"github.com/github/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore-go/pkg/testing/ca"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -30,8 +30,8 @@ import (
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 
-	"github.com/github/sigstore-go/pkg/root"
-	"github.com/github/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tlog"
 )
 
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
@@ -174,7 +174,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 
 		// Check tlog entry time against bundle certificates
 		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
-			return nil, errors.New("Integrated time outside certificate validity")
+			return nil, errors.New("integrated time outside certificate validity")
 		}
 	}
 

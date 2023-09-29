@@ -27,10 +27,10 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
-	"github.com/github/sigstore-go/pkg/bundle"
-	"github.com/github/sigstore-go/pkg/root"
-	"github.com/github/sigstore-go/pkg/tuf"
-	"github.com/github/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 var bundlePath *string

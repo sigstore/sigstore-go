@@ -20,9 +20,9 @@ import (
 
 	"encoding/json"
 
-	"github.com/github/sigstore-go/pkg/fulcio/certificate"
-	"github.com/github/sigstore-go/pkg/testing/data"
-	v "github.com/github/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/testing/data"
+	v "github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 

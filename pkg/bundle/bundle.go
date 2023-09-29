@@ -29,8 +29,8 @@ import (
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/github/sigstore-go/pkg/tlog"
-	"github.com/github/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"

@@ -23,7 +23,7 @@ import (
 
 	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
-	"github.com/github/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
 // VerifyTimestampAuthority verifies that the given entity has been timestamped
@@ -104,5 +104,5 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, tr
 		return timestamp.Time, nil
 	}
 
-	return time.Time{}, errors.New("Unable to verify signed timestamps")
+	return time.Time{}, errors.New("unable to verify signed timestamps")
 }
