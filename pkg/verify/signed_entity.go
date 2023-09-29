@@ -162,10 +162,22 @@ func NewVerificationResult() *VerificationResult {
 	}
 }
 
-type PolicyOptionConfigurator func(*PolicyOptions) error
+type PolicyOption func(*PolicyConfig) error
+type ArtifactPolicyOption func(*PolicyConfig) error
 
-type PolicyOptions struct {
-	verifyIdentities        bool
+type PolicyCollection struct {
+	artifactPolicy ArtifactPolicyOption
+	policyOptions  []PolicyOption
+}
+
+func (pc PolicyCollection) Options() []PolicyOption {
+	arr := []PolicyOption{PolicyOption(pc.artifactPolicy)}
+	return append(arr, pc.policyOptions...)
+}
+
+type PolicyConfig struct {
+	weDoNotExpectAnArtifact bool
+	weDoNotExpectIdentities bool
 	certificateIdentities   CertificateIdentities
 	verifyArtifact          bool
 	artifact                io.Reader
@@ -174,8 +186,58 @@ type PolicyOptions struct {
 	artifactDigestAlgorithm string
 }
 
+// WeExpectAnArtifact returns true if the Verify algorithm should perform
+// signature verification with an an artifact provided by either the
+// WithArtifact or the WithArtifactDigest functions.
+//
+// By default, unless explicitly turned off, we should always expect to verify
+// a SignedEntity's signature using an artifact. Bools are initialized to false,
+// so this behaviour is therefore controlled by the weDoNotExpectAnArtifact
+// field.
+//
+// Double negatives are confusing, though. To aid with comprehension of the
+// main Verify loop, this function therefore just wraps the double negative.
+func (p *PolicyConfig) WeExpectAnArtifact() bool {
+	return !p.weDoNotExpectAnArtifact
+}
+
+// WeExpectIdentities returns true if the Verify algorithm should check
+// whether the SignedEntity's certificate was created by one of the identities
+// provided by the WithCertificateIdentity function.
+//
+// By default, unless explicitly turned off, we should always expect to enforce
+// that a SignedEntity's certificate was created by an Identity we trust. Bools
+// are initialized to false, so this behaviour is therefore controlled by the
+// weDoNotExpectIdentities field.
+//
+// Double negatives are confusing, though. To aid with comprehension of the
+// main Verify loop, this function therefore just wraps the double negative.
+func (p *PolicyConfig) WeExpectIdentities() bool {
+	return !p.weDoNotExpectIdentities
+}
+
+func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) PolicyCollection {
+	return PolicyCollection{artifactPolicy: artifactOpt, policyOptions: options}
+}
+
+// WithoutIdentitiesUnsafe allows the caller of Verify to skip enforcing any
+// checks on the identity that created the SignedEntity being verified.
+//
+// DO NOT USE THIS OPTION UNLESS YOU KNOW WHAT YOU ARE DOING. As the name
+// implies, using WithoutIdentitiesUnsafe is not safe: outside of exceptional
+// circumstances, we should always enforce that the SignedEntity being verified
+// was signed by a trusted CertificateIdentity.
+//
+// For more information, consult WithCertificateIdentity.
+func WithoutIdentitiesUnsafe() PolicyOption {
+	return func(p *PolicyConfig) error {
+		p.weDoNotExpectIdentities = true
+		return nil
+	}
+}
+
 // WithCertificateIdentity allows the caller of Verify to enforce that the
-// SignedEntity being verified was created by a given identity, as defined by
+// SignedEntity being verified was signed by the given identity, as defined by
 // the Fulcio certificate embedded in the entity. If this policy is enabled,
 // but the SignedEntity does not have a certificate, verification will fail.
 //
@@ -185,20 +247,35 @@ type PolicyOptions struct {
 // If all of the provided CertificateIdentities fail to match the Fulcio
 // certificate, then verification will fail. If *any* CertificateIdentity
 // matches, then verification will succeed. Therefore, each CertificateIdentity
-// provided to this function must define a "sufficient" identity.
+// provided to this function must define a "sufficient" identity to trust.
 //
 // The CertificateIdentity struct allows callers to specify:
 // - The exact value, or Regexp, of the SubjectAlternativeName
 // - The exact value of any Fulcio OID X.509 extension, i.e. Issuer
 //
 // For convenience, consult the NewShortCertificateIdentity function.
-//
-// Enabling this policy is highly recommended, especially to assert that the
-// OID Issuer matches the expected value.
-func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigurator {
-	return func(v *PolicyOptions) error {
-		v.verifyIdentities = true
+func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
+	return func(v *PolicyConfig) error {
 		v.certificateIdentities = append(v.certificateIdentities, identity)
+		return nil
+	}
+}
+
+// WithoutArtifactUnsafe allows the caller of Verify to skip checking whether
+// the SignedEntity was created from, or references, an artifact.
+//
+// WithoutArtifactUnsafe can only be used with SignedEntities that contain a
+// DSSE envelope. If the the SignedEntity has a MessageSignature, providing
+// this policy option will cause verification to always fail, since
+// MessageSignatures can only be verified in the presence of an Artifact or
+// artifact digest. See WithArtifact/WithArtifactDigest for more informaiton.
+//
+// DO NOT USE THIS OPTION UNLESS YOU KNOW WHAT YOU ARE DOING. As the name
+// implies, using WithoutArtifactUnsafe is not safe: outside of exceptional
+// circumstances, SignedEntities should always be verified with an artifact.
+func WithoutArtifactUnsafe() ArtifactPolicyOption {
+	return func(p *PolicyConfig) error {
+		p.weDoNotExpectAnArtifact = true
 		return nil
 	}
 }
@@ -209,8 +286,8 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOptionConfigura
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
 // calculated from the given artifact, and compared to the digest in the
 // envelope's statement.
-func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
-	return func(v *PolicyOptions) error {
+func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
+	return func(v *PolicyConfig) error {
 		if v.verifyArtifact || v.verifyArtifactDigest {
 			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
 		}
@@ -229,8 +306,8 @@ func WithArtifact(artifact io.Reader) PolicyOptionConfigurator {
 //
 // If the SignedEntity contains a DSSE envelope, then the artifact digest is
 // compared to the digest in the envelope's statement.
-func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionConfigurator {
-	return func(v *PolicyOptions) error {
+func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyOption {
+	return func(v *PolicyConfig) error {
 		if v.verifyArtifact || v.verifyArtifactDigest {
 			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
 		}
@@ -262,11 +339,11 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) PolicyOptionCon
 //     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
-func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOptionConfigurator) (*VerificationResult, error) {
+func (v *SignedEntityVerifier) Verify(entity SignedEntity, policyCol PolicyCollection) (*VerificationResult, error) {
 	var err error
-	policy := &PolicyOptions{}
-	for _, opt := range options {
-		err = opt(policy)
+	policy := &PolicyConfig{}
+	for _, applyOption := range policyCol.Options() {
+		err = applyOption(policy)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure policy: %w", err)
 		}
@@ -332,14 +409,22 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
-	switch {
-	case policy.verifyArtifact:
-		err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
-	case policy.verifyArtifactDigest:
-		err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
-	default:
+	if policy.WeExpectAnArtifact() {
+		switch {
+		case policy.verifyArtifact:
+			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
+		case policy.verifyArtifactDigest:
+			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
+		default:
+			// should never happen, but just in case:
+			err = errors.New("no artifact or artifact digest provided")
+		}
+	} else {
+		// verifying with artifact has been explicitly turned off, so just check
+		// the signature on the dsse envelope:
 		err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify signature: %w", err)
 	}
@@ -373,7 +458,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, options ...PolicyOpti
 
 	// From ## Certificate section,
 	// >The Verifier MUST then check the certificate against the verification policy. Details on how to do this depend on the verification policy, but the Verifier SHOULD check the Issuer X.509 extension (OID 1.3.6.1.4.1.57264.1.1) at a minimum, and will in most cases check the SubjectAlternativeName as well. See  Spec: Fulcio §TODO for example checks on the certificate.
-	if policy.verifyIdentities {
+	if policy.WeExpectIdentities() {
 		if !signedWithCertificate {
 			// We got asked to verify identities, but the entity was not signed with
 			// a certificate. That's a problem!

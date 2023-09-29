@@ -8,7 +8,7 @@ import (
 
 	"github.com/github/sigstore-go/pkg/fulcio/certificate"
 	"github.com/github/sigstore-go/pkg/testing/data"
-	v "github.com/github/sigstore-go/pkg/verify"
+	"github.com/github/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,24 +16,24 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 
 	// can't create a verifier without specifying either tlog or tsa
-	_, err := v.NewSignedEntityVerifier(tr)
+	_, err := verify.NewSignedEntityVerifier(tr)
 	assert.NotNil(t, err)
 
 	// can create a verifier with both of them
-	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1), v.WithSignedTimestamps(1))
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
 	// unless we are really sure we want a verifier without either tlog or tsa
-	_, err = v.NewSignedEntityVerifier(tr, v.WithoutAnyObserverTimestampsInsecure())
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
 	assert.Nil(t, err)
 
 	// can configure the verifiers with thresholds
-	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(2), v.WithSignedTimestamps(10))
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2), verify.WithSignedTimestamps(10))
 
 	assert.Nil(t, err)
 
 	// can't configure them with < 1 thresholds
-	_, err = v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(0), v.WithSignedTimestamps(-10))
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(0), verify.WithSignedTimestamps(-10))
 	assert.Error(t, err)
 }
 
@@ -46,10 +46,10 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
 
@@ -65,10 +65,10 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := v.NewSignedEntityVerifier(tr, v.WithoutAnyObserverTimestampsInsecure())
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
 }
@@ -77,10 +77,10 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(2))
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -89,10 +89,10 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1), v.WithSignedTimestamps(1))
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.Nil(t, err)
 
-	res, err := v.Verify(entity)
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -103,23 +103,26 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	goodCI, _ := certIDForTesting("", "", v.SigstoreSanRegex, v.ActionsIssuerValue, "")
-	badCI, _ := certIDForTesting("BadSANValue", "", "", v.ActionsIssuerValue, "")
+	goodCI, _ := certIDForTesting("", "", verify.SigstoreSanRegex, verify.ActionsIssuerValue, "")
+	badCI, _ := certIDForTesting("BadSANValue", "", "", verify.ActionsIssuerValue, "")
 
-	verifier, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
 
 	assert.Nil(t, err)
 
 	res, err := verifier.Verify(entity,
-		v.WithCertificateIdentity(badCI),
-		v.WithCertificateIdentity(goodCI))
+		verify.NewPolicy(verify.WithoutArtifactUnsafe(),
+			verify.WithCertificateIdentity(badCI),
+			verify.WithCertificateIdentity(goodCI)))
 	assert.Nil(t, err)
 
-	assert.Equal(t, res.VerifiedIdentity.Issuer, v.ActionsIssuerValue)
+	assert.Equal(t, res.VerifiedIdentity.Issuer, verify.ActionsIssuerValue)
 
 	// but if only pass in the bad CI, it will fail:
 	res, err = verifier.Verify(entity,
-		v.WithCertificateIdentity(badCI))
+		verify.NewPolicy(
+			verify.WithoutArtifactUnsafe(),
+			verify.WithCertificateIdentity(badCI)))
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -137,10 +140,10 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	verifier, err := v.NewSignedEntityVerifier(tr, v.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
 	assert.Nil(t, err)
 
-	res, err := verifier.Verify(entity)
+	res, err := verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Nil(t, err)
 
 	rawJSON, err := json.Marshal(res)
@@ -171,11 +174,11 @@ func ensureKeysBeginWithLowercase(t *testing.T, obj interface{}) {
 }
 
 // copied from verify/certificate_identity_test.go
-func certIDForTesting(sanValue, sanType, sanRegex, issuer, runnerEnv string) (v.CertificateIdentity, error) {
-	san, err := v.NewSANMatcher(sanValue, sanType, sanRegex)
+func certIDForTesting(sanValue, sanType, sanRegex, issuer, runnerEnv string) (verify.CertificateIdentity, error) {
+	san, err := verify.NewSANMatcher(sanValue, sanType, sanRegex)
 	if err != nil {
-		return v.CertificateIdentity{}, err
+		return verify.CertificateIdentity{}, err
 	}
 
-	return v.CertificateIdentity{SubjectAlternativeName: san, Extensions: certificate.Extensions{Issuer: issuer, RunnerEnvironment: runnerEnv}}, nil
+	return verify.CertificateIdentity{SubjectAlternativeName: san, Extensions: certificate.Extensions{Issuer: issuer, RunnerEnvironment: runnerEnv}}, nil
 }
