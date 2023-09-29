@@ -400,7 +400,6 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
 func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationResult, error) {
-
 	policy, err := pb.BuildConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build policy: %w", err)
