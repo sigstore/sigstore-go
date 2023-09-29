@@ -521,6 +521,10 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 			return nil, errors.New("can't verify certificate identities: entity was not signed with a certificate")
 		}
 
+		if len(policy.certificateIdentities) == 0 {
+			return nil, errors.New("can't verify certificate identities: no identities provided")
+		}
+
 		matchingCertID, err := policy.certificateIdentities.Verify(certSummary)
 		if err != nil {
 			return nil, fmt.Errorf("failed to verify certificate identity: %w", err)
