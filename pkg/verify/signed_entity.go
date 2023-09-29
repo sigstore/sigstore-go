@@ -179,14 +179,31 @@ func NewVerificationResult() *VerificationResult {
 type PolicyOption func(*PolicyConfig) error
 type ArtifactPolicyOption func(*PolicyConfig) error
 
-type PolicyCollection struct {
+// PolicyBuilder is responsible for building & validating a PolicyConfig
+type PolicyBuilder struct {
 	artifactPolicy ArtifactPolicyOption
 	policyOptions  []PolicyOption
 }
 
-func (pc PolicyCollection) Options() []PolicyOption {
+func (pc PolicyBuilder) Options() []PolicyOption {
 	arr := []PolicyOption{PolicyOption(pc.artifactPolicy)}
 	return append(arr, pc.policyOptions...)
+}
+
+func (pc PolicyBuilder) BuildConfig() (PolicyConfig, error) {
+	policy := &PolicyConfig{}
+	for _, applyOption := range pc.Options() {
+		err := applyOption(policy)
+		if err != nil {
+			return PolicyConfig{}, err
+		}
+	}
+
+	if err := policy.Validate(); err != nil {
+		return PolicyConfig{}, err
+	}
+
+	return *policy, nil
 }
 
 type PolicyConfig struct {
@@ -198,6 +215,14 @@ type PolicyConfig struct {
 	verifyArtifactDigest    bool
 	artifactDigest          []byte
 	artifactDigestAlgorithm string
+}
+
+func (p *PolicyConfig) Validate() error {
+	if p.WeExpectIdentities() && len(p.certificateIdentities) == 0 {
+		return errors.New("can't verify identities without providing at least one identity")
+	}
+
+	return nil
 }
 
 // WeExpectAnArtifact returns true if the Verify algorithm should perform
@@ -230,8 +255,8 @@ func (p *PolicyConfig) WeExpectIdentities() bool {
 	return !p.weDoNotExpectIdentities
 }
 
-func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) PolicyCollection {
-	return PolicyCollection{artifactPolicy: artifactOpt, policyOptions: options}
+func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) PolicyBuilder {
+	return PolicyBuilder{artifactPolicy: artifactOpt, policyOptions: options}
 }
 
 // WithoutIdentitiesUnsafe allows the caller of Verify to skip enforcing any
@@ -245,6 +270,10 @@ func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) Policy
 // For more information, consult WithCertificateIdentity.
 func WithoutIdentitiesUnsafe() PolicyOption {
 	return func(p *PolicyConfig) error {
+		if len(p.certificateIdentities) > 0 {
+			return errors.New("can't use WithoutIdentitiesUnsafe while specifying CertificateIdentities")
+		}
+
 		p.weDoNotExpectIdentities = true
 		return nil
 	}
@@ -270,6 +299,10 @@ func WithoutIdentitiesUnsafe() PolicyOption {
 // For convenience, consult the NewShortCertificateIdentity function.
 func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 	return func(v *PolicyConfig) error {
+		if v.weDoNotExpectIdentities {
+			return errors.New("can't use WithCertificateIdentity while using WithoutIdentitiesUnsafe")
+		}
+
 		v.certificateIdentities = append(v.certificateIdentities, identity)
 		return nil
 	}
@@ -289,6 +322,10 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 // circumstances, SignedEntities should always be verified with an artifact.
 func WithoutArtifactUnsafe() ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
+		if p.verifyArtifact || p.verifyArtifactDigest {
+			return errors.New("can't use WithoutArtifactUnsafe while using WithArtifact or WithArtifactDigest")
+		}
+
 		p.weDoNotExpectAnArtifact = true
 		return nil
 	}
@@ -303,8 +340,13 @@ func WithoutArtifactUnsafe() ArtifactPolicyOption {
 func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 	return func(v *PolicyConfig) error {
 		if v.verifyArtifact || v.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
+			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
 		}
+
+		if v.weDoNotExpectAnArtifact {
+			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
+		}
+
 		v.verifyArtifact = true
 		v.artifact = artifact
 		return nil
@@ -323,8 +365,13 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyOption {
 	return func(v *PolicyConfig) error {
 		if v.verifyArtifact || v.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact()/WithArtifactDigest() is allowed")
+			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
 		}
+
+		if v.weDoNotExpectAnArtifact {
+			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
+		}
+
 		v.verifyArtifactDigest = true
 		v.artifactDigestAlgorithm = algorithm
 		v.artifactDigest = artifactDigest
@@ -352,14 +399,11 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 //     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
-func (v *SignedEntityVerifier) Verify(entity SignedEntity, policyCol PolicyCollection) (*VerificationResult, error) {
-	var err error
-	policy := &PolicyConfig{}
-	for _, applyOption := range policyCol.Options() {
-		err = applyOption(policy)
-		if err != nil {
-			return nil, fmt.Errorf("failed to configure policy: %w", err)
-		}
+func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationResult, error) {
+
+	policy, err := pb.BuildConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build policy: %w", err)
 	}
 
 	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.msyyz1cr5bcs
