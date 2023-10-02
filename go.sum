@@ -289,8 +289,8 @@ github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/google/go-containerregistry v0.15.2 h1:MMkSh+tjSdnmJZO7ljvEqV1DjfekB6VUEAZgy3a+TQE=
-github.com/google/go-containerregistry v0.15.2/go.mod h1:wWK+LnOv4jXMM23IT/F1wdYftGWGr47Is8CG+pmHK1Q=
+github.com/google/go-containerregistry v0.16.1 h1:rUEt426sR6nyrL3gt+18ibRcvYpKYdpsa5ZW7MA08dQ=
+github.com/google/go-containerregistry v0.16.1/go.mod h1:u0qB2l7mvtWVR5kNcbFIhFY1hLbf8eeGapA+vbFDCtQ=
 github.com/google/gofuzz v1.2.0 h1:xRy4A+RhZaiKjJ1bPfwQ8sedCA+YS2YcCHW6ec7JMi0=
 github.com/google/gofuzz v1.2.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/martian v2.1.0+incompatible/go.mod h1:9I4somxYTbIHy5NJKHRl3wXiIaQGbYVAs8BPL6v8lEs=
@@ -468,8 +468,8 @@ github.com/sigstore/protobuf-specs v0.1.0 h1:X0l/E2C2c79t/rI/lmSu8WAoKWsQtMqDzAM
 github.com/sigstore/protobuf-specs v0.1.0/go.mod h1:5shUCxf82hGnjUEFVWiktcxwzdtn6EfeeJssxZ5Q5HE=
 github.com/sigstore/rekor v1.2.3-0.20230707120854-3ded91ee7185 h1:AP0wP7fl8yFMqOWPzlqgb9WZRJRY7U8V2e28FSNdGeM=
 github.com/sigstore/rekor v1.2.3-0.20230707120854-3ded91ee7185/go.mod h1:pe/wnpU6iNVJrs+LUQHNvFqDGXFItIkLKrogQzzLe4A=
-github.com/sigstore/sigstore v1.7.2 h1:MY0wSOhKWa8SIWSCO9SzFnUl+b7jbthgXHJpuUg31Qs=
-github.com/sigstore/sigstore v1.7.2/go.mod h1:2IPD5YXrXoznfnIoVsDF7ARC1Nha8xIdLpsC4kEQh5w=
+github.com/sigstore/sigstore v1.7.3 h1:HVVTfrMezJeLyl2xhJ8edzkrEGBa4KxjQZB4FlQ4JLU=
+github.com/sigstore/sigstore v1.7.3/go.mod h1:cl0c7Dtg3MM3c13L8pqqrfrmBa0eM3POcdtBepjylmw=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.7.2 h1:JtdEI/81xugNfHqHyK1icPtnjgrLHJmWm3fgUBhyFPw=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.7.2/go.mod h1:GBGQtFm6XmC00DeGc1GI/PdETg7vrhzaHBgj5YCS9lY=
 github.com/sigstore/sigstore/pkg/signature/kms/azure v1.7.2 h1:WtTn0OYxbSPY/xEy13iSPjJnSHXhILmzbfleg9x8CuQ=
