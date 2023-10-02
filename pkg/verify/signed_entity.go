@@ -192,17 +192,17 @@ func (pc PolicyBuilder) Options() []PolicyOption {
 	return append(arr, pc.policyOptions...)
 }
 
-func (pc PolicyBuilder) BuildConfig() (PolicyConfig, error) {
-	policy := PolicyConfig{}
+func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
+	policy := &PolicyConfig{}
 	for _, applyOption := range pc.Options() {
-		err := applyOption(&policy)
+		err := applyOption(policy)
 		if err != nil {
-			return PolicyConfig{}, err
+			return nil, err
 		}
 	}
 
 	if err := policy.Validate(); err != nil {
-		return PolicyConfig{}, err
+		return nil, err
 	}
 
 	return policy, nil
