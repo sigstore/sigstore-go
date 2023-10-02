@@ -151,7 +151,7 @@ func main() {
 			},
 		}
 
-		policyConfig := []verify.PolicyOptionConfigurator{}
+		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
@@ -159,10 +159,8 @@ func main() {
 				os.Exit(1)
 			}
 
-			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
+			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 		}
-
-		policyConfig = append(policyConfig, verify.WithArtifactDigest("sha256", fileDigest[:]))
 
 		// Load trust root
 		tr := getTrustedRoot()
@@ -178,7 +176,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.Verify(bun, policyConfig...)
+		_, err = sev.Verify(bun, verify.NewPolicy(verify.WithArtifactDigest("sha256", fileDigest[:]), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -209,7 +207,7 @@ func main() {
 		}
 
 		// Configure verification options
-		policyConfig := []verify.PolicyOptionConfigurator{verify.WithArtifact(file)}
+		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
@@ -217,7 +215,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
+			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -229,7 +227,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.Verify(b, policyConfig...)
+		_, err = sev.Verify(b, verify.NewPolicy(verify.WithArtifact(file), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}

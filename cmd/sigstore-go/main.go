@@ -95,8 +95,9 @@ func run() error {
 		}
 	}
 
-	verifierConfig := []verify.VerifierConfigurator{}
-	policyConfig := []verify.PolicyOptionConfigurator{}
+	verifierConfig := []verify.VerifierOption{}
+	identityPolicies := []verify.PolicyOption{}
+	var artifactPolicy verify.ArtifactPolicyOption
 
 	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 
@@ -117,7 +118,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
+		identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 	}
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
@@ -170,17 +171,17 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		policyConfig = append(policyConfig, verify.WithArtifactDigest(*artifactDigestAlgorithm, artifactDigestBytes))
+		artifactPolicy = verify.WithArtifactDigest(*artifactDigestAlgorithm, artifactDigestBytes)
 	}
 	if *artifact != "" {
 		file, err := os.Open(*artifact)
 		if err != nil {
 			return err
 		}
-		policyConfig = append(policyConfig, verify.WithArtifact(file))
+		artifactPolicy = verify.WithArtifact(file)
 	}
 
-	res, err := sev.Verify(b, policyConfig...)
+	res, err := sev.Verify(b, verify.NewPolicy(artifactPolicy, identityPolicies...))
 	if err != nil {
 		return err
 	}

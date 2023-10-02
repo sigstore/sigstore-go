@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var SkipArtifactAndIdentitiesPolicy = verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe())
+
 func TestSignatureVerifier(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
@@ -70,21 +72,21 @@ func TestEnvelopeSubject(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity)
+	_, err = verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(subjectBody)))
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(subjectBody)), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha256", digest))
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
 	// Error: incorrect artifact
-	_, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString("Hi, I am a different subject!")))
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString("Hi, I am a different subject!")), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 
 	// Error: incorrect digest algorithm
-	_, err = verifier.Verify(entity, verify.WithArtifactDigest("sha512", digest))
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 }
 
@@ -99,7 +101,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1))
 	assert.NoError(t, err)
 
-	result, err := verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(artifact)))
+	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
 	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName.Value, "foofighters@example.com")
@@ -107,7 +109,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 
 	// should fail to verify with a different artifact
 	artifact2 := "Hi, I am a different artifact!"
-	result, err = verifier.Verify(entity, verify.WithArtifact(bytes.NewBufferString(artifact2)))
+	result, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact2)), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 	assert.Nil(t, result)
 }
