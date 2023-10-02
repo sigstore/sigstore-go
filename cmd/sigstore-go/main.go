@@ -95,7 +95,7 @@ func run() error {
 		}
 	}
 
-	verifierConfig := []verify.VerifierConfigurator{}
+	verifierConfig := []verify.VerifierOption{}
 	identityPolicies := []verify.PolicyOption{}
 	var artifactPolicy verify.ArtifactPolicyOption
 
