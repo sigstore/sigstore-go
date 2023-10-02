@@ -39,7 +39,7 @@ jobs:
 
       - run: go build -o conformance cmd/conformance/main.go
 
-      - uses: sigstore/sigstore-conformance@main # maybe we should pin this in the future, once sigstore-conformace development slows down?
+      - uses: sigstore/sigstore-conformance@main # maybe we should pin this in the future, once sigstore-conformance development slows down?
         with:
           entrypoint: ${{ github.workspace }}/conformance
           skip-signing: true
