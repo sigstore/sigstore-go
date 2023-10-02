@@ -191,9 +191,9 @@ func (pc PolicyBuilder) Options() []PolicyOption {
 }
 
 func (pc PolicyBuilder) BuildConfig() (PolicyConfig, error) {
-	policy := &PolicyConfig{}
+	policy := PolicyConfig{}
 	for _, applyOption := range pc.Options() {
-		err := applyOption(policy)
+		err := applyOption(&policy)
 		if err != nil {
 			return PolicyConfig{}, err
 		}
@@ -203,7 +203,7 @@ func (pc PolicyBuilder) BuildConfig() (PolicyConfig, error) {
 		return PolicyConfig{}, err
 	}
 
-	return *policy, nil
+	return policy, nil
 }
 
 type PolicyConfig struct {
