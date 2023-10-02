@@ -135,7 +135,9 @@ func WithSignedCertificateTimestamps(threshold int) VerifierOption {
 // A SignedEntity without a trusted "observer" timestamp to verify the attached
 // Fulcio certificate can't provide the same kind of integrity guarantee.
 //
-// Do not enable this if you don't know what you are doing.
+// Do not enable this if you don't know what you are doing; as the name implies,
+// using it defeats part of the security guarantees offered by Sigstore. This
+// option is only useful for testing.
 func WithoutAnyObserverTimestampsInsecure() VerifierOption {
 	return func(c *VerifierConfig) error {
 		c.weDoNotExpectAnyObserverTimestamps = true
@@ -262,10 +264,11 @@ func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) Policy
 // WithoutIdentitiesUnsafe allows the caller of Verify to skip enforcing any
 // checks on the identity that created the SignedEntity being verified.
 //
-// DO NOT USE THIS OPTION UNLESS YOU KNOW WHAT YOU ARE DOING. As the name
-// implies, using WithoutIdentitiesUnsafe is not safe: outside of exceptional
-// circumstances, we should always enforce that the SignedEntity being verified
-// was signed by a trusted CertificateIdentity.
+// Do not use this option unless you know what you are doing!
+//
+// As the name implies, using WithoutIdentitiesUnsafe is not safe: outside of
+// exceptional circumstances, we should always enforce that the SignedEntity
+// being verified was signed by a trusted CertificateIdentity.
 //
 // For more information, consult WithCertificateIdentity.
 func WithoutIdentitiesUnsafe() PolicyOption {
@@ -317,9 +320,11 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 // MessageSignatures can only be verified in the presence of an Artifact or
 // artifact digest. See WithArtifact/WithArtifactDigest for more informaiton.
 //
-// DO NOT USE THIS OPTION UNLESS YOU KNOW WHAT YOU ARE DOING. As the name
-// implies, using WithoutArtifactUnsafe is not safe: outside of exceptional
-// circumstances, SignedEntities should always be verified with an artifact.
+// Do not use this function unless you know what you are doing!
+//
+// As the name implies, using WithoutArtifactUnsafe is not safe: outside of
+// exceptional circumstances, SignedEntities should always be verified with
+// an artifact.
 func WithoutArtifactUnsafe() ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
 		if p.verifyArtifact || p.verifyArtifactDigest {
