@@ -1,3 +1,17 @@
+// Copyright 2023 The Sigstore Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -13,10 +27,10 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
-	"github.com/github/sigstore-go/pkg/bundle"
-	"github.com/github/sigstore-go/pkg/root"
-	"github.com/github/sigstore-go/pkg/tuf"
-	"github.com/github/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 var bundlePath *string
@@ -137,7 +151,7 @@ func main() {
 			},
 		}
 
-		policyConfig := []verify.PolicyOptionConfigurator{}
+		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
@@ -145,10 +159,8 @@ func main() {
 				os.Exit(1)
 			}
 
-			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
+			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 		}
-
-		policyConfig = append(policyConfig, verify.WithArtifactDigest("sha256", fileDigest[:]))
 
 		// Load trust root
 		tr := getTrustedRoot()
@@ -164,7 +176,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.Verify(bun, policyConfig...)
+		_, err = sev.Verify(bun, verify.NewPolicy(verify.WithArtifactDigest("sha256", fileDigest[:]), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -195,7 +207,7 @@ func main() {
 		}
 
 		// Configure verification options
-		policyConfig := []verify.PolicyOptionConfigurator{verify.WithArtifact(file)}
+		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
@@ -203,7 +215,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			policyConfig = append(policyConfig, verify.WithCertificateIdentity(certID))
+			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -215,7 +227,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.Verify(b, policyConfig...)
+		_, err = sev.Verify(b, verify.NewPolicy(verify.WithArtifact(file), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}

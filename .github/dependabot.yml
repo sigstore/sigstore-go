@@ -1,3 +1,4 @@
+#
 # Copyright 2023 The Sigstore Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,27 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-run:
-  timeout: 10m
-  go: '1.21'
-linters:
-  enable:
-    - revive
-    - gofmt
-    - goconst
-    - tagliatelle
-    - whitespace
-    - gosec
-    - gocritic
-    - misspell
-    - errcheck
-    - errorlint
-    - unused
-    - staticcheck
-    # - wrapcheck
-  presets:
-    - format
-  disable:
-    - gofumpt
-    - gci
-    - tagalign
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
