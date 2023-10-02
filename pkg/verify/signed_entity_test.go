@@ -15,12 +15,13 @@
 package verify_test
 
 import (
+	"strings"
 	"testing"
 	"unicode"
 
+	"encoding/hex"
 	"encoding/json"
 
-	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/testing/data"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
@@ -113,19 +114,101 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 
 // Now we test policy:
 
+func TestVerifyPolicyOptionErors(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreJS200ProvenanceBundle(t)
+
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	assert.Nil(t, err)
+
+	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
+	assert.Nil(t, err)
+
+	digest, _ := hex.DecodeString("46d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
+
+	// first, we demonstrate a happy path combination:
+	noArtifactHappyPath := verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithCertificateIdentity(goodCertID))
+	p, err := noArtifactHappyPath.BuildConfig()
+	assert.Nil(t, err)
+	assert.NotNil(t, p)
+
+	assert.False(t, p.WeExpectAnArtifact())
+	assert.True(t, p.WeExpectIdentities())
+
+	// ---
+
+	noArtifactNoCertHappyPath := verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe())
+	p, err = noArtifactNoCertHappyPath.BuildConfig()
+	assert.Nil(t, err)
+	assert.NotNil(t, p)
+
+	assert.False(t, p.WeExpectAnArtifact())
+	assert.False(t, p.WeExpectIdentities())
+
+	// ---
+
+	yesArtifactNoCertHappyPath := verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithoutIdentitiesUnsafe())
+	p, err = yesArtifactNoCertHappyPath.BuildConfig()
+	assert.Nil(t, err)
+	assert.NotNil(t, p)
+
+	assert.True(t, p.WeExpectAnArtifact())
+	assert.False(t, p.WeExpectIdentities())
+
+	// let's exercise the different error cases!
+	// 1. can't combine WithoutArtifactUnsafe with other Artifact options
+	// technically a hack that requires casting but better safe than sorry:
+	badArtifactComboPolicy1 := verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.PolicyOption(verify.WithArtifactDigest("sha512", digest)), verify.WithCertificateIdentity(goodCertID))
+
+	_, err = badArtifactComboPolicy1.BuildConfig()
+	assert.NotNil(t, err)
+
+	// imho good to check that the verify func also fails
+	_, err = verifier.Verify(entity, badArtifactComboPolicy1)
+	assert.NotNil(t, err)
+
+	// 2. can't combine several artifact policies
+	badArtifactComboPolicy2 := verify.NewPolicy(verify.WithArtifact(strings.NewReader("")), verify.PolicyOption(verify.WithArtifactDigest("sha512", digest)), verify.WithCertificateIdentity(goodCertID))
+
+	_, err = badArtifactComboPolicy2.BuildConfig()
+	assert.NotNil(t, err)
+
+	_, err = verifier.Verify(entity, badArtifactComboPolicy2)
+	assert.NotNil(t, err)
+
+	// 3. always have to provide _an_ identity option, even tho it will compile:
+	badIdentityPolicyOpts := verify.NewPolicy(verify.WithoutArtifactUnsafe())
+	_, err = badIdentityPolicyOpts.BuildConfig()
+	assert.NotNil(t, err)
+
+	_, err = verifier.Verify(entity, badIdentityPolicyOpts)
+	assert.NotNil(t, err)
+
+	// 4. can't combine incompatible identity options
+	badIdentityPolicyCombo := verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe(), verify.WithCertificateIdentity(goodCertID))
+	_, err = badIdentityPolicyCombo.BuildConfig()
+	assert.NotNil(t, err)
+
+	_, err = verifier.Verify(entity, badIdentityPolicyCombo)
+	assert.NotNil(t, err)
+}
+
 func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	goodCI, _ := certIDForTesting("", "", verify.SigstoreSanRegex, verify.ActionsIssuerValue, "")
-	badCI, _ := certIDForTesting("BadSANValue", "", "", verify.ActionsIssuerValue, "")
+	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
+	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "BadSANValue", "", "")
 
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
 
 	assert.Nil(t, err)
 
+	digest, err := hex.DecodeString("46d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
+	assert.Nil(t, err)
+
 	res, err := verifier.Verify(entity,
-		verify.NewPolicy(verify.WithoutArtifactUnsafe(),
+		verify.NewPolicy(verify.WithArtifactDigest("sha512", digest),
 			verify.WithCertificateIdentity(badCI),
 			verify.WithCertificateIdentity(goodCI)))
 	assert.Nil(t, err)
@@ -135,8 +218,19 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	// but if only pass in the bad CI, it will fail:
 	res, err = verifier.Verify(entity,
 		verify.NewPolicy(
-			verify.WithoutArtifactUnsafe(),
+			verify.WithArtifactDigest("sha512", digest),
 			verify.WithCertificateIdentity(badCI)))
+	assert.NotNil(t, err)
+	assert.Nil(t, res)
+
+	// and if the digest is off, verification fails
+	badDigest, err := hex.DecodeString("56d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
+	assert.Nil(t, err)
+
+	res, err = verifier.Verify(entity,
+		verify.NewPolicy(
+			verify.WithArtifactDigest("sha512", badDigest),
+			verify.WithCertificateIdentity(goodCI)))
 	assert.NotNil(t, err)
 	assert.Nil(t, res)
 }
@@ -185,14 +279,4 @@ func ensureKeysBeginWithLowercase(t *testing.T, obj interface{}) {
 			ensureKeysBeginWithLowercase(t, val)
 		}
 	}
-}
-
-// copied from verify/certificate_identity_test.go
-func certIDForTesting(sanValue, sanType, sanRegex, issuer, runnerEnv string) (verify.CertificateIdentity, error) {
-	san, err := verify.NewSANMatcher(sanValue, sanType, sanRegex)
-	if err != nil {
-		return verify.CertificateIdentity{}, err
-	}
-
-	return verify.CertificateIdentity{SubjectAlternativeName: san, Extensions: certificate.Extensions{Issuer: issuer, RunnerEnvironment: runnerEnv}}, nil
 }
