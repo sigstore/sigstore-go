@@ -207,7 +207,7 @@ func main() {
 		}
 
 		// Configure verification options
-		identityOpts := []verify.PolicyOption{}
+		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
 			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "", "")
 			if err != nil {
@@ -215,7 +215,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			identityOpts = append(identityOpts, verify.WithCertificateIdentity(certID))
+			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 		}
 
 		// Load trust root
@@ -227,7 +227,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, err = sev.Verify(b, verify.NewPolicy(verify.WithArtifact(file), identityOpts...))
+		_, err = sev.Verify(b, verify.NewPolicy(verify.WithArtifact(file), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}
