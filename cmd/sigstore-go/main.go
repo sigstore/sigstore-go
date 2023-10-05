@@ -166,7 +166,7 @@ func run() error {
 		return err
 	}
 
-	if *artifactDigest != "" {
+	if *artifactDigest != "" { //nolint:gocritic
 		artifactDigestBytes, err := hex.DecodeString(*artifactDigest)
 		if err != nil {
 			return err
