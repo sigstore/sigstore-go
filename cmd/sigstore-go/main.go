@@ -172,13 +172,15 @@ func run() error {
 			return err
 		}
 		artifactPolicy = verify.WithArtifactDigest(*artifactDigestAlgorithm, artifactDigestBytes)
-	}
-	if *artifact != "" {
+	} else if *artifact != "" {
 		file, err := os.Open(*artifact)
 		if err != nil {
 			return err
 		}
 		artifactPolicy = verify.WithArtifact(file)
+	} else {
+		artifactPolicy = verify.WithoutArtifactUnsafe()
+		fmt.Fprintf(os.Stderr, "No artifact provided, skipping artifact verification. This is unsafe!\n")
 	}
 
 	res, err := sev.Verify(b, verify.NewPolicy(artifactPolicy, identityPolicies...))
