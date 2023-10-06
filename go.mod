@@ -17,7 +17,7 @@ require (
 	github.com/sigstore/timestamp-authority v1.1.2
 	github.com/stretchr/testify v1.8.4
 	github.com/theupdateframework/go-tuf v0.6.1
-	golang.org/x/mod v0.12.0
+	golang.org/x/mod v0.13.0
 	google.golang.org/protobuf v1.31.0
 )
 
