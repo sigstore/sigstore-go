@@ -25,6 +25,10 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
+const (
+	VerificationResultMediaType01 = "application/vnd.dev.sigstore.verificationresult+json;version=0.1"
+)
+
 type SignedEntityVerifier struct {
 	trustedMaterial root.TrustedMaterial
 	config          VerifierConfig
@@ -174,7 +178,7 @@ type TimestampVerificationResult struct {
 
 func NewVerificationResult() *VerificationResult {
 	return &VerificationResult{
-		MediaType: "application/vnd.dev.sigstore.verificationresult+json;version=0.1",
+		MediaType: VerificationResultMediaType01,
 	}
 }
 
