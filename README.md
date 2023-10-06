@@ -27,26 +27,37 @@ Sigstore already has a canonical Go client implementation, [cosign](https://gith
 
 You can use the CLI with `go run` as in the below examples, or compile/install the `sigstore-go` CLI:
 
-```bash
+```shell
 $ make install
 ```
 ## Examples
 
-```bash
-$ go run cmd/sigstore-go/main.go -trustedrootJSONpath examples/trusted-root-public-good.json examples/bundle-provenance.json
+```shell
+$ go run cmd/sigstore-go/main.go \
+  -artifact-digest 76176ffa33808b54602c7c35de5c6e9a4deb96066dba6533f50ac234f4f1f4c6b3527515dc17c06fbe2860030f410eee69ea20079bd3a2c6f3dcf3b329b10751 \
+  -artifact-digest-algorithm sha512 \
+  -expectedIssuer https://token.actions.githubusercontent.com \
+  -expectedSAN https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main \
+  examples/bundle-provenance.json
 Verification successful!
+{
+   "version": 20230823,
+   "statement": {
+      "_type": "https://in-toto.io/Statement/v0.1",
+      "predicateType": "https://slsa.dev/provenance/v0.2",
+      "subject": ...
+    },
+    ...
+}
 ```
 
-```bash
-$ go run cmd/sigstore-go/main.go -tufRootURL tuf-repo-cdn.sigstore.dev examples/bundle-provenance.json
-Verification successful!
-```
+You can also specify a TUF root with something like `-tufRootURL tuf-repo-cdn.sigstore.dev`.
 
 Alternatively, you can install a binary of the CLI like so:
 
 ```shell
 $ go install ./cmd/sigstore-go
-$ sigstore-go examples/bundle-provenance.json
+$ sigstore-go ...
 ```
 
 ## Testing
