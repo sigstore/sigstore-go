@@ -25,6 +25,10 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
+const (
+	VerificationResultMediaType01 = "application/vnd.dev.sigstore.verificationresult+json;version=0.1"
+)
+
 type SignedEntityVerifier struct {
 	trustedMaterial root.TrustedMaterial
 	config          VerifierConfig
@@ -154,7 +158,7 @@ func (c *VerifierConfig) Validate() error {
 }
 
 type VerificationResult struct {
-	Version            int                           `json:"version"`
+	MediaType          string                        `json:"mediaType"`
 	Statement          *in_toto.Statement            `json:"statement,omitempty"`
 	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
 	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
@@ -174,7 +178,7 @@ type TimestampVerificationResult struct {
 
 func NewVerificationResult() *VerificationResult {
 	return &VerificationResult{
-		Version: 20230823,
+		MediaType: VerificationResultMediaType01,
 	}
 }
 
@@ -193,9 +197,11 @@ func (pc PolicyBuilder) Options() []PolicyOption {
 }
 
 func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
+	var err error
+
 	policy := &PolicyConfig{}
 	for _, applyOption := range pc.Options() {
-		err := applyOption(policy)
+		err = applyOption(policy)
 		if err != nil {
 			return nil, err
 		}
