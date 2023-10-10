@@ -12,7 +12,7 @@ Features:
 - Support for custom [trusted root](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_trustroot.proto)
 - Basic CLI
 
-For an example of how to use this library, see [cmd/sigstore-go](./cmd/sigstore-go/main.go), or see the CLI examples below.
+For an example of how to use this library, see [cmd/sigstore-go](./cmd/sigstore-go/main.go), or see the CLI examples below. Note that the CLI is to demonstrate how to use the library, and not intended as a fully-featured Sigstore CLI like [cosign](https://github.com/sigstore/cosign).
 
 ## Background
 
