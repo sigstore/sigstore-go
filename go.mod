@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
-	github.com/digitorus/timestamp v0.0.0-20230821155606-d1ad5ca9624c
+	github.com/digitorus/timestamp v0.0.0-20230902153158-687734543647
 	github.com/go-openapi/runtime v0.26.0
 	github.com/go-openapi/strfmt v0.21.7
 	github.com/go-openapi/swag v0.22.4
@@ -14,7 +14,7 @@ require (
 	github.com/sigstore/protobuf-specs v0.2.1
 	github.com/sigstore/rekor v1.3.2
 	github.com/sigstore/sigstore v1.7.3
-	github.com/sigstore/timestamp-authority v1.1.2
+	github.com/sigstore/timestamp-authority v1.2.0
 	github.com/stretchr/testify v1.8.4
 	github.com/theupdateframework/go-tuf v0.6.1
 	golang.org/x/mod v0.13.0
