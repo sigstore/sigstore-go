@@ -423,7 +423,7 @@ func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey 
 		ExtraExtensions: req.Extensions,
 	}
 
-	return tsTemplate.CreateResponse(tsaCert, tsaKey)
+	return tsTemplate.CreateResponseWithOpts(tsaCert, tsaKey, hash)
 }
 
 func (ca *VirtualSigstore) TSACertificateAuthorities() []root.CertificateAuthority {
