@@ -28,7 +28,7 @@ Sigstore already has a canonical Go client implementation, [cosign](https://gith
 
 ## Status
 
-`sigstore-go` is currently pre-1.0 and therefore does not guarantee a stable API. It does however pass the [`sigstore-conformance`](https://github.com/sigstore/sigstore-conformance) bundle verification test suite, and verification correctness is taken very seriously.
+`sigstore-go` is currently pre-1.0 and therefore does not guarantee a stable API. It does however pass the [`sigstore-conformance`](https://github.com/sigstore/sigstore-conformance) verification test suite, and verification correctness is taken very seriously.
 
 ## Documentation
 
