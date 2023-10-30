@@ -2,6 +2,10 @@
 
 A client library for [Sigstore](https://www.sigstore.dev/), written in Go.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/sigstore/sigstore-go.svg)](https://pkg.go.dev/github.com/sigstore/sigstore-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sigstore/sigstore-go)](https://goreportcard.com/report/github.com/sigstore/sigstore-go)
+[![e2e-tests](https://github.com/sigstore/sigstore-go/actions/workflows/build.yml/badge.svg)](https://github.com/sigstore/sigstore-go/actions/workflows/build.yml)
+
 Features:
 - Verification of [Sigstore bundles](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto) compliant with Sigstore Client Spec
 - Verification of raw Sigstore signatures by creating bundles for them (see [conformance tests](cmd/conformance/main.go) for example)
@@ -12,11 +16,23 @@ Features:
 - Support for custom [trusted root](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_trustroot.proto)
 - Basic CLI
 
-For an example of how to use this library, see [cmd/sigstore-go](./cmd/sigstore-go/main.go), or see the CLI examples below. Note that the CLI is to demonstrate how to use the library, and not intended as a fully-featured Sigstore CLI like [cosign](https://github.com/sigstore/cosign).
+Unsupported at this time:
+- Signing
+- KMS
+
+For an example of how to use this library, see [the verification documentation](./docs/verification.md), the CLI [cmd/sigstore-go](./cmd/sigstore-go/main.go), or the CLI examples below. Note that the CLI is to demonstrate how to use the library, and not intended as a fully-featured Sigstore CLI like [cosign](https://github.com/sigstore/cosign).
 
 ## Background
 
-Sigstore already has a canonical Go client implementation, [cosign](https://github.com/sigstore/cosign), which was developed with a focus on container image signing/verification. It has a rich CLI and a long legacy of features and development. `sigstore-go` is a more minimal and friendly API for integrating Go code with Sigstore, with a focus on the newly specified data structures in [sigstore/protobuf-specs](https://github.com/sigstore/protobuf-specs).
+Sigstore already has a canonical Go client implementation, [cosign](https://github.com/sigstore/cosign), which was developed with a focus on container image signing/verification. It has a rich CLI and a long legacy of features and development. `sigstore-go` is a more minimal and friendly API for integrating Go code with Sigstore, with a focus on the newly specified data structures in [sigstore/protobuf-specs](https://github.com/sigstore/protobuf-specs). `sigstore-go` attempts to minimize the dependency tree for simple verification tasks, omitting KMS support and container image verification, and we intend to refactor parts of `cosign` to depend on `sigstore-go`.
+
+## Status
+
+`sigstore-go` is currently pre-1.0 and therefore does not guarantee a stable API. It does however pass the [`sigstore-conformance`](https://github.com/sigstore/sigstore-conformance) verification test suite, and verification correctness is taken very seriously.
+
+## Documentation
+
+Documentation is found in the [`docs`](./docs) subdirectory.
 
 ## Requirements
 
