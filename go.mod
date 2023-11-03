@@ -8,7 +8,7 @@ require (
 	github.com/go-openapi/runtime v0.26.0
 	github.com/go-openapi/strfmt v0.21.7
 	github.com/go-openapi/swag v0.22.4
-	github.com/google/certificate-transparency-go v1.1.6
+	github.com/google/certificate-transparency-go v1.1.7
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0
 	github.com/sigstore/protobuf-specs v0.2.1
