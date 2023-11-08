@@ -41,7 +41,9 @@ import (
 	"github.com/sigstore/rekor/pkg/pki"
 	"github.com/sigstore/rekor/pkg/types"
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
+	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	"github.com/sigstore/rekor/pkg/types/intoto"
+	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
 	"github.com/sigstore/rekor/pkg/types/rekord"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -256,7 +258,7 @@ func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	rekorBody, err := generateRekorEntry(intoto.KIND, intoto.New().DefaultVersion(), envelopeBytes, leafCertPem, sig)
+	rekorBody, err := generateRekorEntry(intoto.KIND, intoto_v002.APIVERSION, envelopeBytes, leafCertPem, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +295,7 @@ func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certific
 		return nil, err
 	}
 
-	rekorBody, err := generateRekorEntry(hashedrekord.KIND, hashedrekord.New().DefaultVersion(), artifact, leafCertPem, sig)
+	rekorBody, err := generateRekorEntry(hashedrekord.KIND, hashedrekord_v001.APIVERSION, artifact, leafCertPem, sig)
 	if err != nil {
 		return nil, err
 	}

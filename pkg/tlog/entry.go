@@ -34,22 +34,23 @@ import (
 	"github.com/go-openapi/swag"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
-	"github.com/sigstore/rekor/pkg/types"
-	dsse_v001 "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
-	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
-	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
+const dsse string = "dsse"
+const hashedrekord string = "hashedrekord"
+const intoto string = "intoto"
+const v001 string = "0.0.1"
+const v002 string = "0.0.2"
+
 type Entry struct {
-	kind                 string
-	version              string
-	rekorEntry           types.EntryImpl
+	rekorEntry           models.ProposedEntry
 	logEntryAnon         models.LogEntryAnon
 	signedEntryTimestamp []byte
+	version              string
 }
 
 type RekorPayload struct {
@@ -66,21 +67,24 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 	if err != nil {
 		return nil, err
 	}
-	rekorEntry, err := types.UnmarshalEntry(pe)
-	if err != nil {
-		return nil, err
-	}
 
 	entry := &Entry{
-		rekorEntry: rekorEntry,
+		rekorEntry: pe,
 		logEntryAnon: models.LogEntryAnon{
 			Body:           base64.StdEncoding.EncodeToString(body),
 			IntegratedTime: swag.Int64(integratedTime),
 			LogIndex:       swag.Int64(logIndex),
 			LogID:          swag.String(string(logID)),
 		},
-		kind:    pe.Kind(),
-		version: rekorEntry.APIVersion(),
+	}
+
+	switch entry.rekorEntry.Kind() {
+	case dsse:
+		entry.version = *(pe.(*models.DSSE).APIVersion)
+	case hashedrekord:
+		entry.version = *(pe.(*models.Hashedrekord).APIVersion)
+	case intoto:
+		entry.version = *(pe.(*models.Intoto).APIVersion)
 	}
 
 	if len(signedEntryTimestamp) > 0 {
@@ -138,32 +142,32 @@ func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 		return nil, err
 	}
 
-	if entry.kind != protoEntry.KindVersion.Kind || entry.version != protoEntry.KindVersion.Version {
-		return nil, fmt.Errorf("kind and version mismatch: %s/%s != %s/%s", entry.kind, entry.version, protoEntry.KindVersion.Kind, protoEntry.KindVersion.Version)
+	if entry.rekorEntry.Kind() != protoEntry.KindVersion.Kind || entry.version != protoEntry.KindVersion.Version {
+		return nil, fmt.Errorf("kind and version mismatch: %s/%s != %s/%s", entry.rekorEntry.Kind(), entry.version, protoEntry.KindVersion.Kind, protoEntry.KindVersion.Version)
 	}
 
 	return entry, nil
 }
 
 func ValidateEntry(entry *Entry) error {
-	switch e := entry.rekorEntry.(type) {
-	case *dsse_v001.V001Entry:
-		err := e.DSSEObj.Validate(strfmt.Default)
+	switch entry.rekorEntry.Kind() {
+	case dsse:
+		err := entry.rekorEntry.(*models.DSSE).Validate(strfmt.Default)
 		if err != nil {
 			return err
 		}
-	case *hashedrekord_v001.V001Entry:
-		err := e.HashedRekordObj.Validate(strfmt.Default)
+	case hashedrekord:
+		err := entry.rekorEntry.(*models.Hashedrekord).Validate(strfmt.Default)
 		if err != nil {
 			return err
 		}
-	case *intoto_v002.V002Entry:
-		err := e.IntotoObj.Validate(strfmt.Default)
+	case intoto:
+		err := entry.rekorEntry.(*models.Intoto).Validate(strfmt.Default)
 		if err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("unsupported entry type: %T", e)
+		return fmt.Errorf("unsupported entry type: %s", entry.rekorEntry.Kind())
 	}
 
 	return nil
@@ -174,21 +178,62 @@ func (entry *Entry) IntegratedTime() time.Time {
 }
 
 func (entry *Entry) Signature() []byte {
-	switch e := entry.rekorEntry.(type) {
-	case *dsse_v001.V001Entry:
-		sigBytes, err := base64.StdEncoding.DecodeString(*e.DSSEObj.Signatures[0].Signature)
-		if err != nil {
-			return []byte{}
+	switch entry.rekorEntry.Kind() {
+	case dsse:
+		if entry.version == v001 {
+			specJSON, err := json.Marshal(entry.rekorEntry.(*models.DSSE).Spec)
+			if err != nil {
+				return []byte{}
+			}
+
+			dsseObj := &models.DSSEV001Schema{}
+			err = json.Unmarshal(specJSON, dsseObj)
+			if err != nil {
+				return []byte{}
+			}
+
+			signature := *dsseObj.Signatures[0].Signature
+			sigBytes, err := base64.StdEncoding.DecodeString(string(signature))
+			if err != nil {
+				return []byte{}
+			}
+			return sigBytes
 		}
-		return sigBytes
-	case *hashedrekord_v001.V001Entry:
-		return e.HashedRekordObj.Signature.Content
-	case *intoto_v002.V002Entry:
-		sigBytes, err := base64.StdEncoding.DecodeString(string(*e.IntotoObj.Content.Envelope.Signatures[0].Sig))
-		if err != nil {
-			return []byte{}
+	case hashedrekord:
+		if entry.version == v001 {
+			specJSON, err := json.Marshal(entry.rekorEntry.(*models.Hashedrekord).Spec)
+			if err != nil {
+				return []byte{}
+			}
+
+			hashedrekordObj := &models.HashedrekordV001Schema{}
+			err = json.Unmarshal(specJSON, hashedrekordObj)
+			if err != nil {
+				return []byte{}
+			}
+
+			return hashedrekordObj.Signature.Content
 		}
-		return sigBytes
+	case intoto:
+		if entry.version == v002 {
+			specJSON, err := json.Marshal(entry.rekorEntry.(*models.Intoto).Spec)
+			if err != nil {
+				return []byte{}
+			}
+
+			intotoObj := &models.IntotoV002Schema{}
+			err = json.Unmarshal(specJSON, intotoObj)
+			if err != nil {
+				return []byte{}
+			}
+
+			signature := *intotoObj.Content.Envelope.Signatures[0].Sig
+			sigBytes, err := base64.StdEncoding.DecodeString(string(signature))
+			if err != nil {
+				return []byte{}
+			}
+			return sigBytes
+		}
 	}
 
 	return []byte{}
@@ -197,13 +242,52 @@ func (entry *Entry) Signature() []byte {
 func (entry *Entry) PublicKey() any {
 	var pemString []byte
 
-	switch e := entry.rekorEntry.(type) {
-	case *dsse_v001.V001Entry:
-		pemString = []byte(*e.DSSEObj.Signatures[0].Verifier)
-	case *hashedrekord_v001.V001Entry:
-		pemString = []byte(e.HashedRekordObj.Signature.PublicKey.Content)
-	case *intoto_v002.V002Entry:
-		pemString = []byte(*e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
+	switch entry.rekorEntry.Kind() {
+	case dsse:
+		if entry.version == v001 {
+			specJSON, err := json.Marshal(entry.rekorEntry.(*models.DSSE).Spec)
+			if err != nil {
+				return []byte{}
+			}
+
+			dsseObj := &models.DSSEV001Schema{}
+			err = json.Unmarshal(specJSON, dsseObj)
+			if err != nil {
+				return nil
+			}
+
+			pemString = []byte(*dsseObj.Signatures[0].Verifier)
+		}
+	case hashedrekord:
+		if entry.version == v001 {
+			specJSON, err := json.Marshal(entry.rekorEntry.(*models.Hashedrekord).Spec)
+			if err != nil {
+				return []byte{}
+			}
+
+			hashedrekordObj := &models.HashedrekordV001Schema{}
+			err = json.Unmarshal(specJSON, hashedrekordObj)
+			if err != nil {
+				return nil
+			}
+
+			pemString = []byte(hashedrekordObj.Signature.PublicKey.Content)
+		}
+	case intoto:
+		if entry.version == v002 {
+			specJSON, err := json.Marshal(entry.rekorEntry.(*models.Intoto).Spec)
+			if err != nil {
+				return []byte{}
+			}
+
+			intotoObj := &models.IntotoV002Schema{}
+			err = json.Unmarshal(specJSON, intotoObj)
+			if err != nil {
+				return []byte{}
+			}
+
+			pemString = []byte(*intotoObj.Content.Envelope.Signatures[0].PublicKey)
+		}
 	}
 
 	certBlock, _ := pem.Decode(pemString)
