@@ -1,6 +1,12 @@
-# OCI image verification using `sigstore-go`
+# Example of OCI image verification using `sigstore-go`
 
 This document will walk through using the `sigstore-go` CLI to verify an OCI image reference.
+
+## Disclaimer
+
+This is an example of how to use the `sigstore-go` library to verify an OCI image reference and is not intended to
+replace cosign and/or be reused in production. The `sigstore-go` library is still in development and is subject to change.
+The following issue tracks the cosign support of the protobuf bundle format - [#3139](https://github.com/sigstore/cosign/issues/3139).
 
 ## Requirements
 
