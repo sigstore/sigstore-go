@@ -30,7 +30,10 @@ In this example, we'll use the `sigstore-go` CLI to verify an OCI image referenc
 The image we are going to verify is `ghcr.io/stacklok/minder/server:latest`
 
 ```shell
-sigstore-go --ociImage="ghcr.io/stacklok/minder/server:latest" --tufRootURL="tuf-repo-cdn.sigstore.dev" --expectedSANRegex="^https://github.com/stacklok/minder/" --expectedIssuer="https://token.actions.githubusercontent.com"
+$ sigstore-go --ociImage="ghcr.io/stacklok/minder/server:latest" \
+    --tufRootURL="tuf-repo-cdn.sigstore.dev" \
+    --expectedSANRegex="^https://github.com/stacklok/minder/" \
+    --expectedIssuer="https://token.actions.githubusercontent.com"
 ```
 
 Upon successful verification, the CLI will print the verification result in JSON format along with a `Verification successful!` message.
