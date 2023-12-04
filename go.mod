@@ -6,7 +6,7 @@ require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
 	github.com/digitorus/timestamp v0.0.0-20230902153158-687734543647
 	github.com/go-openapi/runtime v0.26.0
-	github.com/go-openapi/strfmt v0.21.7
+	github.com/go-openapi/strfmt v0.21.8
 	github.com/go-openapi/swag v0.22.4
 	github.com/google/certificate-transparency-go v1.1.7
 	github.com/in-toto/in-toto-golang v0.9.0
