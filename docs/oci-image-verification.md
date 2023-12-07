@@ -25,8 +25,6 @@ reference metadata as a prerequisite to the verification process.
 Clone this repository and navigate to the `examples/oci-image-verification` directory:
 
 ```shell
-
-```shell
 $ go build .
 ```
 
