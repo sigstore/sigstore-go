@@ -1,6 +1,6 @@
 # Example of OCI image verification using `sigstore-go`
 
-This document will walk through using the `sigstore-go` CLI to verify an OCI image reference.
+This document will walk through using the `sigstore-go` library to verify an OCI image reference.
 
 ## Disclaimer
 
@@ -8,23 +8,27 @@ This is an example of how to use the `sigstore-go` library to verify an OCI imag
 replace cosign and/or be reused in production. The `sigstore-go` library is still in development and is subject to change.
 The following issue tracks the cosign support of the protobuf bundle format - [#3139](https://github.com/sigstore/cosign/issues/3139).
 
+## Overview
+
+In this example, we'll use the `sigstore-go` library to verify an OCI image reference.
+This simple CLI is a wrapper around the Go API with the difference that it constructs a
+[Sigstore bundle](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto) from the OCI image
+reference metadata as a prerequisite to the verification process.
+
 ## Requirements
 
 - Unix-compatible OS
 - [Go 1.21](https://go.dev/doc/install)
 
-## Installation
+## Getting started
 
-Clone this repository and use `make install` to install the `sigstore-go` CLI:
+Clone this repository and navigate to the `examples/oci-image-verification` directory:
 
 ```shell
-$ make install
-go install ./cmd/...
+
+```shell
+$ go build .
 ```
-
-## Bundle
-
-This library supports generating and verifying a [Sigstore bundle](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto) based on an OCI image reference. Signing is not currently supported by this library.
 
 ## Trusted Root
 
@@ -32,11 +36,10 @@ The verifier allows you to use the Sigstore Public Good TUF root or your own cus
 
 ## Verification Process
 
-In this example, we'll use the `sigstore-go` CLI to verify an OCI image reference. The CLI is a thin wrapper around the Go API, so the process is the same, but the CLI provides a convenient way to verify an OCI image reference without writing any code.
 The image we are going to verify is `ghcr.io/stacklok/minder/server:latest`
 
 ```shell
-$ sigstore-go --ociImage="ghcr.io/stacklok/minder/server:latest" \
+$ ./oci-image-verification --ociImage="ghcr.io/stacklok/minder/server:latest" \
     --tufRootURL="tuf-repo-cdn.sigstore.dev" \
     --expectedSANRegex="^https://github.com/stacklok/minder/" \
     --expectedIssuer="https://token.actions.githubusercontent.com"
@@ -44,7 +47,7 @@ $ sigstore-go --ociImage="ghcr.io/stacklok/minder/server:latest" \
 
 Upon successful verification, the CLI will print the verification result in JSON format along with a `Verification successful!` message.
 
-Below is an example of the bundle that was generated for this image(at that point of time) followed by the successful verification result, serialized as JSON:
+Below is an example of the bundle that was constructed for this image(at that point of time) followed by the successful verification result, serialized as JSON:
 
 ```json
 {
