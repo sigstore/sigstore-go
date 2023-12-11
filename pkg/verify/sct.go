@@ -38,7 +38,7 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 		return err
 	}
 
-	certChain, err := ctx509.ParseCertificates(leafCert.Raw)
+	leafCTCert, err := ctx509.ParseCertificates(leafCert.Raw)
 	if err != nil {
 		return err
 	}
@@ -52,8 +52,8 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 		}
 
 		for _, fulcioCa := range fulcioCerts {
-			fulcioChain := make([]*ctx509.Certificate, len(certChain))
-			copy(fulcioChain, certChain)
+			fulcioChain := make([]*ctx509.Certificate, len(leafCTCert))
+			copy(fulcioChain, leafCTCert)
 
 			var parentCert []byte
 
