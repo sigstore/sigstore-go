@@ -52,16 +52,21 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 		}
 
 		for _, fulcioCa := range fulcioCerts {
+			fulcioChain := make([]*ctx509.Certificate, len(certChain))
+			copy(fulcioChain, certChain)
+
+			var parentCert []byte
+
 			if len(fulcioCa.Intermediates) == 0 {
-				continue
+				parentCert = fulcioCa.Root.Raw
+			} else {
+				parentCert = fulcioCa.Intermediates[0].Raw
 			}
-			fulcioIssuer, err := ctx509.ParseCertificates(fulcioCa.Intermediates[0].Raw)
+
+			fulcioIssuer, err := ctx509.ParseCertificates(parentCert)
 			if err != nil {
 				continue
 			}
-
-			fulcioChain := make([]*ctx509.Certificate, len(certChain))
-			copy(fulcioChain, certChain)
 			fulcioChain = append(fulcioChain, fulcioIssuer...)
 
 			err = ctutil.VerifySCT(key.PublicKey, fulcioChain, sct, true)
