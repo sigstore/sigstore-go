@@ -1,6 +1,6 @@
 module github.com/sigstore/sigstore-go
 
-go 1.21
+go 1.21.5
 
 require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
@@ -10,13 +10,13 @@ require (
 	github.com/go-openapi/swag v0.22.7
 	github.com/google/certificate-transparency-go v1.1.7
 	github.com/in-toto/in-toto-golang v0.9.0
+	github.com/rdimitrov/go-tuf-metadata v0.0.0-20231211110834-6de72dba550c
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/protobuf-specs v0.2.1
 	github.com/sigstore/rekor v1.3.4
 	github.com/sigstore/sigstore v1.8.1
 	github.com/sigstore/timestamp-authority v1.2.1
 	github.com/stretchr/testify v1.8.4
-	github.com/theupdateframework/go-tuf v0.7.0
 	golang.org/x/mod v0.14.0
 	google.golang.org/protobuf v1.32.0
 )
@@ -66,6 +66,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.18.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
+	github.com/theupdateframework/go-tuf v0.7.0 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.13.1 // indirect

@@ -15,137 +15,184 @@
 package tuf
 
 import (
-	"bytes"
-	"embed"
-	"encoding/json"
 	"fmt"
-	"path"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-	tufclient "github.com/theupdateframework/go-tuf/client"
-	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
-	tufdata "github.com/theupdateframework/go-tuf/data"
-	tufutil "github.com/theupdateframework/go-tuf/util"
+	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
+	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
 )
 
-//go:embed repository
-var embeddedRepos embed.FS
-
-const TrustedRootTUFPath = "trusted_root.json"
-const RootTUFPath = "root.json"
-
-// Implementation of go-tuf/client.Destination interface
-type Writer struct {
-	Bytes []byte
+// Client is a Sigstore TUF client
+type Client struct {
+	cfg  *config.UpdaterConfig
+	up   *updater.Updater
+	opts *Options
 }
 
-func (w *Writer) Write(b []byte) (int, error) {
-	w.Bytes = append(w.Bytes, b...)
-	return len(b), nil
-}
+// New returns a new client with custom options
+func New(opts *Options) (*Client, error) {
+	var c = Client{
+		opts: opts,
+	}
+	var dir = filepath.Join(opts.CachePath, URLToPath(opts.RepositoryBaseURL))
+	var err error
 
-func (w *Writer) Delete() error {
-	w = nil
-	return nil
-}
+	if c.cfg, err = config.New(opts.RepositoryBaseURL, opts.Root); err != nil {
+		return nil, fmt.Errorf("failed to create TUF repo: %w", err)
+	}
 
-func GetTrustedrootJSON(tufRootURL, workPath string) (trustedrootJSON []byte, err error) {
-	// Ensure we have a RootTUFPath file for this TUF URL
-	tufPath := path.Join(workPath, tufRootURL)
+	c.cfg.LocalMetadataDir = dir
+	c.cfg.LocalTargetsDir = filepath.Join(dir, "targets")
+	c.cfg.RemoteTargetsURL, err = url.JoinPath(opts.RepositoryBaseURL, "targets")
+	if err != nil {
+		return nil, fmt.Errorf("malformed config mirror: %w", err)
+	}
+	c.cfg.DisableLocalCache = c.opts.DisableLocalCache
+	c.cfg.PrefixTargetsWithHash = true
 
-	fileJSONStore, err := filejsonstore.NewFileJSONStore(tufPath)
+	if c.cfg.DisableLocalCache {
+		c.opts.CachePath = ""
+		c.opts.CacheValidity = 0
+		c.opts.ForceCache = false
+	}
+
+	// Upon client creation, we may not perform a full TUF update,
+	// based on the cache control configuration. Start with a local
+	// client (only reads content on disk) and then decide if we
+	// must perform a full TUF update.
+	var tmpCfg = *c.cfg
+	tmpCfg.UnsafeLocalMode = true
+	c.up, err = updater.New(&tmpCfg)
 	if err != nil {
 		return nil, err
 	}
-
-	tufMetaMap, err := fileJSONStore.GetMeta()
-	if err != nil {
+	if err = c.loadMetadata(); err != nil {
 		return nil, err
 	}
 
-	_, ok := tufMetaMap[RootTUFPath]
-	if !ok {
-		// There isn't a RootTUFPath for this TUF URL, so see if the library has one embedded
-		_, err = checkEmbedded(tufRootURL, fileJSONStore)
+	return &c, nil
+}
 
+// DefaultClient returns a Sigstore TUF client for the public good instance
+func DefaultClient() (*Client, error) {
+	opts, err := DefaultOptions()
+	if err != nil {
+		return nil, err
+	}
+	return New(opts)
+}
+
+// loadMetadata controls if the client actually should perform a TUF refresh.
+// The TUF specification mandates so, but for certain Sigstore clients, it
+// may be beneficial to rely on the cache, or in air-gapped deployments it
+// it may not even be possible.
+func (c *Client) loadMetadata() error {
+	// Load the metadata into memory and verify it
+	if err := c.up.Refresh(); err != nil {
+		// this is most likely due to the lack of metadata files
+		// on disk. Perform a full update and return.
+		return c.Refresh()
+	}
+
+	var tm = c.up.GetTrustedMetadataSet()
+	if c.opts.ForceCache {
+		// Use cache until it expires
+		if tm.Timestamp.Signed.IsExpired(time.Now()) {
+			return c.Refresh()
+		}
+
+		// Cache not expired, return
+		return nil
+	} else if c.opts.CacheValidity > 0 {
+		// Use cached metadata for up to CacheValidity days.
+		// This is a bit of an hack, as we don't know when the
+		// last the it was updated, fallback to check the
+		// modification time of timestamp.json
+		if tm.Timestamp.Signed.IsExpired(time.Now()) {
+			// Always update if the timestamp is expired
+			return c.Refresh()
+		}
+
+		var p = filepath.Join(
+			c.opts.CachePath,
+			URLToPath(c.opts.RepositoryBaseURL),
+			"timestamp.json",
+		)
+		fi, err := os.Stat(p)
 		if err != nil {
-			return nil, err
+			// Failed to get info on the file, fall back
+			// and update if needed
+			return c.Refresh()
 		}
-	}
 
-	// Now that we have fileJSONStore, create a tufclient and check remote for updates
-	tufRemoteOptions := &tufclient.HTTPRemoteOptions{
-		MetadataPath: "",
-		TargetsPath:  "targets",
-		Retries:      tufclient.DefaultHTTPRetries,
-	}
-
-	tufRemoteStore, err := tufclient.HTTPRemoteStore(fmt.Sprintf("https://%s", tufRootURL), tufRemoteOptions, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	tufClient := tufclient.NewClient(fileJSONStore, tufRemoteStore)
-	targetFiles, err := tufClient.Update()
-	if err != nil {
-		return nil, err
-	}
-
-	// Now that we've updated, see if remote trustedroot metadata matches local disk
-	trustedrootMeta, ok := targetFiles[TrustedRootTUFPath]
-	if !ok {
-		return nil, fmt.Errorf("Unable to find %s via TUF", TrustedRootTUFPath)
-	}
-
-	trustedroot, ok := tufMetaMap[TrustedRootTUFPath]
-	if ok {
-		if ok, _ := validTarget(trustedrootMeta, trustedroot); ok {
-			return trustedroot, nil
+		if fi.ModTime().After(time.Now().Add(
+			time.Duration(-24*c.opts.CacheValidity) * time.Hour)) {
+			// No need to update
+			return nil
 		}
+		// A TUF client refresh will now happen (c.Refresh),
+		// update the mod time for the timestamp.
+		//
+		// Ignore the error here, there is no need to fail
+		// operation only because the file's metadata could
+		// not be updated
+		//nolint:errcheck
+		os.Chtimes(p, time.Now(), time.Now())
 	}
 
-	// What's on disk didn't match, so download from TUF remote (and cache it to disk)
-	writer := &Writer{
-		Bytes: make([]byte, 0),
-	}
-
-	err = tufClient.Download(TrustedRootTUFPath, writer)
-	if err != nil {
-		return nil, err
-	}
-
-	err = fileJSONStore.SetMeta(TrustedRootTUFPath, writer.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return writer.Bytes, nil
+	return c.Refresh()
 }
 
-func checkEmbedded(tufRootURL string, fileJSONStore *filejsonstore.FileJSONStore) (json.RawMessage, error) {
-	embeddedRootPath := path.Join("repository", tufRootURL, RootTUFPath)
+// Refresh forces a refresh of the underlying TUF client.
+// As the tuf client does not support multiple refreshes during its
+// life-time, this will replace the TUF client with a new one.
+func (c *Client) Refresh() error {
+	var err error
 
-	root, err := embeddedRepos.ReadFile(embeddedRootPath)
+	c.up, err = updater.New(c.cfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	err = fileJSONStore.SetMeta(RootTUFPath, root)
-	if err != nil {
-		return nil, err
-	}
-
-	return root, nil
+	return c.up.Refresh()
 }
 
-func validTarget(expected tufdata.TargetFileMeta, localTarget []byte) (bool, error) {
-	got, err := tufutil.GenerateTargetFileMeta(
-		bytes.NewReader(localTarget),
-		"sha256", "sha512")
+// GetTarget returns a target file from the TUF repository
+func (c *Client) GetTarget(target string) ([]byte, error) {
+	ti, err := c.up.GetTargetInfo(target)
 	if err != nil {
-		return false, err
+		return nil, fmt.Errorf("target %s not found: %w", target, err)
 	}
-	if err = tufutil.TargetFileMetaEqual(got, expected); err != nil {
-		return false, err
+
+	path, tb, err := c.up.FindCachedTarget(ti, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting target cache: %w", err)
 	}
-	return true, nil
+	if path != "" {
+		// Cached version found
+		return tb, nil
+	}
+
+	// Download of target is needed
+	_, tb, err = c.up.DownloadTarget(ti, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to download target file %s - %w", target, err)
+	}
+
+	return tb, nil
+}
+
+// URLToPath converts a URL to a filename-compatible string
+func URLToPath(url string) string {
+	// Strip scheme, replace slashes with dashes
+	// e.g. https://github.github.com/prod-tuf-root -> github.github.com-prod-tuf-root
+	fn := url
+	if len(fn) > 8 && fn[:8] == "https://" {
+		fn = fn[8:]
+	}
+	fn = strings.ReplaceAll(fn, "/", "-")
+	return fn
 }

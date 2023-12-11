@@ -47,7 +47,6 @@ var onlineTlog *bool
 var trustedPublicKey *string
 var trustedrootJSONpath *string
 var tufRootURL *string
-var tufDirectory *string
 
 func init() {
 	artifact = flag.String("artifact", "", "Path to artifact to verify")
@@ -63,7 +62,6 @@ func init() {
 	trustedPublicKey = flag.String("publicKey", "", "Path to trusted public key")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
-	tufDirectory = flag.String("tufDirectory", "tufdata", "Directory to store TUF metadata")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		usage()
@@ -120,20 +118,32 @@ func run() error {
 	identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
-	var trustedrootJSON []byte
+	var trustedRootJSON []byte
 
 	if *tufRootURL != "" {
-		trustedrootJSON, err = tuf.GetTrustedrootJSON(*tufRootURL, *tufDirectory)
+		opts, err := tuf.DefaultOptions()
+		if err != nil {
+			return err
+		}
+		opts.RepositoryBaseURL = *tufRootURL
+		client, err := tuf.New(opts)
+		if err != nil {
+			return err
+		}
+		trustedRootJSON, err = client.GetTarget("trusted_root.json")
+		if err != nil {
+			return err
+		}
 	} else if *trustedrootJSONpath != "" {
-		trustedrootJSON, err = os.ReadFile(*trustedrootJSONpath)
+		trustedRootJSON, err = os.ReadFile(*trustedrootJSONpath)
 	}
 	if err != nil {
 		return err
 	}
 
-	if len(trustedrootJSON) > 0 {
+	if len(trustedRootJSON) > 0 {
 		var trustedRoot *root.TrustedRoot
-		trustedRoot, err = root.NewTrustedRootFromJSON(trustedrootJSON)
+		trustedRoot, err = root.NewTrustedRootFromJSON(trustedRootJSON)
 		if err != nil {
 			return err
 		}
