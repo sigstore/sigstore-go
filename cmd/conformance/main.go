@@ -222,7 +222,19 @@ func main() {
 		tr := getTrustedRoot()
 
 		// Verify bundle
-		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig := []verify.VerifierOption{}
+		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+
+		switch b.Bundle.MediaType {
+		case bundle.SigstoreBundleMediaType01:
+			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
+		case bundle.SigstoreBundleMediaType02:
+			verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
+		default:
+			log.Fatalf("Unknown bundle media type: %s", b.Bundle.MediaType)
+		}
+
+		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}
