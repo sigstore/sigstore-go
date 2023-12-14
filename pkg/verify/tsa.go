@@ -33,6 +33,9 @@ import (
 // verified.
 func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]time.Time, error) { //nolint:revive
 	signedTimestamps, err := entity.Timestamps()
+	if err != nil {
+		return nil, err
+	}
 
 	// disallow duplicate timestamps, as a malicious actor could use duplicates to bypass the threshold
 	for i := 0; i < len(signedTimestamps); i++ {
@@ -41,10 +44,6 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 				return nil, errors.New("duplicate timestamps found")
 			}
 		}
-	}
-
-	if err != nil || (len(signedTimestamps) < threshold) {
-		return nil, fmt.Errorf("not enough signed timestamps: %d < %d", len(signedTimestamps), threshold)
 	}
 
 	sigContent, err := entity.SignatureContent()
@@ -62,11 +61,19 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 	verifiedTimestamps := []time.Time{}
 	for _, timestamp := range signedTimestamps {
 		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial, verificationContent)
+
+		// Timestamps from unknown source are okay, but don't count as verified
 		if err != nil {
-			return nil, errors.New("unable to verify timestamp")
+			continue
 		}
+
 		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
+
+	if len(verifiedTimestamps) < threshold {
+		return nil, fmt.Errorf("not enough verified timestamps: %d < %d", len(verifiedTimestamps), threshold)
+	}
+
 	return verifiedTimestamps, nil
 }
 
