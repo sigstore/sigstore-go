@@ -221,12 +221,31 @@ func main() {
 		// Load trust root
 		tr := getTrustedRoot()
 
-		// Verify bundle
-		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig := []verify.VerifierOption{}
+		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+
+		// Check bundle and trusted root for signed timestamp information
+		bundleTimestamps, err := b.Timestamps()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		if len(tr.TSACertificateAuthorities()) > 0 && len(bundleTimestamps) > 0 {
+			verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
+		}
+
+		// Check bundle and trusted root for Tlog information
+		if len(tr.TlogAuthorities()) > 0 && b.HasInclusionPromise() {
+			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
+		}
+
+		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		// Verify bundle
 		_, err = sev.Verify(b, verify.NewPolicy(verify.WithArtifact(file), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
