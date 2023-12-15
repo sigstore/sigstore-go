@@ -75,16 +75,15 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		if err != nil {
 			return nil, err
 		}
-		inclusionVerified := false
 
 		if !online {
 			// TODO: do we validate that an entry has EITHER a promise OR a proof?
 			if entry.HasInclusionPromise() {
 				err = tlog.VerifySET(entry, trustedMaterial.TlogAuthorities())
 				if err != nil {
+					// skip entries the trust root cannot verify
 					continue
 				}
-				inclusionVerified = true
 			}
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
@@ -104,13 +103,8 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				if err != nil {
 					return nil, err
 				}
-
-				inclusionVerified = true
 			}
-
-			if inclusionVerified {
-				verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
-			}
+			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
@@ -156,27 +150,24 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 					return nil, err
 				}
 			}
-			inclusionVerified = true
 			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 		}
 
-		if inclusionVerified {
-			// Ensure entry signature matches signature from bundle
-			if !bytes.Equal(entry.Signature(), entitySignature) {
-				return nil, errors.New("transparency log signature does not match")
-			}
+		// Ensure entry signature matches signature from bundle
+		if !bytes.Equal(entry.Signature(), entitySignature) {
+			return nil, errors.New("transparency log signature does not match")
+		}
 
-			// Ensure entry certificate matches bundle certificate
-			if !verificationContent.CompareKey(entry.PublicKey(), trustedMaterial) {
-				return nil, errors.New("transparency log certificate does not match")
-			}
+		// Ensure entry certificate matches bundle certificate
+		if !verificationContent.CompareKey(entry.PublicKey(), trustedMaterial) {
+			return nil, errors.New("transparency log certificate does not match")
+		}
 
-			// TODO: if you have access to artifact, check that it matches body subject
+		// TODO: if you have access to artifact, check that it matches body subject
 
-			// Check tlog entry time against bundle certificates
-			if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
-				return nil, errors.New("integrated time outside certificate validity")
-			}
+		// Check tlog entry time against bundle certificates
+		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
+			return nil, errors.New("integrated time outside certificate validity")
 		}
 	}
 
