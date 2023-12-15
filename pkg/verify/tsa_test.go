@@ -39,6 +39,34 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 
 	_, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2, 1)
 	assert.Error(t, err) // different sigstore instance should fail to verify
+
+	untrustedEntity, err := virtualSigstore2.Attest("foo@fighters.com", "issuer", []byte("statement"))
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyTimestampAuthority(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 1)
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyTimestampAuthority(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 2)
+	assert.Error(t, err) // only 1 trusted should not meet threshold of 2
+}
+
+type oneTrustedOneUntrustedTimestampEntity struct {
+	*ca.TestEntity
+	UntrustedTestEntity *ca.TestEntity
+}
+
+func (e *oneTrustedOneUntrustedTimestampEntity) Timestamps() ([][]byte, error) {
+	timestamps, err := e.TestEntity.Timestamps()
+	if err != nil {
+		return nil, err
+	}
+
+	untrustedTimestamps, err := e.UntrustedTestEntity.Timestamps()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(timestamps, untrustedTimestamps...), nil
 }
 
 type dupTimestampEntity struct {
