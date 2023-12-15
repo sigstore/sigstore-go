@@ -55,9 +55,6 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 			}
 		}
 	}
-	if len(entries) < threshold {
-		return nil, fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), threshold)
-	}
 
 	sigContent, err := entity.SignatureContent()
 	if err != nil {
@@ -78,14 +75,14 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		if err != nil {
 			return nil, err
 		}
+		inclusionVerified := false
 
 		if !online {
-			var inclusionVerified bool
 			// TODO: do we validate that an entry has EITHER a promise OR a proof?
 			if entry.HasInclusionPromise() {
 				err = tlog.VerifySET(entry, trustedMaterial.TlogAuthorities())
 				if err != nil {
-					return nil, err
+					continue
 				}
 				inclusionVerified = true
 			}
@@ -94,7 +91,8 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				hex64Key := hex.EncodeToString([]byte(keyID))
 				tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
 				if !ok {
-					return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+					// skip entries the trust root cannot verify
+					continue
 				}
 
 				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
@@ -118,7 +116,8 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 			hex64Key := hex.EncodeToString([]byte(keyID))
 			tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
 			if !ok {
-				return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+				// skip entries the trust root cannot verify
+				continue
 			}
 
 			client, err := getRekorClient(tlogVerifier.BaseURL)
@@ -157,25 +156,32 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 					return nil, err
 				}
 			}
+			inclusionVerified = true
 			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 		}
 
-		// Ensure entry signature matches signature from bundle
-		if !bytes.Equal(entry.Signature(), entitySignature) {
-			return nil, errors.New("transparency log signature does not match")
-		}
+		if inclusionVerified {
+			// Ensure entry signature matches signature from bundle
+			if !bytes.Equal(entry.Signature(), entitySignature) {
+				return nil, errors.New("transparency log signature does not match")
+			}
 
-		// Ensure entry certificate matches bundle certificate
-		if !verificationContent.CompareKey(entry.PublicKey(), trustedMaterial) {
-			return nil, errors.New("transparency log certificate does not match")
-		}
+			// Ensure entry certificate matches bundle certificate
+			if !verificationContent.CompareKey(entry.PublicKey(), trustedMaterial) {
+				return nil, errors.New("transparency log certificate does not match")
+			}
 
-		// TODO: if you have access to artifact, check that it matches body subject
+			// TODO: if you have access to artifact, check that it matches body subject
 
-		// Check tlog entry time against bundle certificates
-		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
-			return nil, errors.New("integrated time outside certificate validity")
+			// Check tlog entry time against bundle certificates
+			if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
+				return nil, errors.New("integrated time outside certificate validity")
+			}
 		}
+	}
+
+	if len(verifiedTimestamps) < threshold {
+		return nil, fmt.Errorf("not enough verified timestamps from transparency log entries: %d < %d", len(verifiedTimestamps), threshold)
 	}
 
 	return verifiedTimestamps, nil

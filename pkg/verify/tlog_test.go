@@ -52,6 +52,47 @@ func TestTlogVerifier(t *testing.T) {
 	assert.Error(t, err)
 }
 
+type goodAndUntrustedLogEntry struct {
+	*ca.TestEntity
+	OtherTestEntity *ca.TestEntity
+}
+
+func (e *goodAndUntrustedLogEntry) TlogEntries() ([]*tlog.Entry, error) {
+	entries, err := e.TestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	otherEntries, err := e.OtherTestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(entries, otherEntries...), nil
+}
+
+func TestIgnoredTLogEntries(t *testing.T) {
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	otherSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+	otherEntity, err := otherSigstore.Attest("foo@fighters.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	// success: entry that cannot be verified is ignored
+	_, err = verify.VerifyArtifactTransparencyLog(&goodAndUntrustedLogEntry{entity, otherEntity}, virtualSigstore, 1, false)
+	assert.NoError(t, err)
+
+	// failure: threshold of 2 is not met since 1 untrusted entry is ignored
+	_, err = verify.VerifyArtifactTransparencyLog(&goodAndUntrustedLogEntry{entity, otherEntity}, virtualSigstore, 2, false)
+	assert.Error(t, err)
+}
+
 type dupTlogEntity struct {
 	*ca.TestEntity
 }
