@@ -131,7 +131,7 @@ func TestInvalidTLogEntries(t *testing.T) {
 	// failure: threshold of 1 is not met with invalid entry
 	_, err = verify.VerifyArtifactTransparencyLog(&invalidTLogEntity{entity}, virtualSigstore, 1, false)
 	assert.Error(t, err)
-	if err.Error() != "entry must contain and inclusion proof and/or promise" {
+	if err.Error() != "entry must contain an inclusion proof and/or promise" {
 		t.Errorf("expected error with missing proof/promises, got: %v", err.Error())
 	}
 }

@@ -78,7 +78,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 
 		if !online {
 			if !entry.HasInclusionPromise() && !entry.HasInclusionProof() {
-				return nil, fmt.Errorf("entry must contain and inclusion proof and/or promise")
+				return nil, fmt.Errorf("entry must contain an inclusion proof and/or promise")
 			}
 			if entry.HasInclusionPromise() {
 				err = tlog.VerifySET(entry, trustedMaterial.TlogAuthorities())
