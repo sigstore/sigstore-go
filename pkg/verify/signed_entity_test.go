@@ -61,7 +61,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
@@ -92,7 +92,7 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2))
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
@@ -118,7 +118,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
 	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
@@ -200,7 +200,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
 	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "BadSANValue", "", "")
 
-	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 
 	assert.Nil(t, err)
 
@@ -248,7 +248,7 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
 	res, err := verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
