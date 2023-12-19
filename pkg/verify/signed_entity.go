@@ -44,10 +44,12 @@ type VerifierConfig struct { // nolint: revive
 	// signedTimestampThreshold is the minimum number of verified
 	// RFC3161 timestamps in a bundle
 	signedTimestampThreshold int
-	// trustIntegratedTime, when used along with requireObserverTimestamps,
-	// lets log integrated timestamps count towards the observer timestamp
-	// threshold
-	// trustIntegratedTime bool
+	// requireIntegratedTimestamps requires log entry integrated timestamps to
+	// verify short-lived certificates
+	requireIntegratedTimestamps bool
+	// integratedTimeThreshold is the minimum number of log entry
+	// integrated timestamps in a bundle
+	integratedTimeThreshold int
 	// requireObserverTimestamps requires RFC3161 timestamps and/or log
 	// integrated timestamps to verify short-lived certificates
 	requireObserverTimestamps bool
@@ -159,6 +161,17 @@ func WithTransparencyLog(threshold int) VerifierOption {
 	}
 }
 
+// WithIntegratedTimestamps configures the SignedEntityVerifier to
+// expect log entry integrated timestamps from either SignedEntryTimestamps
+// or live log lookups.
+func WithIntegratedTimestamps(threshold int) VerifierOption {
+	return func(c *VerifierConfig) error {
+		c.requireIntegratedTimestamps = true
+		c.integratedTimeThreshold = threshold
+		return nil
+	}
+}
+
 // WithSignedCertificateTimestamps configures the SignedEntityVerifier to
 // expect the Fulcio certificate to have a SignedCertificateTimestamp, and
 // verify it using the TrustedMaterial's CTLogAuthorities().
@@ -189,13 +202,11 @@ func WithoutAnyObserverTimestampsInsecure() VerifierOption {
 	}
 }
 
-// TODO: Update with requireObserverTimestamps
 func (c *VerifierConfig) Validate() error {
-	// TODO: Fix up
-	if !c.weExpectSignedTimestamps && !c.requireObserverTimestamps && !c.weDoNotExpectAnyObserverTimestamps {
-		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one, or both, of WithSignedTimestamps() or WithObserverTimestamps()")
+	if !c.requireObserverTimestamps && !c.weExpectSignedTimestamps && !c.requireIntegratedTimestamps && !c.weDoNotExpectAnyObserverTimestamps {
+		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one of " +
+			"WithObserverTimestamps(), WithSignedTimestamps(), WithIntegratedTimestamps(), or WithoutAnyObserverTimestampsInsecure()")
 	}
-	// TODO: require WithTransparencyLog?
 
 	return nil
 }
@@ -603,7 +614,9 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 	verifiedTimestamps := []TimestampVerificationResult{}
 
 	if v.config.weExpectTlogEntries {
-		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold, v.config.requireObserverTimestamps, v.config.performOnlineVerification)
+		// log timestamps should be verified if with WithIntegratedTimestamps or WithObserverTimestamps is used
+		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
+			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps, v.config.performOnlineVerification)
 		if err != nil {
 			return nil, err
 		}
@@ -625,8 +638,6 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps []TimestampVerificationResult) ([]TimestampVerificationResult, error) {
 	verifiedTimestamps := []TimestampVerificationResult{}
 
-	fmt.Println(len(logTimestamps))
-
 	// From spec:
 	// > … if verification or timestamp parsing fails, the Verifier MUST abort
 	if v.config.weExpectSignedTimestamps {
@@ -639,6 +650,12 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 		}
 	}
 
+	if v.config.requireIntegratedTimestamps {
+		if len(logTimestamps) < v.config.integratedTimeThreshold {
+			return nil, fmt.Errorf("threshold not met for verified log entry integrated timestamps: %d < %d", len(logTimestamps), v.config.integratedTimeThreshold)
+		}
+	}
+
 	if v.config.requireObserverTimestamps {
 		verifiedSignedTimestamps, err := VerifyTimestampAuthority(entity, v.trustedMaterial)
 		if err != nil {
@@ -648,7 +665,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 		// check threshold for both RFC3161 and log timestamps
 		tsCount := len(verifiedSignedTimestamps) + len(logTimestamps)
 		if tsCount < v.config.observerTimestampThreshold {
-			return nil, fmt.Errorf("threshold not met for verified signed & log timestamps: %d < %d",
+			return nil, fmt.Errorf("threshold not met for verified signed & log entry integrated timestamps: %d < %d",
 				tsCount, v.config.observerTimestampThreshold)
 		}
 
