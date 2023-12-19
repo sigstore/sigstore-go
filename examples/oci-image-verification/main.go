@@ -121,6 +121,7 @@ func run() error {
 
 	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 
+	// TODO: Add flag for requiring any timestamp
 	if *requireTSA {
 		verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
 	}
