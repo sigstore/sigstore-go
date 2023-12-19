@@ -121,7 +121,7 @@ func run() error {
 
 	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 
-	// TODO: Add flag for requiring any timestamp
+	// TODO: Add flag for allowing observer timestamp once merged
 	if *requireTSA {
 		verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
 	}

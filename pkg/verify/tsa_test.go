@@ -50,6 +50,29 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 	assert.Error(t, err) // only 1 trusted should not meet threshold of 2
 }
 
+func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
+	assert.NoError(t, err)
+
+	virtualSigstore2, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	var ts []time.Time
+
+	// expect one verified timestamp
+	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore)
+	assert.NoError(t, err)
+	assert.Len(t, ts, 1)
+
+	// no failure, but also no verified timestamps
+	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2)
+	assert.NoError(t, err)
+	assert.Empty(t, ts)
+}
+
 type oneTrustedOneUntrustedTimestampEntity struct {
 	*ca.TestEntity
 	UntrustedTestEntity *ca.TestEntity

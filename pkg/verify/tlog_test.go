@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO(issue#53): Add unit tests for online log verification and inclusion proofs
 func TestTlogVerifier(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
@@ -34,8 +35,16 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
+	var ts []time.Time
+	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
 	assert.NoError(t, err)
+	// 1 verified timestamp
+	assert.Len(t, ts, 1)
+
+	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false, false)
+	assert.NoError(t, err)
+	// 0 verified timestamps, since integrated timestamps are ignored
+	assert.Len(t, ts, 0)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)

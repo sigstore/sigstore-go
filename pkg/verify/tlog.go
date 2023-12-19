@@ -131,7 +131,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 
 			logIndex := entry.LogIndex()
 
-			// TODO: Change from search by index to search by hash?
+			// TODO(issue#52): Change to GetLogEntryByIndex
 			searchParams := rekorEntries.NewSearchLogQueryParams()
 			searchLogQuery := rekorModels.SearchLogQuery{}
 			searchLogQuery.LogIndexes = []*int64{&logIndex}
@@ -185,9 +185,6 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 	if logEntriesVerified < logThreshold {
 		return nil, fmt.Errorf("not enough verified log entries from transparency log: %d < %d", logEntriesVerified, logThreshold)
 	}
-	// if len(verifiedTimestamps) < tsThreshold {
-	// 	return nil, fmt.Errorf("not enough verified timestamps from transparency log entries: %d < %d", len(verifiedTimestamps), tsThreshold)
-	// }
 
 	return verifiedTimestamps, nil
 }

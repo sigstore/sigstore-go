@@ -41,6 +41,8 @@ var expectedOIDIssuer *string
 var expectedSAN *string
 var expectedSANRegex *string
 var requireTSA *bool
+var requireIntegratedTs *bool
+var requireTimestamp *bool
 var requireTlog *bool
 var minBundleVersion *string
 var onlineTlog *bool
@@ -57,6 +59,8 @@ func init() {
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
 	requireTSA = flag.Bool("requireTSA", false, "Require RFC 3161 signed timestamp")
+	requireIntegratedTs = flag.Bool("requireIntegratedTs", false, "Require log entry integrated timestamp")
+	requireTimestamp = flag.Bool("requireTimestamp", false, "Require either an RFC3161 signed timestamp or log entry integrated timestamp")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
 	onlineTlog = flag.Bool("onlineTlog", false, "Verify Artifact Transparency log entry online (Rekor)")
@@ -101,9 +105,16 @@ func run() error {
 
 	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 
-	// TODO: Add flag for requiring any timestamp
 	if *requireTSA {
 		verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
+	}
+
+	if *requireIntegratedTs {
+		verifierConfig = append(verifierConfig, verify.WithIntegratedTimestamps(1))
+	}
+
+	if *requireTimestamp {
+		verifierConfig = append(verifierConfig, verify.WithObserverTimestamps(1))
 	}
 
 	if *requireTlog {

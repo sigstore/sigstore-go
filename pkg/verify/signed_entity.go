@@ -629,12 +629,13 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 	return verifiedTimestamps, nil
 }
 
-// VerifyObserverTimestamps verifies TlogEntries and SignedTimestamps, if we
-// expect them, and returns a slice of verified results, which embed the actual
-// time.Time value. This value can then be used to verify certificates, if any.
+// VerifyObserverTimestamps verifies RFC3161 signed timestamps, and verifies
+// that timestamp thresholds are met with log entry integrated timestamps,
+// signed timestamps, or a combination of both. The returned timestamps
+// can be used to verify short-lived certificates.
+// logTimestamps may be populated with verified log entry integrated timestamps
 // In order to be verifiable, a SignedEntity must have at least one verified
 // "observer timestamp".
-// TODO: Update comment saying logTimestamps is populated when observertimestamps are used
 func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps []TimestampVerificationResult) ([]TimestampVerificationResult, error) {
 	verifiedTimestamps := []TimestampVerificationResult{}
 
@@ -654,6 +655,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 		if len(logTimestamps) < v.config.integratedTimeThreshold {
 			return nil, fmt.Errorf("threshold not met for verified log entry integrated timestamps: %d < %d", len(logTimestamps), v.config.integratedTimeThreshold)
 		}
+		verifiedTimestamps = append(verifiedTimestamps, logTimestamps...)
 	}
 
 	if v.config.requireObserverTimestamps {
