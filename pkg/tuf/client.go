@@ -64,6 +64,12 @@ func New(opts *Options) (*Client, error) {
 	// client (only reads content on disk) and then decide if we
 	// must perform a full TUF update.
 	var tmpCfg = *c.cfg
+	// Create a temporary config for the first use where UnsafeLocalMode
+	// is true. This means that when we first initialize the client,
+	// we are guaranteed to only read the metadata on disk.
+	// Based on that metadata we take a decision if a full TUF
+	// refresh should be done or not. As so, the tmpCfg is only needed
+	// here and not in future invocations.
 	tmpCfg.UnsafeLocalMode = true
 	c.up, err = updater.New(&tmpCfg)
 	if err != nil {
