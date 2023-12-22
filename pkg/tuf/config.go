@@ -49,5 +49,6 @@ func (c *Config) Persist(p string) error {
 	if err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
+
 	return nil
 }

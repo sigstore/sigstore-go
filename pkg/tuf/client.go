@@ -162,6 +162,7 @@ func (c *Client) Refresh() error {
 	cfg.LastTimestamp = time.Now()
 	// ignore error writing update config file
 	_ = cfg.Persist(c.configPath())
+
 	return nil
 }
 
