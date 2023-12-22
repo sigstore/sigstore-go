@@ -17,7 +17,6 @@ package tuf
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -107,42 +106,36 @@ func (c *Client) loadMetadata() error {
 		return nil
 	} else if c.opts.CacheValidity > 0 {
 		// Use cached metadata for up to CacheValidity days.
-		// This is a bit of an hack, as we don't know when the
-		// last the it was updated, fallback to check the
-		// modification time of timestamp.json
 		if tm.Timestamp.Signed.IsExpired(time.Now()) {
 			// Always update if the timestamp is expired
 			return c.Refresh()
 		}
 
-		var p = filepath.Join(
-			c.opts.CachePath,
-			URLToPath(c.opts.RepositoryBaseURL),
-			"timestamp.json",
-		)
-		fi, err := os.Stat(p)
+		cfg, err := LoadConfig(c.configPath())
 		if err != nil {
-			// Failed to get info on the file, fall back
-			// and update if needed
-			return c.Refresh()
+			// Config may not exist, don'tt error
+			// create a new empty config
+			cfg = &Config{}
 		}
 
-		if fi.ModTime().After(time.Now().Add(
-			time.Duration(-24*c.opts.CacheValidity) * time.Hour)) {
+		cacheValidUntil := cfg.LastTimestamp.Add(
+			time.Duration(-24*c.opts.CacheValidity) * time.Hour)
+		if time.Now().Before(cacheValidUntil) {
 			// No need to update
 			return nil
 		}
-		// A TUF client refresh will now happen (c.Refresh),
-		// update the mod time for the timestamp.
-		//
-		// Ignore the error here, there is no need to fail
-		// operation only because the file's metadata could
-		// not be updated
-		//nolint:errcheck
-		os.Chtimes(p, time.Now(), time.Now())
 	}
 
 	return c.Refresh()
+}
+
+func (c *Client) configPath() string {
+	var p = filepath.Join(
+		c.opts.CachePath,
+		fmt.Sprintf("%s.json", URLToPath(c.opts.RepositoryBaseURL)),
+	)
+
+	return p
 }
 
 // Refresh forces a refresh of the underlying TUF client.
@@ -155,7 +148,21 @@ func (c *Client) Refresh() error {
 	if err != nil {
 		return err
 	}
-	return c.up.Refresh()
+	err = c.up.Refresh()
+	if err != nil {
+		return err
+	}
+
+	// Update config with last update
+	cfg, err := LoadConfig(c.configPath())
+	if err != nil {
+		// Likely config file did not exit, create it
+		cfg = &Config{}
+	}
+	cfg.LastTimestamp = time.Now()
+	// ignore error writing update config file
+	_ = cfg.Persist(c.configPath())
+	return nil
 }
 
 // GetTarget returns a target file from the TUF repository
