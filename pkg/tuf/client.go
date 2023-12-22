@@ -51,7 +51,7 @@ func New(opts *Options) (*Client, error) {
 		return nil, fmt.Errorf("malformed config mirror: %w", err)
 	}
 	c.cfg.DisableLocalCache = c.opts.DisableLocalCache
-	c.cfg.PrefixTargetsWithHash = true
+	c.cfg.PrefixTargetsWithHash = !c.opts.DisableConsistentSnapshot
 
 	if c.cfg.DisableLocalCache {
 		c.opts.CachePath = ""

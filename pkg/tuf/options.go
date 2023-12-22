@@ -43,6 +43,8 @@ type Options struct {
 	// DisableLocalCache mode allows a client to work on a read-only
 	// files system if this is set, cache path is ignored.
 	DisableLocalCache bool
+	// DisableConsistentSnapshot
+	DisableConsistentSnapshot bool
 }
 
 // DefaultOptions returns an options struct for the public good instance
