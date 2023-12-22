@@ -160,12 +160,15 @@ func (c *Client) Refresh() error {
 
 // GetTarget returns a target file from the TUF repository
 func (c *Client) GetTarget(target string) ([]byte, error) {
+	// Set filepath to the empty string. When we get targets,
+	// we rely in the target info struct instead.
+	const filePath = ""
 	ti, err := c.up.GetTargetInfo(target)
 	if err != nil {
 		return nil, fmt.Errorf("target %s not found: %w", target, err)
 	}
 
-	path, tb, err := c.up.FindCachedTarget(ti, "")
+	path, tb, err := c.up.FindCachedTarget(ti, filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error getting target cache: %w", err)
 	}
@@ -175,7 +178,9 @@ func (c *Client) GetTarget(target string) ([]byte, error) {
 	}
 
 	// Download of target is needed
-	_, tb, err = c.up.DownloadTarget(ti, "", "")
+	// Ignore targetsBaseURL, set to empty string
+	const targetsBaseURL = ""
+	_, tb, err = c.up.DownloadTarget(ti, filePath, targetsBaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download target file %s - %w", target, err)
 	}
