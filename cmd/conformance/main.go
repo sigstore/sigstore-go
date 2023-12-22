@@ -57,10 +57,7 @@ func getTrustedRoot() root.TrustedMaterial {
 		if !ok {
 			log.Fatal("unable to get path")
 		}
-		opts, err := tuf.DefaultOptions()
-		if err != nil {
-			log.Fatal(err)
-		}
+		opts := tuf.DefaultOptions()
 		opts.CachePath = path.Join(path.Dir(filename), "tufdata")
 		client, err := tuf.New(opts)
 		if err != nil {

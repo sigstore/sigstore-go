@@ -79,10 +79,8 @@ func New(opts *Options) (*Client, error) {
 
 // DefaultClient returns a Sigstore TUF client for the public good instance
 func DefaultClient() (*Client, error) {
-	opts, err := DefaultOptions()
-	if err != nil {
-		return nil, err
-	}
+	opts := DefaultOptions()
+
 	return New(opts)
 }
 

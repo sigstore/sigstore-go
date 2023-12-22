@@ -26,9 +26,6 @@ var embeddedRepo embed.FS
 const DefaultMirror = "https://tuf-repo-cdn.sigstore.dev"
 
 // Options represent the various options for a Sigstore TUF Client
-//
-// Note that currently, the cache control is not working. Upon initialization
-// the client will *ALWAYS* perform a TUF update.
 type Options struct {
 	// CacheValidity period in days (default 1)
 	CacheValidity int
@@ -49,33 +46,36 @@ type Options struct {
 }
 
 // DefaultOptions returns an options struct for the public good instance
-func DefaultOptions() (*Options, error) {
+func DefaultOptions() *Options {
 	var opts Options
 	var err error
 
-	opts.Root, err = DefaultRoot()
-	if err != nil {
-		return nil, err
-	}
+	opts.Root = DefaultRoot()
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		// Fall back to using a TUF repository in the temp location
+		home = os.TempDir()
 	}
 	opts.CacheValidity = 1
 	opts.CachePath = filepath.Join(home, ".sigstore", "root")
 	opts.RepositoryBaseURL = DefaultMirror
 
-	return &opts, nil
+	return &opts
 }
 
 // DefaultRoot returns the root.json for the public good instance
-func DefaultRoot() ([]byte, error) {
+func DefaultRoot() []byte {
 	var p = filepath.Join("repository", "root.json")
 
 	b, err := embeddedRepo.ReadFile(p)
 	if err != nil {
-		return nil, err
+		// This should never happen.
+		// ReadFile from an embedded FS will never fail as long as
+		// the path is correct. If it fails, it would mean
+		// that the binary is not assembled as it should, and there
+		// is no way to recover from that.
+		panic(err)
 	}
 
-	return b, nil
+	return b
 }
