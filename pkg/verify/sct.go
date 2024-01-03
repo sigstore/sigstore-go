@@ -29,6 +29,7 @@ import (
 // leaf certificate, will extract SCTs from the leaf certificate and verify the
 // timestamps using the TrustedMaterial's FulcioCertificateAuthorities() and
 // CTlogAuthorities()
+// TODO(issue#46): Add unit tests
 func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	ctlogs := trustedMaterial.CTlogAuthorities()
 	fulcioCerts := trustedMaterial.FulcioCertificateAuthorities()
@@ -48,7 +49,8 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 		encodedKeyID := hex.EncodeToString(sct.LogID.KeyID[:])
 		key, ok := ctlogs[encodedKeyID]
 		if !ok {
-			return fmt.Errorf("unable to find ctlogs key for %s", encodedKeyID)
+			// skip entries the trust root cannot verify
+			continue
 		}
 
 		for _, fulcioCa := range fulcioCerts {

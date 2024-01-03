@@ -230,6 +230,10 @@ func (entry *Entry) LogIndex() int64 {
 	return *entry.logEntryAnon.LogIndex
 }
 
+func (entry *Entry) Body() any {
+	return entry.logEntryAnon.Body
+}
+
 func (entry *Entry) HasInclusionPromise() bool {
 	return entry.signedEntryTimestamp != nil
 }

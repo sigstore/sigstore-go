@@ -55,9 +55,6 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 			}
 		}
 	}
-	if len(entries) < threshold {
-		return nil, fmt.Errorf("not enough transparency log entries: %d < %d", len(entries), threshold)
-	}
 
 	sigContent, err := entity.SignatureContent()
 	if err != nil {
@@ -80,21 +77,23 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		}
 
 		if !online {
-			var inclusionVerified bool
-			// TODO: do we validate that an entry has EITHER a promise OR a proof?
+			if !entry.HasInclusionPromise() && !entry.HasInclusionProof() {
+				return nil, fmt.Errorf("entry must contain an inclusion proof and/or promise")
+			}
 			if entry.HasInclusionPromise() {
 				err = tlog.VerifySET(entry, trustedMaterial.TlogAuthorities())
 				if err != nil {
-					return nil, err
+					// skip entries the trust root cannot verify
+					continue
 				}
-				inclusionVerified = true
 			}
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
 				hex64Key := hex.EncodeToString([]byte(keyID))
 				tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
 				if !ok {
-					return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+					// skip entries the trust root cannot verify
+					continue
 				}
 
 				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
@@ -106,19 +105,15 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				if err != nil {
 					return nil, err
 				}
-
-				inclusionVerified = true
 			}
-
-			if inclusionVerified {
-				verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
-			}
+			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
 			tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
 			if !ok {
-				return nil, fmt.Errorf("unable to find tlog information for key %s", hex64Key)
+				// skip entries the trust root cannot verify
+				continue
 			}
 
 			client, err := getRekorClient(tlogVerifier.BaseURL)
@@ -176,6 +171,10 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
 			return nil, errors.New("integrated time outside certificate validity")
 		}
+	}
+
+	if len(verifiedTimestamps) < threshold {
+		return nil, fmt.Errorf("not enough verified timestamps from transparency log entries: %d < %d", len(verifiedTimestamps), threshold)
 	}
 
 	return verifiedTimestamps, nil

@@ -15,6 +15,8 @@
 package verify_test
 
 import (
+	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,6 +52,112 @@ func TestTlogVerifier(t *testing.T) {
 
 	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false)
 	assert.Error(t, err)
+}
+
+type oneTrustedOneUntrustedLogEntry struct {
+	*ca.TestEntity
+	UntrustedTestEntity *ca.TestEntity
+}
+
+func (e *oneTrustedOneUntrustedLogEntry) TlogEntries() ([]*tlog.Entry, error) {
+	entries, err := e.TestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	otherEntries, err := e.UntrustedTestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(entries, otherEntries...), nil
+}
+
+func TestIgnoredTLogEntries(t *testing.T) {
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	untrustedSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+	untrustedEntity, err := untrustedSigstore.Attest("foo@fighters.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	// success: entry that cannot be verified is ignored
+	_, err = verify.VerifyArtifactTransparencyLog(&oneTrustedOneUntrustedLogEntry{entity, untrustedEntity}, virtualSigstore, 1, false)
+	assert.NoError(t, err)
+
+	// failure: threshold of 2 is not met since 1 untrusted entry is ignored
+	_, err = verify.VerifyArtifactTransparencyLog(&oneTrustedOneUntrustedLogEntry{entity, untrustedEntity}, virtualSigstore, 2, false)
+	assert.Error(t, err)
+}
+
+// invalidTLogEntity constructs a bundle with a Rekor response, but without an inclusion proof or promise
+type invalidTLogEntity struct {
+	*ca.TestEntity
+}
+
+func (e *invalidTLogEntity) TlogEntries() ([]*tlog.Entry, error) {
+	entries, err := e.TestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+	var invalidEntries []*tlog.Entry
+	for _, entry := range entries {
+		body, err := base64.StdEncoding.DecodeString(entry.Body().(string))
+		if err != nil {
+			return nil, err
+		}
+		invalidEntry, err := tlog.NewEntry(body, entry.IntegratedTime().Unix(), entry.LogIndex(), []byte(entry.LogKeyID()), nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		invalidEntries = append(invalidEntries, invalidEntry)
+	}
+	return invalidEntries, nil
+}
+
+func TestInvalidTLogEntries(t *testing.T) {
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	// failure: threshold of 1 is not met with invalid entry
+	_, err = verify.VerifyArtifactTransparencyLog(&invalidTLogEntity{entity}, virtualSigstore, 1, false)
+	assert.Error(t, err)
+	if err.Error() != "entry must contain an inclusion proof and/or promise" {
+		t.Errorf("expected error with missing proof/promises, got: %v", err.Error())
+	}
+}
+
+type noTLogEntity struct {
+	*ca.TestEntity
+}
+
+func (e *noTLogEntity) TlogEntries() ([]*tlog.Entry, error) {
+	return []*tlog.Entry{}, nil
+}
+
+func TestNoTLogEntries(t *testing.T) {
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	// failure: threshold of 1 is not met with no entries
+	_, err = verify.VerifyArtifactTransparencyLog(&noTLogEntity{entity}, virtualSigstore, 1, false)
+	assert.Error(t, err)
+	if !strings.Contains(err.Error(), "not enough verified timestamps from transparency log") {
+		t.Errorf("expected error with timestamp threshold, got: %v", err.Error())
+	}
 }
 
 type dupTlogEntity struct {
