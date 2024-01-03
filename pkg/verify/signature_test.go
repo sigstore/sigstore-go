@@ -69,7 +69,7 @@ func TestEnvelopeSubject(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
 	_, err = verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
@@ -98,7 +98,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	entity, err := virtualSigstore.Sign("foofighters@example.com", "issuer", []byte(artifact))
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
 	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))

@@ -31,23 +31,46 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(entity, virtualSigstore, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, virtualSigstore, 1)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, virtualSigstore2, 1)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 
 	untrustedEntity, err := virtualSigstore2.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 1)
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 2)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 2)
 	assert.Error(t, err) // only 1 trusted should not meet threshold of 2
+}
+
+func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
+	assert.NoError(t, err)
+
+	virtualSigstore2, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	var ts []time.Time
+
+	// expect one verified timestamp
+	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore)
+	assert.NoError(t, err)
+	assert.Len(t, ts, 1)
+
+	// no failure, but also no verified timestamps
+	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2)
+	assert.NoError(t, err)
+	assert.Empty(t, ts)
 }
 
 type oneTrustedOneUntrustedTimestampEntity struct {
@@ -89,7 +112,7 @@ func TestDuplicateTimestamps(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(&dupTimestampEntity{entity}, virtualSigstore, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(&dupTimestampEntity{entity}, virtualSigstore, 1)
 	assert.Error(t, err) // duplicate timestamps should fail to verify
 }
 
@@ -108,7 +131,7 @@ func TestBadTSASignature(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(&badTSASignatureEntity{entity}, virtualSigstore, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(&badTSASignatureEntity{entity}, virtualSigstore, 1)
 	assert.Error(t, err)
 }
 
@@ -141,7 +164,7 @@ func TestBadTSACertificateChain(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{badChain}}, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{badChain}}, 1)
 	assert.Error(t, err)
 }
 
@@ -191,7 +214,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 			entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", []byte("statement"))
 			assert.NoError(t, err)
 
-			_, err = verify.VerifyTimestampAuthority(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{test.ca}}, 1)
+			_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{test.ca}}, 1)
 			if test.err {
 				assert.Error(t, err)
 			} else {

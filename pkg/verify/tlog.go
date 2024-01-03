@@ -41,7 +41,7 @@ import (
 // that must be verified.
 //
 // If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int, online bool) ([]time.Time, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]time.Time, error) { //nolint:revive
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -69,6 +69,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 	}
 
 	verifiedTimestamps := []time.Time{}
+	logEntriesVerified := 0
 
 	for _, entry := range entries {
 		err := tlog.ValidateEntry(entry)
@@ -85,6 +86,9 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				if err != nil {
 					// skip entries the trust root cannot verify
 					continue
+				}
+				if trustIntegratedTime {
+					verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 				}
 			}
 			if entity.HasInclusionProof() {
@@ -105,8 +109,8 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				if err != nil {
 					return nil, err
 				}
+				// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
 			}
-			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
@@ -127,6 +131,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 
 			logIndex := entry.LogIndex()
 
+			// TODO(issue#52): Change to GetLogEntryByIndex
 			searchParams := rekorEntries.NewSearchLogQueryParams()
 			searchLogQuery := rekorModels.SearchLogQuery{}
 			searchLogQuery.LogIndexes = []*int64{&logIndex}
@@ -152,9 +157,10 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 					return nil, err
 				}
 			}
-			verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
+			if trustIntegratedTime {
+				verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
+			}
 		}
-
 		// Ensure entry signature matches signature from bundle
 		if !bytes.Equal(entry.Signature(), entitySignature) {
 			return nil, errors.New("transparency log signature does not match")
@@ -171,10 +177,13 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
 			return nil, errors.New("integrated time outside certificate validity")
 		}
+
+		// successful log entry verification
+		logEntriesVerified++
 	}
 
-	if len(verifiedTimestamps) < threshold {
-		return nil, fmt.Errorf("not enough verified timestamps from transparency log entries: %d < %d", len(verifiedTimestamps), threshold)
+	if logEntriesVerified < logThreshold {
+		return nil, fmt.Errorf("not enough verified log entries from transparency log: %d < %d", logEntriesVerified, logThreshold)
 	}
 
 	return verifiedTimestamps, nil

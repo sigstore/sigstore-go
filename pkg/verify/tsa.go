@@ -28,10 +28,7 @@ import (
 
 // VerifyTimestampAuthority verifies that the given entity has been timestamped
 // by a trusted timestamp authority and that the timestamp is valid.
-//
-// The threshold parameter is the number of unique timestamps that must be
-// verified.
-func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]time.Time, error) { //nolint:revive
+func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]time.Time, error) { //nolint:revive
 	signedTimestamps, err := entity.Timestamps()
 	if err != nil {
 		return nil, err
@@ -70,10 +67,22 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
 
-	if len(verifiedTimestamps) < threshold {
-		return nil, fmt.Errorf("not enough verified timestamps: %d < %d", len(verifiedTimestamps), threshold)
-	}
+	return verifiedTimestamps, nil
+}
 
+// VerifyTimestampAuthority verifies that the given entity has been timestamped
+// by a trusted timestamp authority and that the timestamp is valid.
+//
+// The threshold parameter is the number of unique timestamps that must be
+// verified.
+func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]time.Time, error) { //nolint:revive
+	verifiedTimestamps, err := VerifyTimestampAuthority(entity, trustedMaterial)
+	if err != nil {
+		return nil, err
+	}
+	if len(verifiedTimestamps) < threshold {
+		return nil, fmt.Errorf("threshold not met for verified signed timestamps: %d < %d", len(verifiedTimestamps), threshold)
+	}
 	return verifiedTimestamps, nil
 }
 

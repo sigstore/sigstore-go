@@ -35,13 +35,40 @@ type SignedEntityVerifier struct {
 }
 
 type VerifierConfig struct { // nolint: revive
-	performOnlineVerification          bool
-	weExpectSignedTimestamps           bool
-	signedTimestampThreshold           int
-	weExpectTlogEntries                bool
-	tlogEntriesThreshold               int
-	weExpectSCTs                       bool
-	ctlogEntriesThreshold              int
+	// performOnlineVerification queries logs during verification.
+	// Default is offline
+	performOnlineVerification bool
+	// weExpectSignedTimestamps requires RFC3161 timestamps to verify
+	// short-lived certificates
+	weExpectSignedTimestamps bool
+	// signedTimestampThreshold is the minimum number of verified
+	// RFC3161 timestamps in a bundle
+	signedTimestampThreshold int
+	// requireIntegratedTimestamps requires log entry integrated timestamps to
+	// verify short-lived certificates
+	requireIntegratedTimestamps bool
+	// integratedTimeThreshold is the minimum number of log entry
+	// integrated timestamps in a bundle
+	integratedTimeThreshold int
+	// requireObserverTimestamps requires RFC3161 timestamps and/or log
+	// integrated timestamps to verify short-lived certificates
+	requireObserverTimestamps bool
+	// observerTimestampThreshold is the minimum number of verified
+	// RFC3161 timestamps and/or log integrated timestamps in a bundle
+	observerTimestampThreshold int
+	// weExpectTlogEntries requires log inclusion proofs in a bundle
+	weExpectTlogEntries bool
+	// tlogEntriesThreshold is the minimum number of verified inclusion
+	// proofs in a bundle
+	tlogEntriesThreshold int
+	// weExpectSCTs requires SCTs in Fulcio certificates
+	weExpectSCTs bool
+	// ctlogEntriesTreshold is the minimum number of verified SCTs in
+	// a Fulcio certificate
+	ctlogEntriesThreshold int
+	// weDoNotExpectAnyObserverTimestamps uses the certificate's lifetime
+	// rather than a provided signed or log timestamp. Most workflows will
+	// not use this option
 	weDoNotExpectAnyObserverTimestamps bool
 }
 
@@ -104,10 +131,25 @@ func WithSignedTimestamps(threshold int) VerifierOption {
 	}
 }
 
+// WithObserverTimestamps configures the SignedEntityVerifier to expect
+// timestamps from either an RFC3161 timestamp authority or a log's
+// SignedEntryTimestamp. These are verified using the TrustedMaterial's
+// TSACertificateAuthorities() or TlogAuthorities(), and used to verify
+// the Fulcio certificate.
+func WithObserverTimestamps(threshold int) VerifierOption {
+	return func(c *VerifierConfig) error {
+		if threshold < 1 {
+			return errors.New("observer timestamp threshold must be at least 1")
+		}
+		c.requireObserverTimestamps = true
+		c.observerTimestampThreshold = threshold
+		return nil
+	}
+}
+
 // WithTransparencyLog configures the SignedEntityVerifier to expect
-// Transparency Log entries, verify them using the TrustedMaterial's
-// TlogAuthorities(), and, if it exists, use the resulting Inclusion timestamp(s)
-// to verify the Fulcio certificate.
+// Transparency Log inclusion proofs or SignedEntryTimestamps, verifying them
+// using the TrustedMaterial's TlogAuthorities().
 func WithTransparencyLog(threshold int) VerifierOption {
 	return func(c *VerifierConfig) error {
 		if threshold < 1 {
@@ -115,6 +157,17 @@ func WithTransparencyLog(threshold int) VerifierOption {
 		}
 		c.weExpectTlogEntries = true
 		c.tlogEntriesThreshold = threshold
+		return nil
+	}
+}
+
+// WithIntegratedTimestamps configures the SignedEntityVerifier to
+// expect log entry integrated timestamps from either SignedEntryTimestamps
+// or live log lookups.
+func WithIntegratedTimestamps(threshold int) VerifierOption {
+	return func(c *VerifierConfig) error {
+		c.requireIntegratedTimestamps = true
+		c.integratedTimeThreshold = threshold
 		return nil
 	}
 }
@@ -150,8 +203,9 @@ func WithoutAnyObserverTimestampsInsecure() VerifierOption {
 }
 
 func (c *VerifierConfig) Validate() error {
-	if !c.weExpectSignedTimestamps && !c.weExpectTlogEntries && !c.weDoNotExpectAnyObserverTimestamps {
-		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one, or both, of WithSignedTimestamps() or WithTransparencyLog()")
+	if !c.requireObserverTimestamps && !c.weExpectSignedTimestamps && !c.requireIntegratedTimestamps && !c.weDoNotExpectAnyObserverTimestamps {
+		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one of " +
+			"WithObserverTimestamps(), WithSignedTimestamps(), WithIntegratedTimestamps(), or WithoutAnyObserverTimestampsInsecure()")
 	}
 
 	return nil
@@ -416,11 +470,16 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		return nil, fmt.Errorf("failed to build policy: %w", err)
 	}
 
-	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.msyyz1cr5bcs
+	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.g11ovq2s1jxh
+	// > ## Transparency Log Entry
+	verifiedTlogTimestamps, err := v.VerifyTransparencyLogInclusion(entity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify log inclusion: %w", err)
+	}
+
 	// > ## Establishing a Time for the Signature
 	// > First, establish a time for the signature. This timestamp is required to validate the certificate chain, so this step comes first.
-
-	verifiedTimestamps, err := v.VerifyObserverTimestamps(entity)
+	verifiedTimestamps, err := v.VerifyObserverTimestamps(entity, verifiedTlogTimestamps)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify timestamps: %w", err)
 	}
@@ -547,35 +606,75 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	return result, nil
 }
 
-// VerifyObserverTimestamps verifies TlogEntries and SignedTimestamps, if we
-// expect them, and returns a slice of verified results, which embed the actual
-// time.Time value. This value can then be used to verify certificates, if any.
-// In order to be verifiable, a SignedEntity must have at least one verified
-// "observer timestamp".
-func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity) ([]TimestampVerificationResult, error) {
+// VerifyTransparencyLogInclusion verifies TlogEntries if expected. Optionally returns
+// a list of verified timestamps from the log integrated timestamps when verifying
+// with observer timestamps.
+// TODO: Return a different verification result for logs specifically (also for #48)
+func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntity) ([]TimestampVerificationResult, error) {
 	verifiedTimestamps := []TimestampVerificationResult{}
 
-	// From spec:
-	// > … if verification or timestamp parsing fails, the Verifier MUST abort
-	if v.config.weExpectSignedTimestamps {
-		verifiedSignedTimestamps, err := VerifyTimestampAuthority(entity, v.trustedMaterial, v.config.signedTimestampThreshold)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, vts := range verifiedSignedTimestamps {
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: "TODO", Timestamp: vts})
-		}
-	}
-
 	if v.config.weExpectTlogEntries {
-		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold, v.config.performOnlineVerification)
+		// log timestamps should be verified if with WithIntegratedTimestamps or WithObserverTimestamps is used
+		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
+			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps, v.config.performOnlineVerification)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, vts := range verifiedTlogTimestamps {
 			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "Tlog", URI: "TODO", Timestamp: vts})
+		}
+	}
+
+	return verifiedTimestamps, nil
+}
+
+// VerifyObserverTimestamps verifies RFC3161 signed timestamps, and verifies
+// that timestamp thresholds are met with log entry integrated timestamps,
+// signed timestamps, or a combination of both. The returned timestamps
+// can be used to verify short-lived certificates.
+// logTimestamps may be populated with verified log entry integrated timestamps
+// In order to be verifiable, a SignedEntity must have at least one verified
+// "observer timestamp".
+func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps []TimestampVerificationResult) ([]TimestampVerificationResult, error) {
+	verifiedTimestamps := []TimestampVerificationResult{}
+
+	// From spec:
+	// > … if verification or timestamp parsing fails, the Verifier MUST abort
+	if v.config.weExpectSignedTimestamps {
+		verifiedSignedTimestamps, err := VerifyTimestampAuthorityWithThreshold(entity, v.trustedMaterial, v.config.signedTimestampThreshold)
+		if err != nil {
+			return nil, err
+		}
+		for _, vts := range verifiedSignedTimestamps {
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: "TODO", Timestamp: vts})
+		}
+	}
+
+	if v.config.requireIntegratedTimestamps {
+		if len(logTimestamps) < v.config.integratedTimeThreshold {
+			return nil, fmt.Errorf("threshold not met for verified log entry integrated timestamps: %d < %d", len(logTimestamps), v.config.integratedTimeThreshold)
+		}
+		verifiedTimestamps = append(verifiedTimestamps, logTimestamps...)
+	}
+
+	if v.config.requireObserverTimestamps {
+		verifiedSignedTimestamps, err := VerifyTimestampAuthority(entity, v.trustedMaterial)
+		if err != nil {
+			return nil, err
+		}
+
+		// check threshold for both RFC3161 and log timestamps
+		tsCount := len(verifiedSignedTimestamps) + len(logTimestamps)
+		if tsCount < v.config.observerTimestampThreshold {
+			return nil, fmt.Errorf("threshold not met for verified signed & log entry integrated timestamps: %d < %d",
+				tsCount, v.config.observerTimestampThreshold)
+		}
+
+		// append all timestamps
+		verifiedTimestamps = append(verifiedTimestamps, logTimestamps...)
+		for _, vts := range verifiedSignedTimestamps {
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: "TODO", Timestamp: vts})
 		}
 	}
 

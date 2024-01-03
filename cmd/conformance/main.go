@@ -237,7 +237,7 @@ func main() {
 
 		// Check bundle and trusted root for Tlog information
 		if len(tr.TlogAuthorities()) > 0 && b.HasInclusionPromise() {
-			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
+			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 		}
 
 		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)

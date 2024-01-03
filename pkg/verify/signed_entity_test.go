@@ -52,6 +52,25 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSignedEntityVerifierInitRequiresTimestamp(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+
+	_, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	assert.Error(t, err)
+	if !strings.Contains(err.Error(), "you must specify at least one of") {
+		t.Errorf("expected error missing timestamp verifier, got: %v", err)
+	}
+
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
+	assert.NoError(t, err)
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
+	assert.NoError(t, err)
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithoutAnyObserverTimestampsInsecure())
+	assert.NoError(t, err)
+}
+
 // Testing a bundle:
 // - signed by public good
 // - one tlog entry
@@ -61,11 +80,11 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
-	assert.Nil(t, err)
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
 	assert.NotNil(t, res.Statement)
@@ -74,6 +93,13 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	assert.NotNil(t, res.Signature.Certificate)
 	assert.Equal(t, "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main", res.Signature.Certificate.SubjectAlternativeName.Value)
 	assert.NotEmpty(t, res.VerifiedTimestamps)
+
+	// verifies with integrated timestamp threshold too
+	v, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
+	assert.NoError(t, err)
+	res, err = v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
 }
 
 func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testing.T) {
@@ -81,10 +107,10 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -92,12 +118,55 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2))
-	assert.Nil(t, err)
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Nil(t, res)
+	if !strings.Contains(err.Error(), "not enough verified log entries from transparency log") {
+		t.Errorf("expected error not meeting log entry threshold, got: %v", err)
+	}
+}
+
+func TestEntitySignedByPublicGoodWithoutVerifyingLogEntryFails(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreJS200ProvenanceBundle(t)
+
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
+
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	if !strings.Contains(err.Error(), "threshold not met for verified signed & log entry integrated timestamps") {
+		t.Errorf("expected error not meeting timestamp threshold without entry verification, got: %v", err)
+	}
+
+	// also fails trying to use integrated timestamps without verifying the log
+	v, err = verify.NewSignedEntityVerifier(tr, verify.WithIntegratedTimestamps(1))
+	assert.NoError(t, err)
+	res, err = v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	if !strings.Contains(err.Error(), "threshold not met for verified log entry integrated timestamps") {
+		t.Errorf("expected error not meeting integrated timestamp threshold without entry verification, got: %v", err)
+	}
+}
+
+func TestEntitySignedByPublicGoodWithHighLogTimestampThresholdFails(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreJS200ProvenanceBundle(t)
+
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(2))
+	assert.NoError(t, err)
+
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	if !strings.Contains(err.Error(), "threshold not met for verified log entry integrated timestamps") {
+		t.Errorf("expected error not meeting log entry integrated timestamp threshold, got: %v", err)
+	}
 }
 
 func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
@@ -105,11 +174,29 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Nil(t, res)
+	if !strings.Contains(err.Error(), "threshold not met for verified signed timestamps") {
+		t.Errorf("expected error not meeting signed timestamp threshold, got: %v", err)
+	}
+}
+
+func TestEntitySignedByPublicGoodWithHighObserverTimestampThresholdFails(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreJS200ProvenanceBundle(t)
+
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(2))
+	assert.NoError(t, err)
+
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	if !strings.Contains(err.Error(), "threshold not met for verified signed & log entry integrated timestamps") {
+		t.Errorf("expected error not meeting observer timestamp threshold, got: %v", err)
+	}
 }
 
 // Now we test policy:
@@ -118,7 +205,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
 	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
@@ -200,7 +287,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
 	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "BadSANValue", "", "")
 
-	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 
 	assert.Nil(t, err)
 
@@ -248,7 +335,7 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
+	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
 	res, err := verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
