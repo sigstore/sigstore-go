@@ -16,7 +16,6 @@ package main
 
 import (
 	"crypto"
-	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -154,7 +153,11 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		trustedMaterial = append(trustedMaterial, trustedPublicKeyMaterial(pubKey))
+		hashFunc, err := verify.GetHashForDigestAlgorithm(*artifactDigestAlgorithm)
+		if err != nil {
+			return err
+		}
+		trustedMaterial = append(trustedMaterial, trustedPublicKeyMaterial(pubKey, hashFunc))
 	}
 
 	if len(trustedMaterial) == 0 {
@@ -205,9 +208,9 @@ func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
 	return true
 }
 
-func trustedPublicKeyMaterial(pk crypto.PublicKey) *root.TrustedPublicKeyMaterial {
+func trustedPublicKeyMaterial(pk crypto.PublicKey, hash crypto.Hash) *root.TrustedPublicKeyMaterial {
 	return root.NewTrustedPublicKeyMaterial(func(string) (root.TimeConstrainedVerifier, error) {
-		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
+		verifier, err := signature.LoadVerifier(pk, hash)
 		if err != nil {
 			return nil, err
 		}
