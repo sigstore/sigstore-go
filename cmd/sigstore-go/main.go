@@ -113,13 +113,11 @@ func run() error {
 		verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 	}
 
-	if *expectedOIDIssuer != "" || *expectedSAN != "" || *expectedSANRegex != "" {
-		certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, "", *expectedSANRegex)
-		if err != nil {
-			return err
-		}
-		identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
+	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, "", *expectedSANRegex)
+	if err != nil {
+		return err
 	}
+	identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
 	var trustedrootJSON []byte

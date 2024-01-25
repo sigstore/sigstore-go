@@ -91,6 +91,10 @@ func (s SubjectAlternativeNameMatcher) Verify(actualCert certificate.Summary) bo
 }
 
 func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, extensions certificate.Extensions) (CertificateIdentity, error) {
+	if sanMatcher.SubjectAlternativeName.Type == "" && sanMatcher.SubjectAlternativeName.Value == "" && sanMatcher.Regexp.String() == "" {
+		return CertificateIdentity{}, errors.New("when verifying a certificate identity, there must be subject alternative name criteria")
+	}
+
 	certID := CertificateIdentity{SubjectAlternativeName: sanMatcher, Extensions: extensions}
 
 	if certID.Issuer == "" {
