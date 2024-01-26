@@ -90,11 +90,17 @@ func TestCertificateIdentityVerify(t *testing.T) {
 	assert.Nil(t, ci)
 }
 
-func TestThatCertIDsHaveToHaveAnIssuer(t *testing.T) {
+func TestThatCertIDsAreFullySpecified(t *testing.T) {
 	_, err := NewShortCertificateIdentity("", "", "", "")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	_, err = NewShortCertificateIdentity("foobar", "", "", "")
+	assert.Error(t, err)
+
+	_, err = NewShortCertificateIdentity("", "", "", SigstoreSanRegex)
+	assert.Error(t, err)
+
+	_, err = NewShortCertificateIdentity("foobar", "", "", SigstoreSanRegex)
 	assert.Nil(t, err)
 }
 
