@@ -72,7 +72,7 @@ Going through this step-by-step, we'll start by loading the trusted root from th
 Next, we'll create a verifier with some options, which will enable SCT verification, ensure a single transparency log entry, and perform online verification:
 
 ```go
-	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithOnlineVerification())
+	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		panic(err)
 	}
@@ -197,7 +197,7 @@ func main() {
 		panic(err)
 	}
 
-	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithOnlineVerification())
+	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		panic(err)
 	}
