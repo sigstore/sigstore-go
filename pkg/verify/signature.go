@@ -43,10 +43,9 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 		return verifyEnvelope(verifier, envelope)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return errors.New("artifact must be provided to verify message signature")
-	} else {
-		// should never happen, but just in case:
-		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
+	// should never happen, but just in case:
+	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
 func VerifySignatureWithArtifact(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifact io.Reader) error { // nolint: revive
@@ -60,7 +59,7 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 		}
 		return verifyEnvelopeWithArtifact(verifier, envelope, artifact)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		hashFunc, err := GetHashForDigestAlgorithm(msg.DigestAlgorithm())
+		hashFunc, err := getHashForHashAlgorithmString(msg.DigestAlgorithm())
 		if err != nil {
 			return fmt.Errorf("could not find hash for message signature: %w", err)
 		}
@@ -69,10 +68,9 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 			return fmt.Errorf("could not load signature verifier: %w", err)
 		}
 		return verifyMessageSignature(verifier, msg, artifact)
-	} else {
-		// should never happen, but just in case:
-		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
+	// should never happen, but just in case:
+	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
 func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifactDigest []byte, artifactDigestAlgorithm string) error { // nolint: revive
@@ -86,7 +84,7 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 		}
 		return verifyEnvelopeWithArtifactDigest(verifier, envelope, artifactDigest, artifactDigestAlgorithm)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		hashFunc, err := GetHashForDigestAlgorithm(msg.DigestAlgorithm())
+		hashFunc, err := getHashForHashAlgorithmString(msg.DigestAlgorithm())
 		if err != nil {
 			return fmt.Errorf("could not find hash for message signature: %w", err)
 		}
@@ -95,10 +93,9 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 			return fmt.Errorf("could not load signature verifier: %w", err)
 		}
 		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
-	} else {
-		// should never happen, but just in case:
-		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
+	// should never happen, but just in case:
+	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
 func getSignatureVerifier(content VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
@@ -110,9 +107,8 @@ func getSignatureVerifierWithHash(verificationContent VerificationContent, tm ro
 		return signature.LoadVerifier(leafCert.PublicKey, hash)
 	} else if pk, ok := verificationContent.HasPublicKey(); ok {
 		return tm.PublicKeyVerifier(pk.Hint())
-	} else {
-		return nil, fmt.Errorf("no public key or certificate found")
 	}
+	return nil, fmt.Errorf("no public key or certificate found")
 }
 
 func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {
@@ -173,7 +169,7 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 	// Compute digest of the artifact.
 	hashFunc, err := GetHashForDigestAlgorithm(artifactDigestAlgorithm)
 	if err != nil {
-		return fmt.Errorf("could not verify artifact: unrecognized digest algorithm: %s", err)
+		return fmt.Errorf("could not verify artifact: unrecognized digest algorithm: %w", err)
 	}
 	hasher := hashFunc.New()
 	_, err = io.Copy(hasher, artifact)
@@ -258,6 +254,17 @@ func GetHashForDigestAlgorithm(digestAlgorithm string) (crypto.Hash, error) {
 		hashFunc = crypto.SHA512
 	default:
 		return crypto.Hash(0), fmt.Errorf("unrecognized digest algorithm: %s", digestAlgorithm)
+	}
+	return hashFunc, nil
+}
+
+func getHashForHashAlgorithmString(hashAlgorithm string) (crypto.Hash, error) {
+	var hashFunc crypto.Hash
+	switch hashAlgorithm {
+	case "SHA2_256":
+		hashFunc = crypto.SHA256
+	default:
+		return crypto.Hash(0), fmt.Errorf("unrecognized hash algorithm: %s", hashAlgorithm)
 	}
 	return hashFunc, nil
 }
