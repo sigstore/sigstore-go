@@ -33,6 +33,9 @@ func TestConfig(t *testing.T) {
 	}
 
 	cp, err := LoadConfig(p)
+	if err != nil {
+		t.Error(err.Error())
+	}
 	delta := ts.Sub(cp.LastTimestamp)
 	if delta < 0 {
 		delta = -delta

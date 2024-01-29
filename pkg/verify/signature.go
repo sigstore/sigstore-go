@@ -44,10 +44,10 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 		return verifyEnvelope(verifier, envelope)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return errors.New("artifact must be provided to verify message signature")
-	} else {
-		// should never happen, but just in case:
-		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
+
+	// should never happen, but just in case:
+	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
 func VerifySignatureWithArtifact(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifact io.Reader) error { // nolint: revive
@@ -63,10 +63,10 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 		return verifyEnvelopeWithArtifact(verifier, envelope, artifact)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return verifyMessageSignature(verifier, msg, artifact)
-	} else {
-		// should never happen, but just in case:
-		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
+
+	// should never happen, but just in case:
+	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
 func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifactDigest []byte, artifactDigestAlgorithm string) error { // nolint: revive
@@ -82,10 +82,10 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 		return verifyEnvelopeWithArtifactDigest(verifier, envelope, artifactDigest, artifactDigestAlgorithm)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
-	} else {
-		// should never happen, but just in case:
-		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
+
+	// should never happen, but just in case:
+	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
@@ -94,9 +94,9 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 		return signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
 	} else if pk, ok := verificationContent.HasPublicKey(); ok {
 		return tm.PublicKeyVerifier(pk.Hint())
-	} else {
-		return nil, fmt.Errorf("no public key or certificate found")
 	}
+
+	return nil, fmt.Errorf("no public key or certificate found")
 }
 
 func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {

@@ -22,7 +22,7 @@ import (
 )
 
 type Config struct {
-	LastTimestamp time.Time `json:"last_timestamp"`
+	LastTimestamp time.Time `json:"lastTimestamp"`
 }
 
 func LoadConfig(p string) (*Config, error) {
