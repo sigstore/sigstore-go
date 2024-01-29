@@ -8,7 +8,7 @@ require (
 	github.com/google/go-containerregistry v0.18.0
 	github.com/sigstore/protobuf-specs v0.2.1
 	github.com/sigstore/sigstore v1.8.1
-	github.com/sigstore/sigstore-go v0.0.0-20240103204255-44c7c85ab358
+	github.com/sigstore/sigstore-go v0.1.0
 )
 
 require (
@@ -31,11 +31,11 @@ require (
 	github.com/go-openapi/jsonpointer v0.20.2 // indirect
 	github.com/go-openapi/jsonreference v0.20.4 // indirect
 	github.com/go-openapi/loads v0.21.5 // indirect
-	github.com/go-openapi/runtime v0.26.2 // indirect
+	github.com/go-openapi/runtime v0.27.1 // indirect
 	github.com/go-openapi/spec v0.20.13 // indirect
 	github.com/go-openapi/strfmt v0.22.0 // indirect
-	github.com/go-openapi/swag v0.22.7 // indirect
-	github.com/go-openapi/validate v0.22.3 // indirect
+	github.com/go-openapi/swag v0.22.9 // indirect
+	github.com/go-openapi/validate v0.22.4 // indirect
 	github.com/google/certificate-transparency-go v1.1.7 // indirect
 	github.com/google/uuid v1.5.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
