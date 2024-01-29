@@ -262,7 +262,11 @@ func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error
 
 // FetchTrustedRoot fetches the Sigstore trusted root from TUF and returns it.
 func FetchTrustedRoot() (*TrustedRoot, error) {
-	opts := tuf.DefaultOptions()
+	return FetchTrustedRootWithOptions(tuf.DefaultOptions())
+}
+
+// FetchTrustedRootWithOptions fetches the trusted root from TUF with the given options and returns it.
+func FetchTrustedRootWithOptions(opts *tuf.Options) (*TrustedRoot, error) {
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, err
