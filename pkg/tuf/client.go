@@ -37,7 +37,7 @@ func New(opts *Options) (*Client, error) {
 	var c = Client{
 		opts: opts,
 	}
-	var dir = filepath.Join(opts.CachePath, URLToPath(opts.RepositoryBaseURL))
+	dir := filepath.Join(opts.CachePath, URLToPath(opts.RepositoryBaseURL))
 	var err error
 
 	if c.cfg, err = config.New(opts.RepositoryBaseURL, opts.Root); err != nil {
@@ -63,7 +63,7 @@ func New(opts *Options) (*Client, error) {
 	// based on the cache control configuration. Start with a local
 	// client (only reads content on disk) and then decide if we
 	// must perform a full TUF update.
-	var tmpCfg = *c.cfg
+	tmpCfg := *c.cfg
 	// Create a temporary config for the first use where UnsafeLocalMode
 	// is true. This means that when we first initialize the client,
 	// we are guaranteed to only read the metadata on disk.
@@ -101,7 +101,7 @@ func (c *Client) loadMetadata() error {
 		return c.Refresh()
 	}
 
-	var tm = c.up.GetTrustedMetadataSet()
+	tm := c.up.GetTrustedMetadataSet()
 	if c.opts.ForceCache {
 		// Use cache until it expires
 		if tm.Timestamp.Signed.IsExpired(time.Now()) {
