@@ -47,6 +47,48 @@ type Options struct {
 	DisableConsistentSnapshot bool
 }
 
+// WithCacheValidity sets the cache validity period in days
+func (o *Options) WithCacheValidity(days int) *Options {
+	o.CacheValidity = days
+	return o
+}
+
+// WithForceCache forces the client to use the cache without updating
+func (o *Options) WithForceCache() *Options {
+	o.ForceCache = true
+	return o
+}
+
+// WithRoot sets the TUF trust anchor
+func (o *Options) WithRoot(root []byte) *Options {
+	o.Root = root
+	return o
+}
+
+// WithCachePath sets the location on disk for TUF cache
+func (o *Options) WithCachePath(path string) *Options {
+	o.CachePath = path
+	return o
+}
+
+// WithRepositoryBaseURL sets the TUF repository location URL
+func (o *Options) WithRepositoryBaseURL(url string) *Options {
+	o.RepositoryBaseURL = url
+	return o
+}
+
+// WithDisableLocalCache sets the client to work on a read-only file system
+func (o *Options) WithDisableLocalCache() *Options {
+	o.DisableLocalCache = true
+	return o
+}
+
+// WithDisableConsistentSnapshot sets the client to disable consistent snapshot
+func (o *Options) WithDisableConsistentSnapshot() *Options {
+	o.DisableConsistentSnapshot = true
+	return o
+}
+
 // DefaultOptions returns an options struct for the public good instance
 func DefaultOptions() *Options {
 	var opts Options
