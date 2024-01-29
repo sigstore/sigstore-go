@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rdimitrov/go-tuf-metadata/metadata/config"
-	"github.com/rdimitrov/go-tuf-metadata/metadata/updater"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 // Client is a Sigstore TUF client

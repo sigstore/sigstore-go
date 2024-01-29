@@ -10,13 +10,13 @@ require (
 	github.com/go-openapi/swag v0.22.7
 	github.com/google/certificate-transparency-go v1.1.7
 	github.com/in-toto/in-toto-golang v0.9.0
-	github.com/rdimitrov/go-tuf-metadata v0.0.0-20231211110834-6de72dba550c
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/protobuf-specs v0.2.1
 	github.com/sigstore/rekor v1.3.4
 	github.com/sigstore/sigstore v1.8.1
 	github.com/sigstore/timestamp-authority v1.2.1
 	github.com/stretchr/testify v1.8.4
+	github.com/theupdateframework/go-tuf/v2 v2.0.0-20240129093820-4e440e28cdf6
 	golang.org/x/mod v0.14.0
 	google.golang.org/protobuf v1.32.0
 )
