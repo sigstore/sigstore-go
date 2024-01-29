@@ -145,10 +145,7 @@ func run() error {
 	var trustedRootJSON []byte
 
 	if *tufRootURL != "" {
-		opts, err := tuf.DefaultOptions()
-		if err != nil {
-			return err
-		}
+		opts := tuf.DefaultOptions()
 		opts.RepositoryBaseURL = *tufRootURL
 		client, err := tuf.New(opts)
 		if err != nil {
