@@ -20,6 +20,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -139,18 +140,18 @@ func trustedPublicKeyMaterial(pk crypto.PublicKey, hash crypto.Hash) *root.Trust
 	})
 }
 
-func TestSignatureVerifierMessageSignatureCustomSignatureAlgorithms(t *testing.T) {
+func TestSignatureVerifierMessageSignatureConfigurableSignatureAlgorithms(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	// Generate an ECDSA key with a different curve and hash.
-	privKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	// Test with an ECDSA key with a different curve.
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	assert.NoError(t, err)
 
-	virtualSigstore.TrustedMaterial = trustedPublicKeyMaterial(privKey.Public(), crypto.SHA512)
+	virtualSigstore.TrustedMaterial = trustedPublicKeyMaterial(ecdsaKey.Public(), crypto.SHA512)
 
 	artifact := "Hi, I am an artifact!"
-	entity, err := virtualSigstore.SignWithPrivateKey("foofighters@example.com", "issuer", []byte(artifact), privKey, crypto.SHA512)
+	entity, err := virtualSigstore.SignWithPrivateKey("foofighters@example.com", "issuer", []byte(artifact), ecdsaKey, crypto.SHA512)
 	assert.NoError(t, err)
 
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
@@ -161,9 +162,17 @@ func TestSignatureVerifierMessageSignatureCustomSignatureAlgorithms(t *testing.T
 
 	assert.Equal(t, result.VerifiedTimestamps[0].Type, "Tlog")
 
-	// should fail to verify with a different artifact
-	artifact2 := "Hi, I am a different artifact!"
-	result, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact2)), verify.WithoutIdentitiesUnsafe()))
-	assert.Error(t, err)
-	assert.Nil(t, result)
+	// Test with an RSA key.
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
+
+	virtualSigstore.TrustedMaterial = trustedPublicKeyMaterial(rsaKey.Public(), crypto.SHA256)
+
+	entity, err = virtualSigstore.SignWithPrivateKey("foofighters@example.com", "issuer", []byte(artifact), rsaKey, crypto.SHA256)
+	assert.NoError(t, err)
+
+	result, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	assert.NoError(t, err)
+
+	assert.Equal(t, result.VerifiedTimestamps[0].Type, "Tlog")
 }
