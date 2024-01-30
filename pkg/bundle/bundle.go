@@ -154,7 +154,7 @@ func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, erro
 		return certChain, nil
 	case *protobundle.VerificationMaterial_PublicKey:
 		pk := &PublicKey{
-			hint: content.PublicKey.Hint,
+			HintString: content.PublicKey.Hint,
 		}
 		return pk, nil
 

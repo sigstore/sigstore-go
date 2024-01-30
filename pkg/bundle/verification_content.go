@@ -28,11 +28,11 @@ type CertificateChain struct {
 }
 
 type PublicKey struct {
-	hint string
+	HintString string
 }
 
 func (pk PublicKey) Hint() string {
-	return pk.hint
+	return pk.HintString
 }
 
 func (cc *CertificateChain) CompareKey(key any, _ root.TrustedMaterial) bool {
@@ -65,7 +65,7 @@ func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
 }
 
 func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
-	verifier, err := tm.PublicKeyVerifier(pk.hint)
+	verifier, err := tm.PublicKeyVerifier(pk.HintString)
 	if err != nil {
 		return false
 	}
@@ -80,7 +80,7 @@ func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
 }
 
 func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
-	verifier, err := tm.PublicKeyVerifier(pk.hint)
+	verifier, err := tm.PublicKeyVerifier(pk.HintString)
 	if err != nil {
 		return false
 	}

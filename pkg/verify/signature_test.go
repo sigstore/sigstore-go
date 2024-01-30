@@ -16,13 +16,20 @@ package verify_test
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -105,6 +112,53 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName.Value, "foofighters@example.com")
+	assert.Equal(t, result.VerifiedTimestamps[0].Type, "Tlog")
+
+	// should fail to verify with a different artifact
+	artifact2 := "Hi, I am a different artifact!"
+	result, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact2)), verify.WithoutIdentitiesUnsafe()))
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+type nonExpiringVerifier struct {
+	signature.Verifier
+}
+
+func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
+	return true
+}
+
+func trustedPublicKeyMaterial(pk crypto.PublicKey, hash crypto.Hash) *root.TrustedPublicKeyMaterial {
+	return root.NewTrustedPublicKeyMaterial(func(string) (root.TimeConstrainedVerifier, error) {
+		verifier, err := signature.LoadVerifier(pk, hash)
+		if err != nil {
+			return nil, err
+		}
+		return &nonExpiringVerifier{verifier}, nil
+	})
+}
+
+func TestSignatureVerifierMessageSignatureCustomSignatureAlgorithms(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	// Generate an ECDSA key with a different curve and hash.
+	privKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	assert.NoError(t, err)
+
+	virtualSigstore.TrustedMaterial = trustedPublicKeyMaterial(privKey.Public(), crypto.SHA512)
+
+	artifact := "Hi, I am an artifact!"
+	entity, err := virtualSigstore.SignWithPrivateKey("foofighters@example.com", "issuer", []byte(artifact), privKey, crypto.SHA512)
+	assert.NoError(t, err)
+
+	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
+
+	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	assert.NoError(t, err)
+
 	assert.Equal(t, result.VerifiedTimestamps[0].Type, "Tlog")
 
 	// should fail to verify with a different artifact
