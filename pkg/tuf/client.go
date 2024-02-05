@@ -59,6 +59,10 @@ func New(opts *Options) (*Client, error) {
 		c.opts.ForceCache = false
 	}
 
+	if opts.Fetcher != nil {
+		c.cfg.Fetcher = opts.Fetcher
+	}
+
 	// Upon client creation, we may not perform a full TUF update,
 	// based on the cache control configuration. Start with a local
 	// client (only reads content on disk) and then decide if we

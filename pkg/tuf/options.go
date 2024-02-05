@@ -18,6 +18,8 @@ import (
 	"embed"
 	"os"
 	"path/filepath"
+
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 //go:embed repository
@@ -45,6 +47,8 @@ type Options struct {
 	DisableLocalCache bool
 	// DisableConsistentSnapshot
 	DisableConsistentSnapshot bool
+	// Fetcher is the metadata fetcher
+	Fetcher fetcher.Fetcher
 }
 
 // WithCacheValidity sets the cache validity period in days
@@ -86,6 +90,12 @@ func (o *Options) WithDisableLocalCache() *Options {
 // WithDisableConsistentSnapshot sets the client to disable consistent snapshot
 func (o *Options) WithDisableConsistentSnapshot() *Options {
 	o.DisableConsistentSnapshot = true
+	return o
+}
+
+// WithFetcher sets the metadata fetcher
+func (o *Options) WithFetcher(f fetcher.Fetcher) *Options {
+	o.Fetcher = f
 	return o
 }
 
