@@ -83,6 +83,13 @@ type testrepo struct {
 	dir   string
 }
 
+const (
+	tufRoot      = "root"
+	tufTargets   = "targets"
+	tufSnapshot  = "snapshot"
+	tufTimestamp = "timestamp"
+)
+
 func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byte, error) {
 	u, err := url.Parse(urlPath)
 	if err != nil {
@@ -106,20 +113,20 @@ func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 			return []byte{}, metadata.ErrDownload{}
 		}
 		switch role {
-		case "root":
+		case tufRoot:
 			meta := r.roles.Root()
 			if meta.Signed.Version != int64(version) {
 				return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
 			}
 			return meta.ToBytes(false)
-		case "snapshot":
+		case tufSnapshot:
 			meta := r.roles.Snapshot()
 			if meta.Signed.Version != int64(version) {
 				return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
 			}
 			return meta.ToBytes(false)
-		case "targets":
-			meta := r.roles.Targets("targets")
+		case tufTargets:
+			meta := r.roles.Targets(tufTargets)
 			if meta.Signed.Version != int64(version) {
 				return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
 			}
@@ -137,19 +144,19 @@ func genTestRepo(t *testing.T) *testrepo {
 		roles: repository.New(),
 	}
 	targets := metadata.Targets(helperExpireIn(7))
-	r.roles.SetTargets("targets", targets)
+	r.roles.SetTargets(tufTargets, targets)
 	r.dir, err = os.MkdirTemp("", "tuf-test-repo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.Mkdir(filepath.Join(r.dir, "targets"), 0700)
+	err = os.Mkdir(filepath.Join(r.dir, tufTargets), 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
 	targetPath := "foo"
 	targetContent := []byte("foo 1")
 	targetHash := sha256.Sum256(targetContent)
-	localPath := filepath.Join(r.dir, "targets", fmt.Sprintf("%x.%s", targetHash, targetPath))
+	localPath := filepath.Join(r.dir, tufTargets, fmt.Sprintf("%x.%s", targetHash, targetPath))
 	err = os.WriteFile(localPath, targetContent, 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +165,7 @@ func genTestRepo(t *testing.T) *testrepo {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.roles.Targets("targets").Signed.Targets[targetPath] = targetFileInfo
+	r.roles.Targets(tufTargets).Signed.Targets[targetPath] = targetFileInfo
 	snapshot := metadata.Snapshot(helperExpireIn(7))
 	r.roles.SetSnapshot(snapshot)
 	timestamp := metadata.Timestamp(helperExpireIn(1))
@@ -166,7 +173,7 @@ func genTestRepo(t *testing.T) *testrepo {
 	root := metadata.Root(helperExpireIn(365))
 	r.roles.SetRoot(root)
 
-	for _, name := range []string{"targets", "snapshot", "timestamp", "root"} {
+	for _, name := range []string{tufTargets, tufSnapshot, tufTimestamp, tufRoot} {
 		_, private, err := ed25519.GenerateKey(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -182,20 +189,20 @@ func genTestRepo(t *testing.T) *testrepo {
 		}
 	}
 
-	for _, name := range []string{"targets", "snapshot", "timestamp", "root"} {
+	for _, name := range []string{tufTargets, tufSnapshot, tufTimestamp, tufRoot} {
 		key := r.keys[name]
 		signer, err := signature.LoadSigner(key, crypto.Hash(0))
 		if err != nil {
 			t.Fatal(err)
 		}
 		switch name {
-		case "targets":
-			_, err = r.roles.Targets("targets").Sign(signer)
-		case "snapshot":
+		case tufTargets:
+			_, err = r.roles.Targets(tufTargets).Sign(signer)
+		case tufSnapshot:
 			_, err = r.roles.Snapshot().Sign(signer)
-		case "timestamp":
+		case tufTimestamp:
 			_, err = r.roles.Timestamp().Sign(signer)
-		case "root":
+		case tufRoot:
 			_, err = r.roles.Root().Sign(signer)
 		}
 		if err != nil {
@@ -203,18 +210,18 @@ func genTestRepo(t *testing.T) *testrepo {
 		}
 	}
 
-	for _, name := range []string{"targets", "snapshot", "timestamp", "root"} {
+	for _, name := range []string{tufTargets, tufSnapshot, tufTimestamp, tufRoot} {
 		switch name {
-		case "targets":
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Targets("targets").Signed.Version, name)
-			err = r.roles.Targets("targets").ToFile(filepath.Join(r.dir, filename), true)
-		case "snapshot":
+		case tufTargets:
+			filename := fmt.Sprintf("%d.%s.json", r.roles.Targets(tufTargets).Signed.Version, name)
+			err = r.roles.Targets(tufTargets).ToFile(filepath.Join(r.dir, filename), true)
+		case tufSnapshot:
 			filename := fmt.Sprintf("%d.%s.json", r.roles.Snapshot().Signed.Version, name)
 			err = r.roles.Snapshot().ToFile(filepath.Join(r.dir, filename), true)
-		case "timestamp":
+		case tufTimestamp:
 			filename := fmt.Sprintf("%s.json", name)
 			err = r.roles.Timestamp().ToFile(filepath.Join(r.dir, filename), true)
-		case "root":
+		case tufRoot:
 			filename := fmt.Sprintf("%d.%s.json", r.roles.Root().Signed.Version, name)
 			err = r.roles.Root().ToFile(filepath.Join(r.dir, filename), true)
 		}

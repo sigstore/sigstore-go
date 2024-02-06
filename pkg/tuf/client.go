@@ -156,11 +156,11 @@ func (c *Client) Refresh() error {
 
 	c.up, err = updater.New(c.cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create tuf updater: %w", err)
 	}
 	err = c.up.Refresh()
 	if err != nil {
-		return err
+		return fmt.Errorf("tuf refresh failed: %w", err)
 	}
 
 	// Update config with last update
