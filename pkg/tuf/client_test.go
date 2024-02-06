@@ -49,7 +49,7 @@ func TestNewOfflineClientFail(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCreateClient(t *testing.T) {
+func TestGetTarget(t *testing.T) {
 	r := genTestRepo(t)
 
 	rootJSON, err := r.roles.Root().ToBytes(false)
@@ -65,6 +65,10 @@ func TestCreateClient(t *testing.T) {
 	c, err := New(opt)
 	assert.NotNil(t, c)
 	assert.NoError(t, err)
+
+	target, err := c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, target)
 }
 
 type repo interface {
@@ -90,8 +94,20 @@ func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 	}
 
 	if strings.HasPrefix(u.Path, "/targets/") {
-		// TODO: handle targets
-		return []byte{}, nil
+		re := regexp.MustCompile(`/targets/[0-9a-f]{64}\.(.*)$`)
+		matches := re.FindStringSubmatch(u.Path)
+		if len(matches) != 2 {
+			return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+		}
+		targetFile, ok := r.roles.Targets(metadata.TARGETS).Signed.Targets[matches[1]]
+		if !ok {
+			return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+		}
+		data, err := os.ReadFile(targetFile.Path)
+		if err != nil {
+			return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+		}
+		return data, nil
 	}
 	if u.Path == "/timestamp.json" {
 		meta := r.roles.Timestamp()
@@ -99,32 +115,34 @@ func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 	}
 	re := regexp.MustCompile(`/(\d+)\.(root|snapshot|targets)\.json$`)
 	matches := re.FindStringSubmatch(u.Path)
-	if len(matches) > 0 {
-		role := matches[2]
-		version, err := strconv.Atoi(matches[1])
-		if err != nil {
-			return []byte{}, metadata.ErrDownload{}
+	if len(matches) != 3 {
+		return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+	}
+	role := matches[2]
+	version, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return []byte{}, metadata.ErrDownload{}
+	}
+	switch role {
+	case metadata.ROOT:
+		// TODO: handle all versions of signed root
+		meta := r.roles.Root()
+		if meta.Signed.Version != int64(version) {
+			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
-		switch role {
-		case metadata.ROOT:
-			meta := r.roles.Root()
-			if meta.Signed.Version != int64(version) {
-				return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
-			}
-			return meta.ToBytes(false)
-		case metadata.SNAPSHOT:
-			meta := r.roles.Snapshot()
-			if meta.Signed.Version != int64(version) {
-				return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
-			}
-			return meta.ToBytes(false)
-		case metadata.TARGETS:
-			meta := r.roles.Targets(metadata.TARGETS)
-			if meta.Signed.Version != int64(version) {
-				return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
-			}
-			return meta.ToBytes(false)
+		return meta.ToBytes(false)
+	case metadata.SNAPSHOT:
+		meta := r.roles.Snapshot()
+		if meta.Signed.Version != int64(version) {
+			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
+		return meta.ToBytes(false)
+	case metadata.TARGETS:
+		meta := r.roles.Targets(metadata.TARGETS)
+		if meta.Signed.Version != int64(version) {
+			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
+		}
+		return meta.ToBytes(false)
 	}
 
 	return []byte{}, nil
