@@ -5,7 +5,7 @@ go 1.21.5
 replace github.com/sigstore/sigstore-go => ../../
 
 require (
-	github.com/google/go-containerregistry v0.18.0
+	github.com/google/go-containerregistry v0.19.0
 	github.com/sigstore/protobuf-specs v0.2.1
 	github.com/sigstore/sigstore v1.8.1
 	github.com/sigstore/sigstore-go v0.1.0

@@ -46,7 +46,7 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 		return errors.New("artifact must be provided to verify message signature")
 	}
 
-	// should never happen, but just in case:
+	// handle an invalid signature content message
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
@@ -65,7 +65,7 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 		return verifyMessageSignature(verifier, msg, artifact)
 	}
 
-	// should never happen, but just in case:
+	// handle an invalid signature content message
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
@@ -84,7 +84,7 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
 	}
 
-	// should never happen, but just in case:
+	// handle an invalid signature content message
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
