@@ -16,7 +16,6 @@ package tuf
 
 import (
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -41,15 +40,11 @@ func New(opts *Options) (*Client, error) {
 	var err error
 
 	if c.cfg, err = config.New(opts.RepositoryBaseURL, opts.Root); err != nil {
-		return nil, fmt.Errorf("failed to create TUF repo: %w", err)
+		return nil, fmt.Errorf("failed to create TUF client: %w", err)
 	}
 
 	c.cfg.LocalMetadataDir = dir
 	c.cfg.LocalTargetsDir = filepath.Join(dir, "targets")
-	c.cfg.RemoteTargetsURL, err = url.JoinPath(opts.RepositoryBaseURL, "targets")
-	if err != nil {
-		return nil, fmt.Errorf("malformed config mirror: %w", err)
-	}
 	c.cfg.DisableLocalCache = c.opts.DisableLocalCache
 	c.cfg.PrefixTargetsWithHash = !c.opts.DisableConsistentSnapshot
 
@@ -105,25 +100,12 @@ func (c *Client) loadMetadata() error {
 		return c.Refresh()
 	}
 
-	tm := c.up.GetTrustedMetadataSet()
 	if c.opts.ForceCache {
-		// Use cache until it expires
-		if tm.Timestamp.Signed.IsExpired(time.Now()) {
-			return c.Refresh()
-		}
-
-		// Cache not expired, return
 		return nil
 	} else if c.opts.CacheValidity > 0 {
-		// Use cached metadata for up to CacheValidity days.
-		if tm.Timestamp.Signed.IsExpired(time.Now()) {
-			// Always update if the timestamp is expired
-			return c.Refresh()
-		}
-
 		cfg, err := LoadConfig(c.configPath())
 		if err != nil {
-			// Config may not exist, don'tt error
+			// Config may not exist, don't error
 			// create a new empty config
 			cfg = &Config{}
 		}

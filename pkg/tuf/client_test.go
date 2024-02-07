@@ -81,6 +81,35 @@ func TestRefresh(t *testing.T) {
 	assert.Equal(t, target, []byte("foo version 2"))
 }
 
+func TestInvalidRoot(t *testing.T) {
+	r := newTestRepo(t)
+	r2 := newTestRepo(t)
+	rootJSON, err := r.roles.Root().ToBytes(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a client with a root that is not signed by the given repository fetcher
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL("https://testing.local").
+		WithRoot(rootJSON).
+		WithCachePath(t.TempDir()).
+		WithFetcher(r2).
+		WithDisableLocalCache()
+	c, err := New(opt)
+	assert.Nil(t, c)
+	assert.Error(t, err)
+}
+
+func TestInvalidRepositoryURL(t *testing.T) {
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL(string(byte(0x7f))).
+		WithCachePath(t.TempDir())
+	c, err := New(opt)
+	assert.Nil(t, c)
+	assert.Error(t, err)
+}
+
 func TestCache(t *testing.T) {
 	r := newTestRepo(t)
 	r.AddTarget("foo", []byte("foo version 1"))
