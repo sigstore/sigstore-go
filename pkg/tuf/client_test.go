@@ -49,9 +49,9 @@ func TestNewOfflineClientFail(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGetTarget(t *testing.T) {
-	r := genTestRepo(t)
-
+func TestRefresh(t *testing.T) {
+	r := newTestRepo(t)
+	r.AddTarget("foo", []byte("foo 1"))
 	rootJSON, err := r.roles.Root().ToBytes(false)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,8 @@ func TestGetTarget(t *testing.T) {
 		WithRepositoryBaseURL("https://testing.local").
 		WithRoot(rootJSON).
 		WithCachePath(t.TempDir()).
-		WithFetcher(r)
+		WithFetcher(r).
+		WithDisableLocalCache()
 	c, err := New(opt)
 	assert.NotNil(t, c)
 	assert.NoError(t, err)
@@ -69,6 +70,15 @@ func TestGetTarget(t *testing.T) {
 	target, err := c.GetTarget("foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, target)
+	assert.Equal(t, target, []byte("foo 1"))
+
+	r.AddTarget("foo", []byte("foo 2"))
+	assert.NoError(t, c.Refresh())
+
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, target)
+	assert.Equal(t, target, []byte("foo 2"))
 }
 
 type repo interface {
@@ -85,6 +95,71 @@ type testrepo struct {
 	keys  map[string]ed25519.PrivateKey
 	roles repo
 	dir   string
+	t     *testing.T
+}
+
+func newTestRepo(t *testing.T) *testrepo {
+	var err error
+	r := &testrepo{
+		keys:  make(map[string]ed25519.PrivateKey),
+		roles: repository.New(),
+		t:     t,
+	}
+	targets := metadata.Targets(helperExpireIn(7))
+	r.roles.SetTargets(metadata.TARGETS, targets)
+	r.dir, err = os.MkdirTemp("", "tuf-test-repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Mkdir(filepath.Join(r.dir, metadata.TARGETS), 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := metadata.Snapshot(helperExpireIn(7))
+	r.roles.SetSnapshot(snapshot)
+	timestamp := metadata.Timestamp(helperExpireIn(1))
+	r.roles.SetTimestamp(timestamp)
+	root := metadata.Root(helperExpireIn(365))
+	r.roles.SetRoot(root)
+
+	for _, name := range []string{metadata.TARGETS, metadata.SNAPSHOT, metadata.TIMESTAMP, metadata.ROOT} {
+		_, private, err := ed25519.GenerateKey(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.keys[name] = private
+		key, err := metadata.KeyFromPublicKey(private.Public())
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = r.roles.Root().Signed.AddKey(key, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, name := range metadata.TOP_LEVEL_ROLE_NAMES {
+		key := r.keys[name]
+		signer, err := signature.LoadSigner(key, crypto.Hash(0))
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch name {
+		case metadata.TARGETS:
+			_, err = r.roles.Targets(metadata.TARGETS).Sign(signer)
+		case metadata.SNAPSHOT:
+			_, err = r.roles.Snapshot().Sign(signer)
+		case metadata.TIMESTAMP:
+			_, err = r.roles.Timestamp().Sign(signer)
+		case metadata.ROOT:
+			_, err = r.roles.Root().Sign(signer)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return r
 }
 
 func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byte, error) {
@@ -148,104 +223,46 @@ func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 	return []byte{}, nil
 }
 
-func (r *testrepo) Publish() {
-	var err error
-	for _, name := range metadata.TOP_LEVEL_ROLE_NAMES {
+func (r *testrepo) AddTarget(name string, content []byte) {
+	targetHash := sha256.Sum256(content)
+	localPath := filepath.Join(r.dir, metadata.TARGETS, fmt.Sprintf("%x.%s", targetHash, name))
+	err := os.WriteFile(localPath, content, 0600)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	targetFileInfo, err := metadata.TargetFile().FromFile(localPath, "sha256")
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	r.roles.Targets(metadata.TARGETS).Signed.Targets[name] = targetFileInfo
+	r.roles.Targets("targets").Signed.Version++
+
+	r.roles.Snapshot().Signed.Meta["targets.json"] = metadata.MetaFile(r.roles.Targets(metadata.TARGETS).Signed.Version)
+	r.roles.Snapshot().Signed.Version++
+
+	r.roles.Timestamp().Signed.Meta["snapshot.json"] = metadata.MetaFile(r.roles.Snapshot().Signed.Version)
+	r.roles.Timestamp().Signed.Version++
+
+	for _, name := range []string{metadata.TARGETS, metadata.SNAPSHOT, metadata.TIMESTAMP} {
+		signer, err := signature.LoadSigner(r.keys[name], crypto.Hash(0))
+		if err != nil {
+			r.t.Fatal(err)
+		}
 		switch name {
 		case metadata.TARGETS:
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Targets(metadata.TARGETS).Signed.Version, name)
-			err = r.roles.Targets(metadata.TARGETS).ToFile(filepath.Join(r.dir, filename), true)
+			r.roles.Targets(metadata.TARGETS).ClearSignatures()
+			_, err = r.roles.Targets(metadata.TARGETS).Sign(signer)
 		case metadata.SNAPSHOT:
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Snapshot().Signed.Version, name)
-			err = r.roles.Snapshot().ToFile(filepath.Join(r.dir, filename), true)
+			r.roles.Snapshot().ClearSignatures()
+			_, err = r.roles.Snapshot().Sign(signer)
 		case metadata.TIMESTAMP:
-			filename := fmt.Sprintf("%s.json", name)
-			err = r.roles.Timestamp().ToFile(filepath.Join(r.dir, filename), true)
-		case metadata.ROOT:
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Root().Signed.Version, name)
-			err = r.roles.Root().ToFile(filepath.Join(r.dir, filename), true)
+			r.roles.Timestamp().ClearSignatures()
+			_, err = r.roles.Timestamp().Sign(signer)
 		}
 		if err != nil {
 			r.t.Fatal(err)
 		}
 	}
-}
-
-func genTestRepo(t *testing.T) *testrepo {
-	var err error
-	r := &testrepo{
-		keys:  make(map[string]ed25519.PrivateKey),
-		roles: repository.New(),
-	}
-	targets := metadata.Targets(helperExpireIn(7))
-	r.roles.SetTargets(metadata.TARGETS, targets)
-	r.dir, err = os.MkdirTemp("", "tuf-test-repo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = os.Mkdir(filepath.Join(r.dir, metadata.TARGETS), 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetPath := "foo"
-	targetContent := []byte("foo 1")
-	targetHash := sha256.Sum256(targetContent)
-	localPath := filepath.Join(r.dir, metadata.TARGETS, fmt.Sprintf("%x.%s", targetHash, targetPath))
-	err = os.WriteFile(localPath, targetContent, 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetFileInfo, err := metadata.TargetFile().FromFile(localPath, "sha256")
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.roles.Targets(metadata.TARGETS).Signed.Targets[targetPath] = targetFileInfo
-	snapshot := metadata.Snapshot(helperExpireIn(7))
-	r.roles.SetSnapshot(snapshot)
-	timestamp := metadata.Timestamp(helperExpireIn(1))
-	r.roles.SetTimestamp(timestamp)
-	root := metadata.Root(helperExpireIn(365))
-	r.roles.SetRoot(root)
-
-	for _, name := range []string{metadata.TARGETS, metadata.SNAPSHOT, metadata.TIMESTAMP, metadata.ROOT} {
-		_, private, err := ed25519.GenerateKey(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		r.keys[name] = private
-		key, err := metadata.KeyFromPublicKey(private.Public())
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = r.roles.Root().Signed.AddKey(key, name)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	for _, name := range metadata.TOP_LEVEL_ROLE_NAMES {
-		key := r.keys[name]
-		signer, err := signature.LoadSigner(key, crypto.Hash(0))
-		if err != nil {
-			t.Fatal(err)
-		}
-		switch name {
-		case metadata.TARGETS:
-			_, err = r.roles.Targets(metadata.TARGETS).Sign(signer)
-		case metadata.SNAPSHOT:
-			_, err = r.roles.Snapshot().Sign(signer)
-		case metadata.TIMESTAMP:
-			_, err = r.roles.Timestamp().Sign(signer)
-		case metadata.ROOT:
-			_, err = r.roles.Root().Sign(signer)
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	r.Publish()
-
-	return r
 }
 
 // helperExpireIn returns time offset by days
