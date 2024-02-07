@@ -148,6 +148,29 @@ func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 	return []byte{}, nil
 }
 
+func (r *testrepo) Publish() {
+	var err error
+	for _, name := range metadata.TOP_LEVEL_ROLE_NAMES {
+		switch name {
+		case metadata.TARGETS:
+			filename := fmt.Sprintf("%d.%s.json", r.roles.Targets(metadata.TARGETS).Signed.Version, name)
+			err = r.roles.Targets(metadata.TARGETS).ToFile(filepath.Join(r.dir, filename), true)
+		case metadata.SNAPSHOT:
+			filename := fmt.Sprintf("%d.%s.json", r.roles.Snapshot().Signed.Version, name)
+			err = r.roles.Snapshot().ToFile(filepath.Join(r.dir, filename), true)
+		case metadata.TIMESTAMP:
+			filename := fmt.Sprintf("%s.json", name)
+			err = r.roles.Timestamp().ToFile(filepath.Join(r.dir, filename), true)
+		case metadata.ROOT:
+			filename := fmt.Sprintf("%d.%s.json", r.roles.Root().Signed.Version, name)
+			err = r.roles.Root().ToFile(filepath.Join(r.dir, filename), true)
+		}
+		if err != nil {
+			r.t.Fatal(err)
+		}
+	}
+}
+
 func genTestRepo(t *testing.T) *testrepo {
 	var err error
 	r := &testrepo{
@@ -220,26 +243,7 @@ func genTestRepo(t *testing.T) *testrepo {
 			t.Fatal(err)
 		}
 	}
-
-	for _, name := range metadata.TOP_LEVEL_ROLE_NAMES {
-		switch name {
-		case metadata.TARGETS:
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Targets(metadata.TARGETS).Signed.Version, name)
-			err = r.roles.Targets(metadata.TARGETS).ToFile(filepath.Join(r.dir, filename), true)
-		case metadata.SNAPSHOT:
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Snapshot().Signed.Version, name)
-			err = r.roles.Snapshot().ToFile(filepath.Join(r.dir, filename), true)
-		case metadata.TIMESTAMP:
-			filename := fmt.Sprintf("%s.json", name)
-			err = r.roles.Timestamp().ToFile(filepath.Join(r.dir, filename), true)
-		case metadata.ROOT:
-			filename := fmt.Sprintf("%d.%s.json", r.roles.Root().Signed.Version, name)
-			err = r.roles.Root().ToFile(filepath.Join(r.dir, filename), true)
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
+	r.Publish()
 
 	return r
 }
