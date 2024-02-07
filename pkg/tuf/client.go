@@ -128,8 +128,7 @@ func (c *Client) loadMetadata() error {
 			cfg = &Config{}
 		}
 
-		cacheValidUntil := cfg.LastTimestamp.Add(
-			time.Duration(-24*c.opts.CacheValidity) * time.Hour)
+		cacheValidUntil := cfg.LastTimestamp.AddDate(0, 0, c.opts.CacheValidity)
 		if time.Now().Before(cacheValidUntil) {
 			// No need to update
 			return nil
@@ -183,12 +182,12 @@ func (c *Client) GetTarget(target string) ([]byte, error) {
 	const filePath = ""
 	ti, err := c.up.GetTargetInfo(target)
 	if err != nil {
-		return nil, fmt.Errorf("target %s not found: %w", target, err)
+		return nil, fmt.Errorf("getting info for target \"%s\": %w", target, err)
 	}
 
 	path, tb, err := c.up.FindCachedTarget(ti, filePath)
 	if err != nil {
-		return nil, fmt.Errorf("error getting target cache: %w", err)
+		return nil, fmt.Errorf("getting target cache: %w", err)
 	}
 	if path != "" {
 		// Cached version found

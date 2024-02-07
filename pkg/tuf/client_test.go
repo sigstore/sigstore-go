@@ -51,7 +51,7 @@ func TestNewOfflineClientFail(t *testing.T) {
 
 func TestRefresh(t *testing.T) {
 	r := newTestRepo(t)
-	r.AddTarget("foo", []byte("foo 1"))
+	r.AddTarget("foo", []byte("foo version 1"))
 	rootJSON, err := r.roles.Root().ToBytes(false)
 	if err != nil {
 		t.Fatal(err)
@@ -70,17 +70,140 @@ func TestRefresh(t *testing.T) {
 	target, err := c.GetTarget("foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, target)
-	assert.Equal(t, target, []byte("foo 1"))
+	assert.Equal(t, target, []byte("foo version 1"))
 
-	r.AddTarget("foo", []byte("foo 2"))
+	r.AddTarget("foo", []byte("foo version 2"))
 	assert.NoError(t, c.Refresh())
 
 	target, err = c.GetTarget("foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, target)
-	assert.Equal(t, target, []byte("foo 2"))
+	assert.Equal(t, target, []byte("foo version 2"))
 }
 
+func TestCache(t *testing.T) {
+	r := newTestRepo(t)
+	r.AddTarget("foo", []byte("foo version 1"))
+	rootJSON, err := r.roles.Root().ToBytes(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL("https://testing.local").
+		WithRoot(rootJSON).
+		WithCachePath(t.TempDir()).
+		WithFetcher(r).
+		WithCacheValidity(1)
+
+	c, err := New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	target, err := c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, target)
+	assert.Equal(t, target, []byte("foo version 1"))
+
+	r.AddTarget("foo", []byte("foo version 2"))
+
+	// Create new client with the same cache path
+	c, err = New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, target)
+	// Cache is still valid, so we should get the old version
+	assert.Equal(t, target, []byte("foo version 1"))
+
+	// Set last updated time to 2 days ago, to trigger cache refresh
+	cfg, err := LoadConfig(c.configPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.LastTimestamp = time.Now().Add(-48 * time.Hour)
+	err = cfg.Persist(c.configPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create new client with the same cache path
+	c, err = New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	// Now we should get the new version
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, target, []byte("foo version 2"))
+}
+
+func TestExpiredTimestamp(t *testing.T) {
+	r := newTestRepo(t)
+	r.AddTarget("foo", []byte("foo version 1"))
+	rootJSON, err := r.roles.Root().ToBytes(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL("https://testing.local").
+		WithRoot(rootJSON).
+		WithCachePath(t.TempDir()).
+		WithFetcher(r).
+		WithCacheValidity(1)
+
+	c, err := New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	target, err := c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, target, []byte("foo version 1"))
+
+	r.AddTarget("foo", []byte("foo version 2"))
+
+	opt.ForceCache = true
+	c, err = New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	// Using ForceCache, so we should get the old version
+	assert.Equal(t, target, []byte("foo version 1"))
+
+	r.SetTimestamp(time.Now())
+
+	// Manually write timestamp to disk, as Refresh() will fail
+	err = r.roles.Timestamp().ToFile(filepath.Join(opt.CachePath, "testing.local", "timestamp.json"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Client creation should fail as the timestamp is expired and the repository has an expired timestamp
+	c, err = New(opt)
+	assert.Nil(t, c)
+	assert.Error(t, err)
+
+	// Update repo with unexpired timestamp
+	r.SetTimestamp(time.Now().AddDate(0, 0, 1))
+
+	c, err = New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	// Even though ForceCache is set, we should get the new version since the cached timestamp is expired
+	assert.Equal(t, target, []byte("foo version 2"))
+}
+
+// repo represents repositoryType from
+// github.com/theupdateframework/go-tuf/v2/metadata/repository, which is
+// unexported.
 type repo interface {
 	Root() *metadata.Metadata[metadata.RootType]
 	SetRoot(meta *metadata.Metadata[metadata.RootType])
@@ -91,21 +214,28 @@ type repo interface {
 	Targets(name string) *metadata.Metadata[metadata.TargetsType]
 	SetTargets(name string, meta *metadata.Metadata[metadata.TargetsType])
 }
-type testrepo struct {
+
+// testRepo is a basic implementation of a TUF repository for testing purposes.
+// It does not support delegates, multiple signers, thresholds, or other
+// advanced TUF features, but it is sufficient for testing the sigstore-go
+// client. Those other features should be covered by the go-tuf tests. This is
+// primarily intended to test the caching and fetching behavior of the client.
+type testRepo struct {
 	keys  map[string]ed25519.PrivateKey
 	roles repo
 	dir   string
 	t     *testing.T
 }
 
-func newTestRepo(t *testing.T) *testrepo {
+func newTestRepo(t *testing.T) *testRepo {
 	var err error
-	r := &testrepo{
+	r := &testRepo{
 		keys:  make(map[string]ed25519.PrivateKey),
 		roles: repository.New(),
 		t:     t,
 	}
-	targets := metadata.Targets(helperExpireIn(7))
+	tomorrow := time.Now().AddDate(0, 0, 1).UTC()
+	targets := metadata.Targets(tomorrow)
 	r.roles.SetTargets(metadata.TARGETS, targets)
 	r.dir, err = os.MkdirTemp("", "tuf-test-repo")
 	if err != nil {
@@ -115,11 +245,11 @@ func newTestRepo(t *testing.T) *testrepo {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := metadata.Snapshot(helperExpireIn(7))
+	snapshot := metadata.Snapshot(tomorrow)
 	r.roles.SetSnapshot(snapshot)
-	timestamp := metadata.Timestamp(helperExpireIn(1))
+	timestamp := metadata.Timestamp(tomorrow)
 	r.roles.SetTimestamp(timestamp)
-	root := metadata.Root(helperExpireIn(365))
+	root := metadata.Root(tomorrow)
 	r.roles.SetRoot(root)
 
 	for _, name := range []string{metadata.TARGETS, metadata.SNAPSHOT, metadata.TIMESTAMP, metadata.ROOT} {
@@ -162,7 +292,10 @@ func newTestRepo(t *testing.T) *testrepo {
 	return r
 }
 
-func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byte, error) {
+// DownloadFile is a test implementation of the Fetcher interface, which the
+// client may use to avoid making real HTTP requests. It returns the contents
+// of the metadata files and target files in the test repository.
+func (r *testRepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byte, error) {
 	u, err := url.Parse(urlPath)
 	if err != nil {
 		return []byte{}, err
@@ -223,7 +356,10 @@ func (r *testrepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 	return []byte{}, nil
 }
 
-func (r *testrepo) AddTarget(name string, content []byte) {
+// AddTarget adds a target file to the repository. It also creates a new
+// snapshot and timestamp metadata file, and signs them with the appropriate
+// key.
+func (r *testRepo) AddTarget(name string, content []byte) {
 	targetHash := sha256.Sum256(content)
 	localPath := filepath.Join(r.dir, metadata.TARGETS, fmt.Sprintf("%x.%s", targetHash, name))
 	err := os.WriteFile(localPath, content, 0600)
@@ -265,7 +401,19 @@ func (r *testrepo) AddTarget(name string, content []byte) {
 	}
 }
 
-// helperExpireIn returns time offset by days
-func helperExpireIn(days int) time.Time {
-	return time.Now().AddDate(0, 0, days).UTC()
+// SetTimestamp sets the expiration date of the timestamp metadata file to the
+// given date, and increments the version number. It then signs the metadata
+// file with the appropriate key.
+func (r *testRepo) SetTimestamp(date time.Time) {
+	r.roles.Timestamp().Signed.Expires = date
+	r.roles.Timestamp().Signed.Version++
+	signer, err := signature.LoadSigner(r.keys[metadata.TIMESTAMP], crypto.Hash(0))
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	r.roles.Timestamp().ClearSignatures()
+	_, err = r.roles.Timestamp().Sign(signer)
+	if err != nil {
+		r.t.Fatal(err)
+	}
 }

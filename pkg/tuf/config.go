@@ -45,7 +45,7 @@ func (c *Config) Persist(p string) error {
 	if err != nil {
 		return fmt.Errorf("failed to JSON marshal config: %w", err)
 	}
-	err = os.WriteFile(p, b, 0400) // Read only by current user
+	err = os.WriteFile(p, b, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
