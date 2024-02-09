@@ -334,15 +334,15 @@ func (r *testRepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 		re := regexp.MustCompile(`/targets/[0-9a-f]{64}\.(.*)$`)
 		matches := re.FindStringSubmatch(u.Path)
 		if len(matches) != 2 {
-			return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return nil, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		targetFile, ok := r.roles.Targets(metadata.TARGETS).Signed.Targets[matches[1]]
 		if !ok {
-			return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return nil, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		data, err := os.ReadFile(targetFile.Path)
 		if err != nil {
-			return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return nil, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		return data, nil
 	}
@@ -353,31 +353,31 @@ func (r *testRepo) DownloadFile(urlPath string, _ int64, _ time.Duration) ([]byt
 	re := regexp.MustCompile(`/(\d+)\.(root|snapshot|targets)\.json$`)
 	matches := re.FindStringSubmatch(u.Path)
 	if len(matches) != 3 {
-		return nil, metadata.ErrDownloadHTTP{StatusCode: 404}
+		return nil, &metadata.ErrDownloadHTTP{StatusCode: 404}
 	}
 	role := matches[2]
 	version, err := strconv.Atoi(matches[1])
 	if err != nil {
-		return []byte{}, metadata.ErrDownload{}
+		return []byte{}, &metadata.ErrDownload{}
 	}
 	switch role {
 	case metadata.ROOT:
 		// TODO: handle all versions of signed root
 		meta := r.roles.Root()
 		if meta.Signed.Version != int64(version) {
-			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return []byte{}, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		return meta.ToBytes(false)
 	case metadata.SNAPSHOT:
 		meta := r.roles.Snapshot()
 		if meta.Signed.Version != int64(version) {
-			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return []byte{}, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		return meta.ToBytes(false)
 	case metadata.TARGETS:
 		meta := r.roles.Targets(metadata.TARGETS)
 		if meta.Signed.Version != int64(version) {
-			return []byte{}, metadata.ErrDownloadHTTP{StatusCode: 404}
+			return []byte{}, &metadata.ErrDownloadHTTP{StatusCode: 404}
 		}
 		return meta.ToBytes(false)
 	}
