@@ -130,8 +130,8 @@ func (c *Client) configPath() string {
 }
 
 // Refresh forces a refresh of the underlying TUF client.
-// As the tuf client does not support multiple refreshes during its
-// life-time, this will replace the TUF client with a new one.
+// As the tuf client updater does not support multiple refreshes during
+// its life-time, this will replace the TUF client updater with a new one.
 func (c *Client) Refresh() error {
 	var err error
 
