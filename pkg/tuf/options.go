@@ -16,6 +16,7 @@ package tuf
 
 import (
 	"embed"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -25,11 +26,20 @@ import (
 //go:embed repository
 var embeddedRepo embed.FS
 
-const DefaultMirror = "https://tuf-repo-cdn.sigstore.dev"
+const (
+	DefaultMirror = "https://tuf-repo-cdn.sigstore.dev"
+
+	// The following caching values can be used for the CacheValidity option
+	NoCache  = 0
+	MaxCache = math.MaxInt
+)
 
 // Options represent the various options for a Sigstore TUF Client
 type Options struct {
-	// CacheValidity period in days (default 0)
+	// CacheValidity period in days (default 0). Note that the client will
+	// always refresh the cache if the metadata is expired, so this is not an
+	// optimal control for air-gapped environments. Use const MaxCache to only
+	// update the cache when the metadata is expired.
 	CacheValidity int
 	// ForceCache controls if the cache should be used without update
 	// as long as the metadata is valid
