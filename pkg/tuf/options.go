@@ -29,7 +29,7 @@ const DefaultMirror = "https://tuf-repo-cdn.sigstore.dev"
 
 // Options represent the various options for a Sigstore TUF Client
 type Options struct {
-	// CacheValidity period in days (default 1)
+	// CacheValidity period in days (default 0)
 	CacheValidity int
 	// ForceCache controls if the cache should be used without update
 	// as long as the metadata is valid
@@ -110,7 +110,6 @@ func DefaultOptions() *Options {
 		// Fall back to using a TUF repository in the temp location
 		home = os.TempDir()
 	}
-	opts.CacheValidity = 1
 	opts.CachePath = filepath.Join(home, ".sigstore", "root")
 	opts.RepositoryBaseURL = DefaultMirror
 
