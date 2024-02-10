@@ -20,11 +20,14 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
+	"sync"
 	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -255,4 +258,103 @@ func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error
 		return nil, err
 	}
 	return pbTrustedRoot, nil
+}
+
+// FetchTrustedRoot fetches the Sigstore trusted root from TUF and returns it.
+func FetchTrustedRoot() (*TrustedRoot, error) {
+	return FetchTrustedRootWithOptions(tuf.DefaultOptions())
+}
+
+// FetchTrustedRootWithOptions fetches the trusted root from TUF with the given options and returns it.
+func FetchTrustedRootWithOptions(opts *tuf.Options) (*TrustedRoot, error) {
+	client, err := tuf.New(opts)
+	if err != nil {
+		return nil, err
+	}
+	return GetTrustedRoot(client)
+}
+
+// GetTrustedRoot returns the trusted root
+func GetTrustedRoot(c *tuf.Client) (*TrustedRoot, error) {
+	jsonBytes, err := c.GetTarget("trusted_root.json")
+	if err != nil {
+		return nil, err
+	}
+	return NewTrustedRootFromJSON(jsonBytes)
+}
+
+// LiveTrustedRoot is a wrapper around TrustedRoot that periodically
+// refreshes the trusted root from TUF. This is needed for long-running
+// processes to ensure that the trusted root does not expire.
+type LiveTrustedRoot struct {
+	*TrustedRoot
+	mu sync.RWMutex
+}
+
+// NewLiveTrustedRoot returns a LiveTrustedRoot that will periodically
+// refresh the trusted root from TUF.
+func NewLiveTrustedRoot(opts *tuf.Options) (*LiveTrustedRoot, error) {
+	client, err := tuf.New(opts)
+	if err != nil {
+		return nil, err
+	}
+	tr, err := GetTrustedRoot(client)
+	if err != nil {
+		return nil, err
+	}
+	ltr := &LiveTrustedRoot{
+		TrustedRoot: tr,
+		mu:          sync.RWMutex{},
+	}
+	ticker := time.NewTicker(time.Hour * 24)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				client, err = tuf.New(opts)
+				if err != nil {
+					log.Printf("error creating TUF client: %v", err)
+				}
+				newTr, err := GetTrustedRoot(client)
+				if err != nil {
+					log.Printf("error fetching trusted root: %v", err)
+					continue
+				}
+				ltr.mu.Lock()
+				ltr.TrustedRoot = newTr
+				ltr.mu.Unlock()
+			}
+		}
+	}()
+	return ltr, nil
+}
+
+func (l *LiveTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.TrustedRoot.TSACertificateAuthorities()
+}
+
+func (l *LiveTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.TrustedRoot.FulcioCertificateAuthorities()
+}
+
+func (l *LiveTrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.TrustedRoot.TlogAuthorities()
+}
+
+func (l *LiveTrustedRoot) CTlogAuthorities() map[string]*TlogAuthority {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.TrustedRoot.CTlogAuthorities()
+}
+
+func (l *LiveTrustedRoot) PublicKeyVerifier(keyID string) (TimeConstrainedVerifier, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.TrustedRoot.PublicKeyVerifier(keyID)
 }

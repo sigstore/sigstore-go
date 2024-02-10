@@ -45,6 +45,7 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return errors.New("artifact must be provided to verify message signature")
 	}
+
 	// handle an invalid signature content message
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
@@ -63,6 +64,7 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return verifyMessageSignature(verifier, msg, artifact)
 	}
+
 	// handle an invalid signature content message
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
@@ -81,6 +83,7 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
 	}
+
 	// handle an invalid signature content message
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
@@ -92,6 +95,7 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 	} else if pk, ok := verificationContent.HasPublicKey(); ok {
 		return tm.PublicKeyVerifier(pk.Hint())
 	}
+
 	return nil, fmt.Errorf("no public key or certificate found")
 }
 

@@ -47,7 +47,7 @@ var onlineTlog *bool
 var trustedPublicKey *string
 var trustedrootJSONpath *string
 var tufRootURL *string
-var tufDirectory *string
+var tufTrustedRoot *string
 
 func init() {
 	artifact = flag.String("artifact", "", "Path to artifact to verify")
@@ -63,7 +63,7 @@ func init() {
 	trustedPublicKey = flag.String("publicKey", "", "Path to trusted public key")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
-	tufDirectory = flag.String("tufDirectory", "tufdata", "Directory to store TUF metadata")
+	tufTrustedRoot = flag.String("tufTrustedRoot", "", "Path to the trusted TUF root.json to bootstrap trust in the remote TUF repository")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		usage()
@@ -120,20 +120,41 @@ func run() error {
 	identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
-	var trustedrootJSON []byte
+	var trustedRootJSON []byte
 
 	if *tufRootURL != "" {
-		trustedrootJSON, err = tuf.GetTrustedrootJSON(*tufRootURL, *tufDirectory)
+		opts := tuf.DefaultOptions()
+		opts.RepositoryBaseURL = *tufRootURL
+
+		// Load the tuf root.json if provided, if not use public good
+		if *tufTrustedRoot != "" {
+			rb, err := os.ReadFile(*tufTrustedRoot)
+			if err != nil {
+				return fmt.Errorf("failed to read %s: %w",
+					*tufTrustedRoot, err)
+			}
+			opts.Root = rb
+		}
+
+		client, err := tuf.New(opts)
+		if err != nil {
+			return err
+		}
+		trustedRootJSON, err = client.GetTarget("trusted_root.json")
+		if err != nil {
+			return err
+		}
 	} else if *trustedrootJSONpath != "" {
-		trustedrootJSON, err = os.ReadFile(*trustedrootJSONpath)
-	}
-	if err != nil {
-		return err
+		trustedRootJSON, err = os.ReadFile(*trustedrootJSONpath)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w",
+				*trustedrootJSONpath, err)
+		}
 	}
 
-	if len(trustedrootJSON) > 0 {
+	if len(trustedRootJSON) > 0 {
 		var trustedRoot *root.TrustedRoot
-		trustedRoot, err = root.NewTrustedRootFromJSON(trustedrootJSON)
+		trustedRoot, err = root.NewTrustedRootFromJSON(trustedRootJSON)
 		if err != nil {
 			return err
 		}

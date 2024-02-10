@@ -142,20 +142,29 @@ func run() error {
 	}
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
-	var trustedrootJSON []byte
+	var trustedRootJSON []byte
 
 	if *tufRootURL != "" {
-		trustedrootJSON, err = tuf.GetTrustedrootJSON(*tufRootURL, *tufDirectory)
+		opts := tuf.DefaultOptions()
+		opts.RepositoryBaseURL = *tufRootURL
+		client, err := tuf.New(opts)
+		if err != nil {
+			return err
+		}
+		trustedRootJSON, err = client.GetTarget("trusted_root.json")
+		if err != nil {
+			return err
+		}
 	} else if *trustedrootJSONpath != "" {
-		trustedrootJSON, err = os.ReadFile(*trustedrootJSONpath)
+		trustedRootJSON, err = os.ReadFile(*trustedrootJSONpath)
 	}
 	if err != nil {
 		return err
 	}
 
-	if len(trustedrootJSON) > 0 {
+	if len(trustedRootJSON) > 0 {
 		var trustedRoot *root.TrustedRoot
-		trustedRoot, err = root.NewTrustedRootFromJSON(trustedrootJSON)
+		trustedRoot, err = root.NewTrustedRootFromJSON(trustedRootJSON)
 		if err != nil {
 			return err
 		}

@@ -57,10 +57,16 @@ func getTrustedRoot() root.TrustedMaterial {
 		if !ok {
 			log.Fatal("unable to get path")
 		}
-
-		tufDir := path.Join(path.Dir(filename), "tufdata")
-
-		trustedRootJSON, err = tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", tufDir)
+		opts := tuf.DefaultOptions()
+		opts.CachePath = path.Join(path.Dir(filename), "tufdata")
+		client, err := tuf.New(opts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		trustedRootJSON, err = client.GetTarget("trusted_root.json")
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if err != nil {

@@ -1,5 +1,6 @@
 .idea
 .DS_Store
+*~
 /sigstore-go
 /tufdata
 /conformance

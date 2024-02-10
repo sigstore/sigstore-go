@@ -272,6 +272,8 @@ github.com/sigstore/sigstore/pkg/signature/kms/hashivault v1.8.1 h1:9Ki0qudKpc1F
 github.com/sigstore/sigstore/pkg/signature/kms/hashivault v1.8.1/go.mod h1:nhIgyu4YwwNgalIwTGsoAzam16jjAn3ADRSWKbWPwGI=
 github.com/sigstore/timestamp-authority v1.2.1 h1:j9RmqSAdvKgSofeltPO4x7d+1M3AXaROBzUJ+AA7L5Q=
 github.com/sigstore/timestamp-authority v1.2.1/go.mod h1:Ce+vWWEf0QaKLY2u6mpwEJbmYXEVeOfUk4fQ69kE6ck=
+github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
+github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
 github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
@@ -297,6 +299,8 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/theupdateframework/go-tuf v0.7.0 h1:CqbQFrWo1ae3/I0UCblSbczevCCbS31Qvs5LdxRWqRI=
 github.com/theupdateframework/go-tuf v0.7.0/go.mod h1:uEB7WSY+7ZIugK6R1hiBMBjQftaFzn7ZCDJcp1tCUug=
+github.com/theupdateframework/go-tuf/v2 v2.0.0-20240207172116-f5cf71290141 h1:SsiWxSpJ9AD71/vqiZVUjXW1Uusv1wlKn4zPKFNq25w=
+github.com/theupdateframework/go-tuf/v2 v2.0.0-20240207172116-f5cf71290141/go.mod h1:D7dcS4bZMmF3pXOgUo8Vs6GLYM9sdrFFd37JqiP3hN4=
 github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 h1:e/5i7d4oYZ+C1wj2THlRK+oAhjeS/TRQwMfkIuet3w0=
 github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399/go.mod h1:LdwHTNJT99C5fTAzDz0ud328OgXz+gierycbcIx2fRs=
 github.com/transparency-dev/merkle v0.0.2 h1:Q9nBoQcZcgPamMkGn7ghV8XiTZ/kRxn1yCG81+twTK4=
