@@ -179,6 +179,7 @@ func (c *Client) GetTarget(target string) ([]byte, error) {
 	// Download of target is needed
 	// Ignore targetsBaseURL, set to empty string
 	const targetsBaseURL = ""
+	panic(fmt.Sprintf("target info path: %+v", ti.Path))
 	_, tb, err = c.up.DownloadTarget(ti, filePath, targetsBaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download target file %s - %w", target, err)
