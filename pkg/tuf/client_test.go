@@ -204,9 +204,7 @@ func TestExpiredTimestamp(t *testing.T) {
 	// Using ForceCache, so we should get the old version
 	assert.Equal(t, target, []byte("foo version 1"))
 
-	expTime := time.Now().Add(-1 * time.Second)
-	r.SetTimestamp(expTime)
-	fmt.Printf("Set expiration to %s\n", expTime)
+	r.SetTimestamp(time.Now().Add(-1 * time.Second))
 
 	// Manually write timestamp to disk, as Refresh() will fail
 	err = r.roles.Timestamp().ToFile(filepath.Join(opt.CachePath, "testing.local", "timestamp.json"), false)
@@ -214,7 +212,6 @@ func TestExpiredTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("Time is now: %s\n", time.Now())
 	// Client creation should fail as the timestamp is expired and the repository has an expired timestamp
 	c, err = New(opt)
 	assert.Nil(t, c)
