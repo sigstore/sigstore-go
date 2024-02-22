@@ -204,7 +204,7 @@ func TestExpiredTimestamp(t *testing.T) {
 	// Using ForceCache, so we should get the old version
 	assert.Equal(t, target, []byte("foo version 1"))
 
-	r.SetTimestamp(time.Now())
+	r.SetTimestamp(time.Now().Add(-1 * time.Second))
 
 	// Manually write timestamp to disk, as Refresh() will fail
 	err = r.roles.Timestamp().ToFile(filepath.Join(opt.CachePath, "testing.local", "timestamp.json"), false)
