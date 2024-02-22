@@ -128,7 +128,9 @@ func DefaultOptions() *Options {
 
 // DefaultRoot returns the root.json for the public good instance
 func DefaultRoot() []byte {
-	var p = filepath.Join("repository", "root.json")
+	// The embed file system always uses forward slashes as path separators,
+	// even on Windows
+	p := "repository/root.json"
 
 	b, err := embeddedRepo.ReadFile(p)
 	if err != nil {
