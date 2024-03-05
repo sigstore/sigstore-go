@@ -298,6 +298,8 @@ github.com/theupdateframework/go-tuf v0.7.0 h1:CqbQFrWo1ae3/I0UCblSbczevCCbS31Qv
 github.com/theupdateframework/go-tuf v0.7.0/go.mod h1:uEB7WSY+7ZIugK6R1hiBMBjQftaFzn7ZCDJcp1tCUug=
 github.com/theupdateframework/go-tuf/v2 v2.0.0-20240222081530-454b12158917 h1:Ov8+IAeR7pivNDC0Cd25MyyaCR3WPlGBED4wNxIFQ8s=
 github.com/theupdateframework/go-tuf/v2 v2.0.0-20240222081530-454b12158917/go.mod h1:+gWwqe1pk4nvGeOKosGJqPgD+N/kbD9M0QVLL9TGIYU=
+github.com/theupdateframework/go-tuf/v2 v2.0.0-20240223092044-1e7978e83f63 h1:27XWhDZHPD+cufF6qSdYx6PgGQvD2jJ6pq9sDvR6VBk=
+github.com/theupdateframework/go-tuf/v2 v2.0.0-20240223092044-1e7978e83f63/go.mod h1:+gWwqe1pk4nvGeOKosGJqPgD+N/kbD9M0QVLL9TGIYU=
 github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 h1:e/5i7d4oYZ+C1wj2THlRK+oAhjeS/TRQwMfkIuet3w0=
 github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399/go.mod h1:LdwHTNJT99C5fTAzDz0ud328OgXz+gierycbcIx2fRs=
 github.com/transparency-dev/merkle v0.0.2 h1:Q9nBoQcZcgPamMkGn7ghV8XiTZ/kRxn1yCG81+twTK4=

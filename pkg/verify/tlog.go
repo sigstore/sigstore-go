@@ -82,7 +82,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				return nil, fmt.Errorf("entry must contain an inclusion proof and/or promise")
 			}
 			if entry.HasInclusionPromise() {
-				err = tlog.VerifySET(entry, trustedMaterial.TlogAuthorities())
+				err = tlog.VerifySET(entry, trustedMaterial.RekorLogs())
 				if err != nil {
 					// skip entries the trust root cannot verify
 					continue
@@ -94,7 +94,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 			if entity.HasInclusionProof() {
 				keyID := entry.LogKeyID()
 				hex64Key := hex.EncodeToString([]byte(keyID))
-				tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
+				tlogVerifier, ok := trustedMaterial.RekorLogs()[hex64Key]
 				if !ok {
 					// skip entries the trust root cannot verify
 					continue
@@ -114,7 +114,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		} else {
 			keyID := entry.LogKeyID()
 			hex64Key := hex.EncodeToString([]byte(keyID))
-			tlogVerifier, ok := trustedMaterial.TlogAuthorities()[hex64Key]
+			tlogVerifier, ok := trustedMaterial.RekorLogs()[hex64Key]
 			if !ok {
 				// skip entries the trust root cannot verify
 				continue

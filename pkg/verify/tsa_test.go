@@ -140,7 +140,7 @@ type customTSAChainTrustedMaterial struct {
 	tsaChain []root.CertificateAuthority
 }
 
-func (i *customTSAChainTrustedMaterial) TSACertificateAuthorities() []root.CertificateAuthority {
+func (i *customTSAChainTrustedMaterial) TimestampingAuthorities() []root.CertificateAuthority {
 	return i.tsaChain
 }
 
@@ -151,8 +151,8 @@ func TestBadTSACertificateChain(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	ca1 := virtualSigstore.TSACertificateAuthorities()[0]
-	ca2 := virtualSigstore2.TSACertificateAuthorities()[0]
+	ca1 := virtualSigstore.TimestampingAuthorities()[0]
+	ca2 := virtualSigstore2.TimestampingAuthorities()[0]
 	badChain := root.CertificateAuthority{
 		Root:                ca2.Root,
 		Intermediates:       ca2.Intermediates,
@@ -172,7 +172,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	ca := virtualSigstore.TSACertificateAuthorities()[0]
+	ca := virtualSigstore.TimestampingAuthorities()[0]
 
 	for _, test := range []struct {
 		name string

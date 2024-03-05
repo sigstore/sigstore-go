@@ -256,7 +256,7 @@ func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {
 	return nil
 }
 
-func VerifySET(entry *Entry, verifiers map[string]*root.TlogAuthority) error {
+func VerifySET(entry *Entry, verifiers map[string]*root.TransparencyLog) error {
 	rekorPayload := RekorPayload{
 		Body:           entry.logEntryAnon.Body,
 		IntegratedTime: *entry.logEntryAnon.IntegratedTime,

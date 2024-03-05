@@ -87,7 +87,7 @@ func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial 
 }
 
 func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent VerificationContent) (time.Time, error) {
-	certAuthorities := trustedMaterial.TSACertificateAuthorities()
+	certAuthorities := trustedMaterial.TimestampingAuthorities()
 
 	// Iterate through TSA certificate authorities to find one that verifies
 	for _, ca := range certAuthorities {
