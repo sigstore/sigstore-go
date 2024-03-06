@@ -84,7 +84,7 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 	}
 
 	trustedRoot = &TrustedRoot{trustedRoot: protobufTrustedRoot}
-	trustedRoot.rekorLogs, err = ParseRekorLogs(protobufTrustedRoot.GetTlogs())
+	trustedRoot.rekorLogs, err = ParseTransparencyLogs(protobufTrustedRoot.GetTlogs())
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 		return nil, err
 	}
 
-	trustedRoot.ctLogs, err = ParseRekorLogs(protobufTrustedRoot.GetCtlogs())
+	trustedRoot.ctLogs, err = ParseTransparencyLogs(protobufTrustedRoot.GetCtlogs())
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +107,8 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 	return trustedRoot, nil
 }
 
-func ParseRekorLogs(tlogs []*prototrustroot.TransparencyLogInstance) (rekorLogs map[string]*TransparencyLog, err error) {
-	rekorLogs = make(map[string]*TransparencyLog)
+func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (transparencyLogs map[string]*TransparencyLog, err error) {
+	transparencyLogs = make(map[string]*TransparencyLog)
 	for _, tlog := range tlogs {
 		if tlog.GetHashAlgorithm() != protocommon.HashAlgorithm_SHA2_256 {
 			return nil, fmt.Errorf("unsupported tlog hash algorithm: %s", tlog.GetHashAlgorithm())
@@ -147,7 +147,7 @@ func ParseRekorLogs(tlogs []*prototrustroot.TransparencyLogInstance) (rekorLogs 
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
 				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
 			}
-			rekorLogs[encodedKeyID] = &TransparencyLog{
+			transparencyLogs[encodedKeyID] = &TransparencyLog{
 				BaseURL:           tlog.GetBaseUrl(),
 				ID:                tlog.GetLogId().GetKeyId(),
 				HashFunc:          hashFunc,
@@ -156,12 +156,12 @@ func ParseRekorLogs(tlogs []*prototrustroot.TransparencyLogInstance) (rekorLogs 
 			}
 			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 				if validFor.GetStart() != nil {
-					rekorLogs[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
+					transparencyLogs[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
 				} else {
 					return nil, fmt.Errorf("tlog missing public key validity period start time")
 				}
 				if validFor.GetEnd() != nil {
-					rekorLogs[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
+					transparencyLogs[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
 				}
 			} else {
 				return nil, fmt.Errorf("tlog missing public key validity period")
@@ -170,7 +170,7 @@ func ParseRekorLogs(tlogs []*prototrustroot.TransparencyLogInstance) (rekorLogs 
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
 	}
-	return rekorLogs, nil
+	return transparencyLogs, nil
 }
 
 func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (certificateAuthorities []CertificateAuthority, err error) {
