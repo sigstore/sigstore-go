@@ -118,7 +118,7 @@ func WithOnlineVerification() VerifierOption {
 
 // WithSignedTimestamps configures the SignedEntityVerifier to expect RFC 3161
 // timestamps from a Timestamp Authority, verify them using the TrustedMaterial's
-// TSACertificateAuthorities(), and, if it exists, use the resulting timestamp(s)
+// TimestampingAuthorities(), and, if it exists, use the resulting timestamp(s)
 // to verify the Fulcio certificate.
 func WithSignedTimestamps(threshold int) VerifierOption {
 	return func(c *VerifierConfig) error {
@@ -134,7 +134,7 @@ func WithSignedTimestamps(threshold int) VerifierOption {
 // WithObserverTimestamps configures the SignedEntityVerifier to expect
 // timestamps from either an RFC3161 timestamp authority or a log's
 // SignedEntryTimestamp. These are verified using the TrustedMaterial's
-// TSACertificateAuthorities() or TlogAuthorities(), and used to verify
+// TimestampingAuthorities() or RekorLogs(), and used to verify
 // the Fulcio certificate.
 func WithObserverTimestamps(threshold int) VerifierOption {
 	return func(c *VerifierConfig) error {
@@ -149,7 +149,7 @@ func WithObserverTimestamps(threshold int) VerifierOption {
 
 // WithTransparencyLog configures the SignedEntityVerifier to expect
 // Transparency Log inclusion proofs or SignedEntryTimestamps, verifying them
-// using the TrustedMaterial's TlogAuthorities().
+// using the TrustedMaterial's RekorLogs().
 func WithTransparencyLog(threshold int) VerifierOption {
 	return func(c *VerifierConfig) error {
 		if threshold < 1 {

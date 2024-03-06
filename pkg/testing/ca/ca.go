@@ -426,7 +426,7 @@ func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey 
 	return tsTemplate.CreateResponseWithOpts(tsaCert, tsaKey, hash)
 }
 
-func (ca *VirtualSigstore) TSACertificateAuthorities() []root.CertificateAuthority {
+func (ca *VirtualSigstore) TimestampingAuthorities() []root.CertificateAuthority {
 	return []root.CertificateAuthority{ca.tsaCA}
 }
 
@@ -434,13 +434,13 @@ func (ca *VirtualSigstore) FulcioCertificateAuthorities() []root.CertificateAuth
 	return []root.CertificateAuthority{ca.fulcioCA}
 }
 
-func (ca *VirtualSigstore) TlogAuthorities() map[string]*root.TlogAuthority {
-	verifiers := make(map[string]*root.TlogAuthority)
+func (ca *VirtualSigstore) RekorLogs() map[string]*root.TransparencyLog {
+	verifiers := make(map[string]*root.TransparencyLog)
 	logID, err := getLogID(ca.rekorKey.Public())
 	if err != nil {
 		panic(err)
 	}
-	verifiers[logID] = &root.TlogAuthority{
+	verifiers[logID] = &root.TransparencyLog{
 		BaseURL:             "test",
 		ID:                  []byte(logID),
 		ValidityPeriodStart: time.Now().Add(-time.Hour),
@@ -451,13 +451,13 @@ func (ca *VirtualSigstore) TlogAuthorities() map[string]*root.TlogAuthority {
 	return verifiers
 }
 
-func (ca *VirtualSigstore) CTlogAuthorities() map[string]*root.TlogAuthority {
-	verifiers := make(map[string]*root.TlogAuthority)
+func (ca *VirtualSigstore) CTLogs() map[string]*root.TransparencyLog {
+	verifiers := make(map[string]*root.TransparencyLog)
 	logID, err := getLogID(ca.ctlogKey.Public())
 	if err != nil {
 		panic(err)
 	}
-	verifiers[logID] = &root.TlogAuthority{
+	verifiers[logID] = &root.TransparencyLog{
 		BaseURL:             "test",
 		ID:                  []byte(logID),
 		ValidityPeriodStart: time.Now().Add(-time.Hour),

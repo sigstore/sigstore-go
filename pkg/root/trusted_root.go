@@ -35,11 +35,11 @@ const TrustedRootMediaType01 = "application/vnd.dev.sigstore.trustedroot+json;ve
 
 type TrustedRoot struct {
 	BaseTrustedMaterial
-	trustedRoot           *prototrustroot.TrustedRoot
-	tlogAuthorities       map[string]*TlogAuthority
-	fulcioCertAuthorities []CertificateAuthority
-	ctLogAuthorities      map[string]*TlogAuthority
-	tsaCertAuthorities    []CertificateAuthority
+	trustedRoot             *prototrustroot.TrustedRoot
+	rekorLogs               map[string]*TransparencyLog
+	fulcioCertAuthorities   []CertificateAuthority
+	ctLogs                  map[string]*TransparencyLog
+	timestampingAuthorities []CertificateAuthority
 }
 
 type CertificateAuthority struct {
@@ -50,7 +50,7 @@ type CertificateAuthority struct {
 	ValidityPeriodEnd   time.Time
 }
 
-type TlogAuthority struct {
+type TransparencyLog struct {
 	BaseURL             string
 	ID                  []byte
 	ValidityPeriodStart time.Time
@@ -62,20 +62,20 @@ type TlogAuthority struct {
 	SignatureHashFunc crypto.Hash
 }
 
-func (tr *TrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
-	return tr.tsaCertAuthorities
+func (tr *TrustedRoot) TimestampingAuthorities() []CertificateAuthority {
+	return tr.timestampingAuthorities
 }
 
 func (tr *TrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
 	return tr.fulcioCertAuthorities
 }
 
-func (tr *TrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
-	return tr.tlogAuthorities
+func (tr *TrustedRoot) RekorLogs() map[string]*TransparencyLog {
+	return tr.rekorLogs
 }
 
-func (tr *TrustedRoot) CTlogAuthorities() map[string]*TlogAuthority {
-	return tr.ctLogAuthorities
+func (tr *TrustedRoot) CTLogs() map[string]*TransparencyLog {
+	return tr.ctLogs
 }
 
 func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot) (trustedRoot *TrustedRoot, err error) {
@@ -84,7 +84,7 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 	}
 
 	trustedRoot = &TrustedRoot{trustedRoot: protobufTrustedRoot}
-	trustedRoot.tlogAuthorities, err = ParseTlogAuthorities(protobufTrustedRoot.GetTlogs())
+	trustedRoot.rekorLogs, err = ParseTransparencyLogs(protobufTrustedRoot.GetTlogs())
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +94,12 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 		return nil, err
 	}
 
-	trustedRoot.tsaCertAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetTimestampAuthorities())
+	trustedRoot.timestampingAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetTimestampAuthorities())
 	if err != nil {
 		return nil, err
 	}
 
-	trustedRoot.ctLogAuthorities, err = ParseTlogAuthorities(protobufTrustedRoot.GetCtlogs())
+	trustedRoot.ctLogs, err = ParseTransparencyLogs(protobufTrustedRoot.GetCtlogs())
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +107,8 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 	return trustedRoot, nil
 }
 
-func ParseTlogAuthorities(tlogs []*prototrustroot.TransparencyLogInstance) (tlogAuthorities map[string]*TlogAuthority, err error) {
-	tlogAuthorities = make(map[string]*TlogAuthority)
+func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (transparencyLogs map[string]*TransparencyLog, err error) {
+	transparencyLogs = make(map[string]*TransparencyLog)
 	for _, tlog := range tlogs {
 		if tlog.GetHashAlgorithm() != protocommon.HashAlgorithm_SHA2_256 {
 			return nil, fmt.Errorf("unsupported tlog hash algorithm: %s", tlog.GetHashAlgorithm())
@@ -147,7 +147,7 @@ func ParseTlogAuthorities(tlogs []*prototrustroot.TransparencyLogInstance) (tlog
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
 				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
 			}
-			tlogAuthorities[encodedKeyID] = &TlogAuthority{
+			transparencyLogs[encodedKeyID] = &TransparencyLog{
 				BaseURL:           tlog.GetBaseUrl(),
 				ID:                tlog.GetLogId().GetKeyId(),
 				HashFunc:          hashFunc,
@@ -156,12 +156,12 @@ func ParseTlogAuthorities(tlogs []*prototrustroot.TransparencyLogInstance) (tlog
 			}
 			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 				if validFor.GetStart() != nil {
-					tlogAuthorities[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
+					transparencyLogs[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
 				} else {
 					return nil, fmt.Errorf("tlog missing public key validity period start time")
 				}
 				if validFor.GetEnd() != nil {
-					tlogAuthorities[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
+					transparencyLogs[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
 				}
 			} else {
 				return nil, fmt.Errorf("tlog missing public key validity period")
@@ -170,7 +170,7 @@ func ParseTlogAuthorities(tlogs []*prototrustroot.TransparencyLogInstance) (tlog
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
 	}
-	return tlogAuthorities, nil
+	return transparencyLogs, nil
 }
 
 func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (certificateAuthorities []CertificateAuthority, err error) {
@@ -329,10 +329,10 @@ func NewLiveTrustedRoot(opts *tuf.Options) (*LiveTrustedRoot, error) {
 	return ltr, nil
 }
 
-func (l *LiveTrustedRoot) TSACertificateAuthorities() []CertificateAuthority {
+func (l *LiveTrustedRoot) TimestampingAuthorities() []CertificateAuthority {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	return l.TrustedRoot.TSACertificateAuthorities()
+	return l.TrustedRoot.TimestampingAuthorities()
 }
 
 func (l *LiveTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
@@ -341,16 +341,16 @@ func (l *LiveTrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority 
 	return l.TrustedRoot.FulcioCertificateAuthorities()
 }
 
-func (l *LiveTrustedRoot) TlogAuthorities() map[string]*TlogAuthority {
+func (l *LiveTrustedRoot) RekorLogs() map[string]*TransparencyLog {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	return l.TrustedRoot.TlogAuthorities()
+	return l.TrustedRoot.RekorLogs()
 }
 
-func (l *LiveTrustedRoot) CTlogAuthorities() map[string]*TlogAuthority {
+func (l *LiveTrustedRoot) CTLogs() map[string]*TransparencyLog {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	return l.TrustedRoot.CTlogAuthorities()
+	return l.TrustedRoot.CTLogs()
 }
 
 func (l *LiveTrustedRoot) PublicKeyVerifier(keyID string) (TimeConstrainedVerifier, error) {

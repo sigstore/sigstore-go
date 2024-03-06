@@ -22,16 +22,16 @@ import (
 )
 
 type TrustedMaterial interface {
-	TSACertificateAuthorities() []CertificateAuthority
+	TimestampingAuthorities() []CertificateAuthority
 	FulcioCertificateAuthorities() []CertificateAuthority
-	TlogAuthorities() map[string]*TlogAuthority
-	CTlogAuthorities() map[string]*TlogAuthority
+	RekorLogs() map[string]*TransparencyLog
+	CTLogs() map[string]*TransparencyLog
 	PublicKeyVerifier(string) (TimeConstrainedVerifier, error)
 }
 
 type BaseTrustedMaterial struct{}
 
-func (b *BaseTrustedMaterial) TSACertificateAuthorities() []CertificateAuthority {
+func (b *BaseTrustedMaterial) TimestampingAuthorities() []CertificateAuthority {
 	return []CertificateAuthority{}
 }
 
@@ -39,12 +39,12 @@ func (b *BaseTrustedMaterial) FulcioCertificateAuthorities() []CertificateAuthor
 	return []CertificateAuthority{}
 }
 
-func (b *BaseTrustedMaterial) TlogAuthorities() map[string]*TlogAuthority {
-	return map[string]*TlogAuthority{}
+func (b *BaseTrustedMaterial) RekorLogs() map[string]*TransparencyLog {
+	return map[string]*TransparencyLog{}
 }
 
-func (b *BaseTrustedMaterial) CTlogAuthorities() map[string]*TlogAuthority {
-	return map[string]*TlogAuthority{}
+func (b *BaseTrustedMaterial) CTLogs() map[string]*TransparencyLog {
+	return map[string]*TransparencyLog{}
 }
 
 func (b *BaseTrustedMaterial) PublicKeyVerifier(_ string) (TimeConstrainedVerifier, error) {
@@ -67,10 +67,10 @@ func (tmc TrustedMaterialCollection) PublicKeyVerifier(keyID string) (TimeConstr
 	return nil, fmt.Errorf("public key verifier not found for keyID: %s", keyID)
 }
 
-func (tmc TrustedMaterialCollection) TSACertificateAuthorities() []CertificateAuthority {
+func (tmc TrustedMaterialCollection) TimestampingAuthorities() []CertificateAuthority {
 	var certAuthorities []CertificateAuthority
 	for _, tm := range tmc {
-		certAuthorities = append(certAuthorities, tm.TSACertificateAuthorities()...)
+		certAuthorities = append(certAuthorities, tm.TimestampingAuthorities()...)
 	}
 	return certAuthorities
 }
@@ -83,24 +83,24 @@ func (tmc TrustedMaterialCollection) FulcioCertificateAuthorities() []Certificat
 	return certAuthorities
 }
 
-func (tmc TrustedMaterialCollection) TlogAuthorities() map[string]*TlogAuthority {
-	tlogAuthorities := make(map[string]*TlogAuthority)
+func (tmc TrustedMaterialCollection) RekorLogs() map[string]*TransparencyLog {
+	rekorLogs := make(map[string]*TransparencyLog)
 	for _, tm := range tmc {
-		for keyID, tlogVerifier := range tm.TlogAuthorities() {
-			tlogAuthorities[keyID] = tlogVerifier
+		for keyID, tlogVerifier := range tm.RekorLogs() {
+			rekorLogs[keyID] = tlogVerifier
 		}
 	}
-	return tlogAuthorities
+	return rekorLogs
 }
 
-func (tmc TrustedMaterialCollection) CTlogAuthorities() map[string]*TlogAuthority {
-	tlogAuthorities := make(map[string]*TlogAuthority)
+func (tmc TrustedMaterialCollection) CTLogs() map[string]*TransparencyLog {
+	rekorLogs := make(map[string]*TransparencyLog)
 	for _, tm := range tmc {
-		for keyID, tlogVerifier := range tm.CTlogAuthorities() {
-			tlogAuthorities[keyID] = tlogVerifier
+		for keyID, tlogVerifier := range tm.CTLogs() {
+			rekorLogs[keyID] = tlogVerifier
 		}
 	}
-	return tlogAuthorities
+	return rekorLogs
 }
 
 type ValidityPeriodChecker interface {

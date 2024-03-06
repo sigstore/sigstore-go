@@ -237,12 +237,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		if len(tr.TSACertificateAuthorities()) > 0 && len(bundleTimestamps) > 0 {
+		if len(tr.TimestampingAuthorities()) > 0 && len(bundleTimestamps) > 0 {
 			verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
 		}
 
 		// Check bundle and trusted root for Tlog information
-		if len(tr.TlogAuthorities()) > 0 && b.HasInclusionPromise() {
+		if len(tr.RekorLogs()) > 0 && b.HasInclusionPromise() {
 			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 		}
 
