@@ -17,7 +17,7 @@ require (
 	github.com/sigstore/timestamp-authority v1.2.2
 	github.com/stretchr/testify v1.9.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.0-20240223092044-1e7978e83f63
-	golang.org/x/crypto v0.20.0
+	golang.org/x/crypto v0.21.0
 	golang.org/x/mod v0.15.0
 	google.golang.org/protobuf v1.32.0
 )
@@ -79,8 +79,8 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
-	golang.org/x/term v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20240116215550-a9fa1716bcac // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
