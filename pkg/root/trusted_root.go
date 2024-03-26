@@ -154,20 +154,33 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 				PublicKey:         ecKey,
 				SignatureHashFunc: crypto.SHA256,
 			}
-			if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
-				if validFor.GetStart() != nil {
-					transparencyLogs[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
-				} else {
-					return nil, fmt.Errorf("tlog missing public key validity period start time")
-				}
-				if validFor.GetEnd() != nil {
-					transparencyLogs[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
-				}
-			} else {
-				return nil, fmt.Errorf("tlog missing public key validity period")
+		case protocommon.PublicKeyDetails_PKCS1_RSA_PKCS1V5:
+			key, err := x509.ParsePKCS1PublicKey(tlog.GetPublicKey().GetRawBytes())
+			if err != nil {
+				return nil, err
+			}
+			transparencyLogs[encodedKeyID] = &TransparencyLog{
+				BaseURL:           tlog.GetBaseUrl(),
+				ID:                tlog.GetLogId().GetKeyId(),
+				HashFunc:          hashFunc,
+				PublicKey:         key,
+				SignatureHashFunc: crypto.SHA256,
 			}
 		default:
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
+		}
+
+		if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
+			if validFor.GetStart() != nil {
+				transparencyLogs[encodedKeyID].ValidityPeriodStart = validFor.GetStart().AsTime()
+			} else {
+				return nil, fmt.Errorf("tlog missing public key validity period start time")
+			}
+			if validFor.GetEnd() != nil {
+				transparencyLogs[encodedKeyID].ValidityPeriodEnd = validFor.GetEnd().AsTime()
+			}
+		} else {
+			return nil, fmt.Errorf("tlog missing public key validity period")
 		}
 	}
 	return transparencyLogs, nil

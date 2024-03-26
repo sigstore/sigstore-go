@@ -42,11 +42,11 @@ var trustedRootPath *string
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] FILE\n", os.Args[0])
-	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] FILE\n", os.Args[0])
+	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
+	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 }
 
-func getTrustedRoot() root.TrustedMaterial {
+func getTrustedRoot(staging bool) root.TrustedMaterial {
 	var trustedRootJSON []byte
 	var err error
 
@@ -59,6 +59,18 @@ func getTrustedRoot() root.TrustedMaterial {
 		}
 		opts := tuf.DefaultOptions()
 		opts.CachePath = path.Join(path.Dir(filename), "tufdata")
+
+		if staging {
+			rootPath := path.Join(opts.CachePath, "tuf-repo-cdn.sigstage.dev", "root.json")
+			rootJSON, err := os.ReadFile(rootPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			opts.Root = rootJSON
+			opts.RepositoryBaseURL = "https://tuf-repo-cdn.sigstage.dev"
+		}
+
 		client, err := tuf.New(opts)
 		if err != nil {
 			log.Fatal(err)
@@ -87,6 +99,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	staging := false
+
 	switch os.Args[1] {
 	case "verify":
 		for i := 2; i < len(os.Args); i += 2 {
@@ -101,6 +115,8 @@ func main() {
 				signaturePath = &os.Args[i+1]
 			case "--trusted-root":
 				trustedRootPath = &os.Args[i+1]
+			case "--staging":
+				staging = true
 			}
 		}
 
@@ -169,7 +185,7 @@ func main() {
 		}
 
 		// Load trust root
-		tr := getTrustedRoot()
+		tr := getTrustedRoot(staging)
 
 		// Verify bundle
 		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
@@ -197,6 +213,8 @@ func main() {
 				certSAN = &os.Args[i+1]
 			case "--trusted-root":
 				trustedRootPath = &os.Args[i+1]
+			case "--staging":
+				staging = true
 			}
 		}
 
@@ -225,7 +243,7 @@ func main() {
 		}
 
 		// Load trust root
-		tr := getTrustedRoot()
+		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
 		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
