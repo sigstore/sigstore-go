@@ -187,8 +187,14 @@ func main() {
 		// Load trust root
 		tr := getTrustedRoot(staging)
 
+		verifierConfig := []verify.VerifierOption{}
+		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsInsecure(), verify.WithSignedCertificateTimestamps(1))
+		if len(tr.RekorLogs()) > 0 {
+			verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
+		}
+
 		// Verify bundle
-		sev, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsInsecure())
+		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}
