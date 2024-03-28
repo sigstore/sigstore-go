@@ -88,9 +88,10 @@ func (b *ProtobufBundle) validate() error {
 			return errors.New("inclusion proof missing in bundle (required for bundle v0.2)")
 		}
 	case SigstoreBundleMediaType03:
-		cert := b.Bundle.VerificationMaterial.GetCertificate()
-		if cert == nil {
-			return errors.New("verification material must be single X.509 certificate (required for bundle v0.3)")
+		certs := b.Bundle.VerificationMaterial.GetX509CertificateChain()
+
+		if certs != nil {
+			return errors.New("verification material cannot be X.509 certificate chain (for bundle v0.3)")
 		}
 	default:
 		return ErrIncorrectMediaType
