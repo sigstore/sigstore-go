@@ -154,7 +154,8 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 				PublicKey:         ecKey,
 				SignatureHashFunc: crypto.SHA256,
 			}
-		case protocommon.PublicKeyDetails_PKCS1_RSA_PKCS1V5:
+		// This key format is deprecated, but currently in use for Sigstore staging instance
+		case protocommon.PublicKeyDetails_PKCS1_RSA_PKCS1V5: //nolint:staticcheck
 			key, err := x509.ParsePKCS1PublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err

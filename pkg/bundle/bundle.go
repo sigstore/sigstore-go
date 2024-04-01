@@ -35,6 +35,8 @@ import (
 
 const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
 const SigstoreBundleMediaType02 = "application/vnd.dev.sigstore.bundle+json;version=0.2"
+const SigstoreBundleMediaType03Legacy = "application/vnd.dev.sigstore.bundle+json;version=0.3"
+const SigstoreBundleMediaType03 = "application/vnd.dev.sigstore.bundle.v0.3+json"
 const IntotoMediaType = "application/vnd.in-toto+json"
 
 var ErrValidation = errors.New("validation error")
@@ -85,6 +87,12 @@ func (b *ProtobufBundle) validate() error {
 	case SigstoreBundleMediaType02:
 		if len(entries) > 0 && !b.hasInclusionProof {
 			return errors.New("inclusion proof missing in bundle (required for bundle v0.2)")
+		}
+	case SigstoreBundleMediaType03, SigstoreBundleMediaType03Legacy:
+		certs := b.Bundle.VerificationMaterial.GetX509CertificateChain()
+
+		if certs != nil {
+			return errors.New("verification material cannot be X.509 certificate chain (for bundle v0.3)")
 		}
 	default:
 		return ErrIncorrectMediaType
@@ -137,21 +145,26 @@ func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, erro
 	switch content := b.VerificationMaterial.GetContent().(type) {
 	case *protobundle.VerificationMaterial_X509CertificateChain:
 		certs := content.X509CertificateChain.GetCertificates()
-		certificates := make([]*x509.Certificate, len(certs))
-		var err error
-		for i, cert := range content.X509CertificateChain.GetCertificates() {
-			certificates[i], err = x509.ParseCertificate(cert.RawBytes)
-			if err != nil {
-				return nil, ErrValidationError(err)
-			}
-		}
-		if len(certificates) == 0 {
+		if len(certs) == 0 {
 			return nil, ErrMissingVerificationMaterial
 		}
-		certChain := &CertificateChain{
-			Certificates: certificates,
+		parsedCert, err := x509.ParseCertificate(certs[0].RawBytes)
+		if err != nil {
+			return nil, ErrValidationError(err)
 		}
-		return certChain, nil
+		cert := &Certificate{
+			Certificate: parsedCert,
+		}
+		return cert, nil
+	case *protobundle.VerificationMaterial_Certificate:
+		parsedCert, err := x509.ParseCertificate(content.Certificate.RawBytes)
+		if err != nil {
+			return nil, ErrValidationError(err)
+		}
+		cert := &Certificate{
+			Certificate: parsedCert,
+		}
+		return cert, nil
 	case *protobundle.VerificationMaterial_PublicKey:
 		pk := &PublicKey{
 			hint: content.PublicKey.Hint,

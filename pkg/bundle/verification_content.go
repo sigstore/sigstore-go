@@ -23,8 +23,8 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
-type CertificateChain struct {
-	Certificates []*x509.Certificate
+type Certificate struct {
+	*x509.Certificate
 }
 
 type PublicKey struct {
@@ -35,33 +35,25 @@ func (pk PublicKey) Hint() string {
 	return pk.hint
 }
 
-func (cc *CertificateChain) CompareKey(key any, _ root.TrustedMaterial) bool {
+func (c *Certificate) CompareKey(key any, _ root.TrustedMaterial) bool {
 	x509Key, ok := key.(*x509.Certificate)
 	if !ok {
 		return false
 	}
 
-	return cc.Certificates[0].Equal(x509Key)
+	return c.Certificate.Equal(x509Key)
 }
 
-func (cc *CertificateChain) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
-	return !(cc.Certificates[0].NotAfter.Before(t) || cc.Certificates[0].NotBefore.After(t))
+func (c *Certificate) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
+	return !(c.Certificate.NotAfter.Before(t) || c.Certificate.NotBefore.After(t))
 }
 
-func (cc *CertificateChain) HasCertificate() (x509.Certificate, bool) {
-	return *cc.Certificates[0], true
+func (c *Certificate) HasCertificate() (x509.Certificate, bool) {
+	return *c.Certificate, true
 }
 
-func (pk *PublicKey) HasCertificate() (x509.Certificate, bool) {
-	return x509.Certificate{}, false
-}
-
-func (cc *CertificateChain) HasPublicKey() (verify.PublicKeyProvider, bool) {
+func (c *Certificate) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return PublicKey{}, false
-}
-
-func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
-	return *pk, true
 }
 
 func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
@@ -85,4 +77,12 @@ func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
 		return false
 	}
 	return verifier.ValidAtTime(t)
+}
+
+func (pk *PublicKey) HasCertificate() (x509.Certificate, bool) {
+	return x509.Certificate{}, false
+}
+
+func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
+	return *pk, true
 }
