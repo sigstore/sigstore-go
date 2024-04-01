@@ -91,8 +91,8 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/go-chi/chi v4.1.2+incompatible h1:fGFk2Gmi/YKXk0OmGfBh0WgmN3XB8lVnEyNz34tQRec=
 github.com/go-chi/chi v4.1.2+incompatible/go.mod h1:eB3wogJHnLi3x/kFX2A+IbTBlXxmMeXJVKy9tTv1XzQ=
-github.com/go-jose/go-jose/v3 v3.0.2 h1:2Edjn8Nrb44UvTdp84KU0bBPs1cO7noRCybtS3eJEUQ=
-github.com/go-jose/go-jose/v3 v3.0.2/go.mod h1:5b+7YgP7ZICgJDBdfjZaIt+H/9L9T/YQrVfLAMboGkQ=
+github.com/go-jose/go-jose/v3 v3.0.3 h1:fFKWeig/irsp7XD2zBxvnmA/XaRWp5V3CBsZXJF7G7k=
+github.com/go-jose/go-jose/v3 v3.0.3/go.mod h1:5b+7YgP7ZICgJDBdfjZaIt+H/9L9T/YQrVfLAMboGkQ=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.1 h1:pKouT5E8xu9zeFC39JXRDukb6JFQPXM5p5I91188VAQ=
 github.com/go-logr/logr v1.4.1/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
@@ -253,8 +253,8 @@ github.com/sigstore/protobuf-specs v0.3.0 h1:E49qS++llp4psM+3NNVEb+C4AD422bT9VkO
 github.com/sigstore/protobuf-specs v0.3.0/go.mod h1:ynKzXpqr3dUj2Xk9O/5ZUhjnpi0F53DNi5AdH6pS3jc=
 github.com/sigstore/rekor v1.3.5 h1:QoVXcS7NppKY+rpbEFVHr4evGDZBBSh65X0g8PXoUkQ=
 github.com/sigstore/rekor v1.3.5/go.mod h1:CWqOk/fmnPwORQmm7SyDgB54GTJizqobbZ7yOP1lvw8=
-github.com/sigstore/sigstore v1.8.2 h1:0Ttjcn3V0fVQXlYq7+oHaaHkGFIt3ywm7SF4JTU/l8c=
-github.com/sigstore/sigstore v1.8.2/go.mod h1:CHVcSyknCcjI4K2ZhS1SI28r0tcQyBlwtALG536x1DY=
+github.com/sigstore/sigstore v1.8.3 h1:G7LVXqL+ekgYtYdksBks9B38dPoIsbscjQJX/MGWkA4=
+github.com/sigstore/sigstore v1.8.3/go.mod h1:mqbTEariiGA94cn6G3xnDiV6BD8eSLdL/eA7bvJ0fVs=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.8.1 h1:rEDdUefulkIQaMJyzLwtgPDLNXBIltBABiFYfb0YmgQ=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.8.1/go.mod h1:RCdYCc1IxCYWzh2IdzdA6Yf7JIY0cMRqH08fpQYechw=
 github.com/sigstore/sigstore/pkg/signature/kms/azure v1.8.1 h1:DvRWG99QGWZC5mp42SEde2Xke/Q384Idnj2da7yB+Mk=

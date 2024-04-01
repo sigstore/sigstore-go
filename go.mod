@@ -13,7 +13,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/protobuf-specs v0.3.0
 	github.com/sigstore/rekor v1.3.5
-	github.com/sigstore/sigstore v1.8.2
+	github.com/sigstore/sigstore v1.8.3
 	github.com/sigstore/timestamp-authority v1.2.2
 	github.com/stretchr/testify v1.9.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.0-20240223092044-1e7978e83f63
