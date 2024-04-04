@@ -58,7 +58,7 @@ func init() {
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
 	requireTimestamp = flag.Bool("requireTimestamp", true, "Require either an RFC3161 signed timestamp or log entry integrated timestamp")
-	requireCTlog = flag.Bool("requireCTlog", true, "Require ArtifactCertificate Transparency log entry")
+	requireCTlog = flag.Bool("requireCTlog", true, "Require Certificate Transparency log entry")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
 	onlineTlog = flag.Bool("onlineTlog", false, "Verify Artifact Transparency log entry online (Rekor)")
