@@ -41,6 +41,7 @@ var expectedOIDIssuer *string
 var expectedSAN *string
 var expectedSANRegex *string
 var requireTimestamp *bool
+var requireCTlog *bool
 var requireTlog *bool
 var minBundleVersion *string
 var onlineTlog *bool
@@ -57,6 +58,7 @@ func init() {
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
 	requireTimestamp = flag.Bool("requireTimestamp", true, "Require either an RFC3161 signed timestamp or log entry integrated timestamp")
+	requireCTlog = flag.Bool("requireCTlog", true, "Require Certificate Transparency log entry")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
 	onlineTlog = flag.Bool("onlineTlog", false, "Verify Artifact Transparency log entry online (Rekor)")
@@ -99,7 +101,9 @@ func run() error {
 	identityPolicies := []verify.PolicyOption{}
 	var artifactPolicy verify.ArtifactPolicyOption
 
-	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+	if *requireCTlog {
+		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+	}
 
 	if *requireTimestamp {
 		verifierConfig = append(verifierConfig, verify.WithObserverTimestamps(1))
