@@ -11,7 +11,7 @@ require (
 	github.com/google/certificate-transparency-go v1.1.8
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
-	github.com/sigstore/protobuf-specs v0.3.0
+	github.com/sigstore/protobuf-specs v0.3.1
 	github.com/sigstore/rekor v1.3.5
 	github.com/sigstore/sigstore v1.8.3
 	github.com/sigstore/timestamp-authority v1.2.2
