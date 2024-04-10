@@ -105,8 +105,8 @@ func (b *ProtobufBundle) validate() error {
 		}
 	}
 
-	// if bundle version is newer than v0.3, return error as this version is not supported
-	if semver.Compare(bundleVersion, "v0.3") > 0 {
+	// if bundle version is >= v0.4, return error as this version is not supported
+	if semver.Compare(bundleVersion, "v0.4") >= 0 {
 		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
 	}
 
