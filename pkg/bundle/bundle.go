@@ -33,14 +33,8 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
-const SigstoreBundleMediaType01 = "application/vnd.dev.sigstore.bundle+json;version=0.1"
-const SigstoreBundleMediaType02 = "application/vnd.dev.sigstore.bundle+json;version=0.2"
-const SigstoreBundleMediaType03Legacy = "application/vnd.dev.sigstore.bundle+json;version=0.3"
-const SigstoreBundleMediaType03 = "application/vnd.dev.sigstore.bundle.v0.3+json"
-const IntotoMediaType = "application/vnd.in-toto+json"
-
 var ErrValidation = errors.New("validation error")
-var ErrIncorrectMediaType = fmt.Errorf("%w: unsupported media type", ErrValidation)
+var ErrUnsupportedMediaType = fmt.Errorf("%w: unsupported media type", ErrValidation)
 var ErrMissingVerificationMaterial = fmt.Errorf("%w: missing verification material", ErrValidation)
 var ErrUnimplemented = errors.New("unimplemented")
 var ErrInvalidAttestation = fmt.Errorf("%w: invalid attestation", ErrValidation)
@@ -74,31 +68,69 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
 }
 
 func (b *ProtobufBundle) validate() error {
+	bundleVersion, err := getBundleVersion(b.Bundle.MediaType)
+	if err != nil {
+		return fmt.Errorf("error getting bundle version: %w", err)
+	}
+
+	// if bundle version is < 0.1, return error
+	if semver.Compare(bundleVersion, "v0.1") < 0 {
+		return fmt.Errorf("%w: bundle version %s is not supported", ErrUnsupportedMediaType, bundleVersion)
+	}
+
+	// fetch tlog entries, as next check needs to check them for inclusion proof/promise
 	entries, err := b.TlogEntries()
 	if err != nil {
 		return err
 	}
 
-	switch b.Bundle.MediaType {
-	case SigstoreBundleMediaType01:
+	// if bundle version == v0.1, require inclusion promise
+	if semver.Compare(bundleVersion, "v0.1") == 0 {
 		if len(entries) > 0 && !b.hasInclusionPromise {
 			return errors.New("inclusion promises missing in bundle (required for bundle v0.1)")
 		}
-	case SigstoreBundleMediaType02:
+	} else {
+		// if bundle version >= v0.2, require inclusion proof
 		if len(entries) > 0 && !b.hasInclusionProof {
 			return errors.New("inclusion proof missing in bundle (required for bundle v0.2)")
 		}
-	case SigstoreBundleMediaType03, SigstoreBundleMediaType03Legacy:
+	}
+
+	// if bundle version >= v0.3, require verification material to not be X.509 certificate chain (only single certificate is allowed)
+	if semver.Compare(bundleVersion, "v0.3") >= 0 {
 		certs := b.Bundle.VerificationMaterial.GetX509CertificateChain()
 
 		if certs != nil {
 			return errors.New("verification material cannot be X.509 certificate chain (for bundle v0.3)")
 		}
-	default:
-		return ErrIncorrectMediaType
+	}
+
+	// if bundle version is newer than v0.3, return error as this version is not supported
+	if semver.Compare(bundleVersion, "v0.3") > 0 {
+		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
 	}
 
 	return nil
+}
+
+func getBundleVersion(mediaType string) (string, error) {
+	switch mediaType {
+	case "application/vnd.dev.sigstore.bundle+json;version=0.1":
+		return "v0.1", nil
+	case "application/vnd.dev.sigstore.bundle+json;version=0.2":
+		return "v0.2", nil
+	case "application/vnd.dev.sigstore.bundle+json;version=0.3":
+		return "v0.3", nil
+	}
+	if strings.HasPrefix(mediaType, "application/vnd.dev.sigstore.bundle.v") && strings.HasSuffix(mediaType, "+json") {
+		version := strings.TrimPrefix(mediaType, "application/vnd.dev.sigstore.bundle.")
+		version = strings.TrimSuffix(version, "+json")
+		if semver.IsValid(version) {
+			return version, nil
+		}
+		return "", fmt.Errorf("%w: invalid bundle version: %s", ErrUnsupportedMediaType, version)
+	}
+	return "", fmt.Errorf("%w: %s", ErrUnsupportedMediaType, mediaType)
 }
 
 func LoadJSONFromPath(path string) (*ProtobufBundle, error) {

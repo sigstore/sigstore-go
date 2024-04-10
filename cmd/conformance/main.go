@@ -154,7 +154,7 @@ func main() {
 		}
 
 		pb := protobundle.Bundle{
-			MediaType: bundle.SigstoreBundleMediaType01,
+			MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
 			VerificationMaterial: &protobundle.VerificationMaterial{
 				Content: &protobundle.VerificationMaterial_X509CertificateChain{
 					X509CertificateChain: &protocommon.X509CertificateChain{

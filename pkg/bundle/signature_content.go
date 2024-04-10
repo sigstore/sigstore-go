@@ -23,6 +23,8 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
+const IntotoMediaType = "application/vnd.in-toto+json"
+
 type MessageSignature struct {
 	digest          []byte
 	digestAlgorithm string
@@ -51,7 +53,7 @@ type Envelope struct {
 
 func (e *Envelope) Statement() (*in_toto.Statement, error) {
 	if e.PayloadType != IntotoMediaType {
-		return nil, ErrIncorrectMediaType
+		return nil, ErrUnsupportedMediaType
 	}
 
 	var statement *in_toto.Statement
