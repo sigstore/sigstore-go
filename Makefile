@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+VERSION := `git describe --tags`
+LDFLAGS = -ldflags "-X main.Version=$(VERSION)"
+
 .PHONY: build
 build:
-	go build ./cmd/sigstore-go
-	go build -o conformance ./cmd/conformance
+	go build $(LDFLAGS) ./cmd/sigstore-go
+	go build $(LDFLAGS) -o conformance ./cmd/conformance
 
 .PHONY: test
 test:

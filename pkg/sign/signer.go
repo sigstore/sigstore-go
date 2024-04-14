@@ -17,8 +17,10 @@ package sign
 import (
 	"crypto"
 	"crypto/rand"
-	_ "crypto/sha256" // hash function will be used by Sign
-	_ "crypto/sha512" // hash function will be used by Sign
+	"crypto/sha256"
+	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-256 for hash
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -38,13 +40,29 @@ type Signer interface {
 // func (f *Fulcio) Sign(data []byte) (*protobundle.Bundle, error) {}
 
 type Keypair struct {
-	signer        crypto.Signer
-	hashAlgorithm protocommon.HashAlgorithm
-	publicKeyHint []byte
+	options *KeypairOptions
 }
 
-func SignerKeypair(s crypto.Signer, ha protocommon.HashAlgorithm, pkh []byte) Keypair {
-	return Keypair{signer: s, hashAlgorithm: ha, publicKeyHint: pkh}
+type KeypairOptions struct {
+	// Object that supports crypto.Signer.Sign, like crypto.PrivateKey
+	Signer crypto.Signer
+	// Hash algorithm to use to create digest of data provided to sign
+	HashAlgorithm protocommon.HashAlgorithm
+	// Optional hint of which signing key was used; will be included in bundle
+	PublicKeyHint []byte
+}
+
+func SignerKeypair(opts *KeypairOptions) (*Keypair, error) {
+	if opts.PublicKeyHint == nil {
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(opts.Signer.Public())
+		if err != nil {
+			return nil, err
+		}
+		hashedBytes := sha256.Sum256(pubKeyBytes)
+		opts.PublicKeyHint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
+	}
+
+	return &Keypair{options: opts}, nil
 }
 
 func (k Keypair) Sign(data []byte) (*protobundle.Bundle, error) {
@@ -53,7 +71,7 @@ func (k Keypair) Sign(data []byte) (*protobundle.Bundle, error) {
 		VerificationMaterial: &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_PublicKey{
 				PublicKey: &protocommon.PublicKeyIdentifier{
-					Hint: string(k.publicKeyHint),
+					Hint: string(k.options.PublicKeyHint),
 				},
 			},
 		},
@@ -61,7 +79,7 @@ func (k Keypair) Sign(data []byte) (*protobundle.Bundle, error) {
 
 	var hashFunc crypto.Hash
 
-	switch k.hashAlgorithm {
+	switch k.options.HashAlgorithm {
 	case protocommon.HashAlgorithm_SHA2_256:
 		hashFunc = crypto.Hash(crypto.SHA256)
 	case protocommon.HashAlgorithm_SHA2_384:
@@ -76,7 +94,7 @@ func (k Keypair) Sign(data []byte) (*protobundle.Bundle, error) {
 	hasher.Write(data)
 	digest := hasher.Sum(nil)
 
-	signature, err := k.signer.Sign(rand.Reader, digest, hashFunc)
+	signature, err := k.options.Signer.Sign(rand.Reader, digest, hashFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +102,7 @@ func (k Keypair) Sign(data []byte) (*protobundle.Bundle, error) {
 	bundle.Content = &protobundle.Bundle_MessageSignature{
 		MessageSignature: &protocommon.MessageSignature{
 			MessageDigest: &protocommon.HashOutput{
-				Algorithm: k.hashAlgorithm,
+				Algorithm: k.options.HashAlgorithm,
 				Digest:    digest,
 			},
 			Signature: signature,

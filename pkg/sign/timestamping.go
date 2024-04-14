@@ -19,6 +19,7 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"io"
+	"time"
 
 	"github.com/digitorus/timestamp"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -27,21 +28,23 @@ import (
 	tsagenclient "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 )
 
-type Witness interface {
-	Witness(*protobundle.Bundle) error
+type TimestampAuthorityOptions struct {
+	BaseURL        string
+	Timeout        time.Duration
+	LibraryVersion string
 }
 
 type TimestampAuthority struct {
-	baseURL string
+	options *TimestampAuthorityOptions
 }
 
-func WitnessTimestampAuthority(baseURL string) TimestampAuthority {
+func NewTimestampAuthority(opts *TimestampAuthorityOptions) TimestampAuthority {
 	return TimestampAuthority{
-		baseURL: baseURL,
+		options: opts,
 	}
 }
 
-func (ta *TimestampAuthority) Witness(b *protobundle.Bundle) error {
+func (ta *TimestampAuthority) GetTimestamp(b *protobundle.Bundle) error {
 	req := &timestamp.Request{
 		Certificates: true,
 	}
@@ -59,13 +62,21 @@ func (ta *TimestampAuthority) Witness(b *protobundle.Bundle) error {
 		return err
 	}
 
-	client, err := tsaclient.GetTimestampClient(ta.baseURL, tsaclient.WithUserAgent("sigstore-go"), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
+	userAgent := "sigstore-go"
+	if ta.options.LibraryVersion != "" {
+		userAgent += "/"
+		userAgent += ta.options.LibraryVersion
+	}
+
+	client, err := tsaclient.GetTimestampClient(ta.options.BaseURL, tsaclient.WithUserAgent(userAgent), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
 	if err != nil {
 		return err
 	}
 
 	clientParams := tsagenclient.NewGetTimestampResponseParams()
-	// TODO: call clientParams.SetTimeout()
+	if ta.options.Timeout != 0 {
+		clientParams.SetTimeout(ta.options.Timeout)
+	}
 	clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))
 
 	var respBytes bytes.Buffer
@@ -99,15 +110,3 @@ func (ta *TimestampAuthority) Witness(b *protobundle.Bundle) error {
 
 	return nil
 }
-
-// TODO: implement
-// type Rekor struct {
-//	baseURL   string
-//	entryType string
-// }
-
-// func (r *Rekor) Witness(_ *protobundle.Bundle) error {
-//	// hashedrekord uses signature and dataDigest
-//	// dsse uses envelope and ephemeralPublicKey
-//	return nil
-// }

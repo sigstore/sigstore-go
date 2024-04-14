@@ -22,12 +22,15 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log"
+	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/sign"
 )
+
+var Version string
 
 func main() {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -47,14 +50,29 @@ func main() {
 	}
 	fmt.Println(string(pem.EncodeToMemory(&pemBlock)))
 
-	signer := sign.SignerKeypair(privateKey, protocommon.HashAlgorithm_SHA2_256, []byte("someKeyHint"))
+	keypairOpts := &sign.KeypairOptions{
+		Signer:        privateKey,
+		HashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
+		PublicKeyHint: []byte("someKeyHint"),
+	}
+	signer, err := sign.SignerKeypair(keypairOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	bundle, err := signer.Sign([]byte("hello world"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	witness := sign.WitnessTimestampAuthority("https://timestamp.githubapp.com")
-	err = witness.Witness(bundle)
+	tsaOpts := &sign.TimestampAuthorityOptions{
+		BaseURL:        "https://timestamp.githubapp.com",
+		Timeout:        time.Duration(30 * time.Second),
+		LibraryVersion: Version,
+	}
+
+	tsa := sign.NewTimestampAuthority(tsaOpts)
+	err = tsa.GetTimestamp(bundle)
 	if err != nil {
 		log.Fatal(err)
 	}
