@@ -18,7 +18,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/sha256"
-	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-256 for hash
+	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
