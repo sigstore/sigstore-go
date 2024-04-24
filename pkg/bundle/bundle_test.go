@@ -17,6 +17,8 @@ package bundle
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_getBundleVersion(t *testing.T) {
@@ -91,6 +93,34 @@ func Test_getBundleVersion(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("getBundleVersion() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestMediaTypeString(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		ver      string
+		expected string
+		mustErr  bool
+	}{
+		{"normal-semver", "v0.3", "application/vnd.dev.sigstore.bundle.v0.3+json", false},
+		{"old-semver1", "v0.1", "application/vnd.dev.sigstore.bundle+json;version=0.1", false},
+		{"old-semver2", "v0.2", "application/vnd.dev.sigstore.bundle+json;version=0.2", false},
+		{"blank", "", "", true},
+		{"invalid", "garbage", "", true},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			res, err := MediaTypeString(tc.ver)
+			if tc.mustErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, res)
 		})
 	}
 }
