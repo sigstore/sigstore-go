@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -33,34 +34,60 @@ import (
 var Version string
 
 func main() {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		log.Fatal(err)
+	flag.Parse()
+
+	var signer sign.Signer
+
+	if flag.NArg() == 0 {
+		// Assume we're signing with a keypair
+		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Print out privateKey.PublicKey() in PEM format
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		pemBlock := pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: pubKeyBytes,
+		}
+		fmt.Println(string(pem.EncodeToMemory(&pemBlock)))
+
+		keypairOpts := &sign.KeypairOptions{
+			Signer:        privateKey,
+			HashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
+			PublicKeyHint: []byte("someKeyHint"),
+		}
+		signer, err = sign.SignerKeypair(keypairOpts)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		// Assume arg is identity token for Fulcio
+		fulcioOpts := &sign.FulcioOptions{
+			BaseURL:        "https://fulcio.sigstage.dev",
+			IdentityToken:  flag.Arg(0),
+			Timeout:        time.Duration(30 * time.Second),
+			LibraryVersion: Version,
+		}
+
+		signer = sign.SignerFulcio(fulcioOpts)
 	}
 
-	// Print out privateKey.PublicKey() in PEM format
-	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		log.Fatal(err)
+	/*data := sign.PlainData{
+		Data: []byte("hello world"),
+	}*/
+
+	data := sign.DSSEData{
+		Data:        []byte(`{"_type":"https://in-toto.io/Statement/v0.1","subject":[{"name":"hello_world.txt","digest":{"sha256":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}}],"predicateType":"something","preidcate":{}}`),
+		PayloadType: "application/vnd.in-toto+json",
 	}
 
-	pemBlock := pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubKeyBytes,
-	}
-	fmt.Println(string(pem.EncodeToMemory(&pemBlock)))
-
-	keypairOpts := &sign.KeypairOptions{
-		Signer:        privateKey,
-		HashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
-		PublicKeyHint: []byte("someKeyHint"),
-	}
-	signer, err := sign.SignerKeypair(keypairOpts)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	bundle, err := signer.Sign([]byte("hello world"))
+	bundle, err := signer.Sign(data)
 	if err != nil {
 		log.Fatal(err)
 	}

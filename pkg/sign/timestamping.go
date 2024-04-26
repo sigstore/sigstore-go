@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/sha256"
+	"errors"
 	"io"
 	"time"
 
@@ -50,11 +51,19 @@ func (ta *TimestampAuthority) GetTimestamp(b *protobundle.Bundle) error {
 	}
 
 	messageSignature := b.GetMessageSignature()
+	dsseEnvelope := b.GetDsseEnvelope()
 
-	if messageSignature != nil {
+	switch {
+	case messageSignature != nil:
 		signatureHash := sha256.Sum256(messageSignature.Signature)
 		req.HashAlgorithm = crypto.SHA256
 		req.HashedMessage = signatureHash[:]
+	case dsseEnvelope != nil:
+		signatureHash := sha256.Sum256(dsseEnvelope.Signatures[0].Sig)
+		req.HashAlgorithm = crypto.SHA256
+		req.HashedMessage = signatureHash[:]
+	default:
+		return errors.New("unable to find signature in bundle")
 	}
 
 	reqBytes, err := req.Marshal()
@@ -62,13 +71,7 @@ func (ta *TimestampAuthority) GetTimestamp(b *protobundle.Bundle) error {
 		return err
 	}
 
-	userAgent := "sigstore-go"
-	if ta.options.LibraryVersion != "" {
-		userAgent += "/"
-		userAgent += ta.options.LibraryVersion
-	}
-
-	client, err := tsaclient.GetTimestampClient(ta.options.BaseURL, tsaclient.WithUserAgent(userAgent), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
+	client, err := tsaclient.GetTimestampClient(ta.options.BaseURL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
 	if err != nil {
 		return err
 	}
@@ -109,4 +112,14 @@ func (ta *TimestampAuthority) GetTimestamp(b *protobundle.Bundle) error {
 	tsVerificationData.Rfc3161Timestamps = append(tsVerificationData.Rfc3161Timestamps, signedTimestamp)
 
 	return nil
+}
+
+func constructUserAgent(version string) string {
+	userAgent := "sigstore-go"
+	if version != "" {
+		userAgent += "/"
+		userAgent += version
+	}
+
+	return userAgent
 }
