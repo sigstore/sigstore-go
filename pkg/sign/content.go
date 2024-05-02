@@ -24,7 +24,7 @@ import (
 
 type Content interface {
 	// Return the data to be signed
-	Prepare() []byte
+	PreAuthEncoding() []byte
 	// Returns something that satisfies protobundle.isBundle_Content
 	Bundle(bundle *protobundle.Bundle, hashAlgorithm protocommon.HashAlgorithm, digest []byte, signature []byte)
 }
@@ -33,7 +33,7 @@ type PlainData struct {
 	Data []byte
 }
 
-func (pd PlainData) Prepare() []byte {
+func (pd PlainData) PreAuthEncoding() []byte {
 	return pd.Data
 }
 
@@ -54,7 +54,7 @@ type DSSEData struct {
 	PayloadType string
 }
 
-func (d DSSEData) Prepare() []byte {
+func (d DSSEData) PreAuthEncoding() []byte {
 	pae := fmt.Sprintf("DSSEv1 %d %s %d %s", len(d.PayloadType), d.PayloadType, len(d.Data), d.Data)
 	return []byte(pae)
 }

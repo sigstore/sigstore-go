@@ -205,7 +205,7 @@ func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
 		return nil, errors.New("unable to parse Fulcio certificate")
 	}
 
-	data := content.Prepare()
+	data := content.PreAuthEncoding()
 	dataDigest := sha256.Sum256([]byte(data))
 	signature, err := ecdsa.SignASN1(rand.Reader, privateKey, dataDigest[:])
 	if err != nil {
@@ -269,7 +269,7 @@ func (k Keypair) Sign(content Content) (*protobundle.Bundle, error) {
 	}
 
 	hasher := hashFunc.New()
-	hasher.Write(content.Prepare())
+	hasher.Write(content.PreAuthEncoding())
 	digest := hasher.Sum(nil)
 
 	signature, err := k.options.Signer.Sign(rand.Reader, digest, hashFunc)
