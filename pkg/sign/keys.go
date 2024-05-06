@@ -34,7 +34,7 @@ type Keypair interface {
 	GetHint() []byte
 	GetKeyAlgorithm() string
 	GetPublicKeyPem() (string, error)
-	SignData(data []byte) ([]byte, []byte, error)
+	SignData(data []byte) ([]byte, error)
 }
 
 type EphemeralKeypairOptions struct {
@@ -106,28 +106,30 @@ func (e *EphemeralKeypair) GetPublicKeyPem() (string, error) {
 	return string(pem.EncodeToMemory(&pemBlock)), nil
 }
 
-func (e *EphemeralKeypair) SignData(data []byte) ([]byte, []byte, error) {
-	var hashFunc crypto.Hash
-
-	switch e.options.HashAlgorithm {
+func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
+	switch hashAlgorithm {
 	case protocommon.HashAlgorithm_SHA2_256:
-		hashFunc = crypto.Hash(crypto.SHA256)
+		return crypto.Hash(crypto.SHA256), nil
 	case protocommon.HashAlgorithm_SHA2_384:
-		hashFunc = crypto.Hash(crypto.SHA384)
+		return crypto.Hash(crypto.SHA384), nil
 	case protocommon.HashAlgorithm_SHA2_512:
-		hashFunc = crypto.Hash(crypto.SHA512)
+		return crypto.Hash(crypto.SHA512), nil
 	default:
-		return nil, nil, errors.New("Unsupported hash algorithm")
+		var hash crypto.Hash
+		return hash, errors.New("Unsupported hash algorithm")
 	}
+}
 
-	hasher := hashFunc.New()
-	hasher.Write(data)
-	digest := hasher.Sum(nil)
-
-	signature, err := e.privateKey.Sign(rand.Reader, digest, hashFunc)
+func (e *EphemeralKeypair) SignData(data []byte) ([]byte, error) {
+	hashFunc, err := getHashFunc(e.options.HashAlgorithm)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return signature, digest, nil
+	signature, err := e.privateKey.Sign(rand.Reader, data, hashFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	return signature, nil
 }

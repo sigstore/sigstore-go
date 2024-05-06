@@ -54,12 +54,12 @@ func main() {
 	}
 
 	if *intoto {
-		content = sign.DSSEData{
+		content = &sign.DSSEData{
 			Data:        data,
 			PayloadType: "application/vnd.in-toto+json",
 		}
 	} else {
-		content = sign.PlainData{
+		content = &sign.PlainData{
 			Data: data,
 		}
 	}

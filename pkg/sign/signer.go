@@ -117,7 +117,7 @@ func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, er
 	}
 
 	// Sign JWT subject for proof of possession
-	subjectSignature, _, err := keypair.SignData([]byte(jwt.Sub))
+	subjectSignature, err := keypair.SignData([]byte(jwt.Sub))
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,12 @@ func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, er
 		return nil, errors.New("unable to parse Fulcio certificate")
 	}
 
-	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
+	digest, err := content.GetDigest(keypair.GetHashAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := keypair.SignData(digest)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +213,7 @@ func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, er
 		},
 	}
 
-	content.Bundle(bundle, keypair.GetHashAlgorithm(), digest, signature)
+	content.Bundle(bundle, signature)
 
 	return bundle, nil
 }
@@ -216,7 +221,12 @@ func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, er
 type KeySigner struct{}
 
 func (ks *KeySigner) Sign(content Content, keypair Keypair) (*protobundle.Bundle, error) {
-	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
+	digest, err := content.GetDigest(keypair.GetHashAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := keypair.SignData(digest)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +242,7 @@ func (ks *KeySigner) Sign(content Content, keypair Keypair) (*protobundle.Bundle
 		},
 	}
 
-	content.Bundle(bundle, keypair.GetHashAlgorithm(), digest, signature)
+	content.Bundle(bundle, signature)
 
 	return bundle, nil
 }
