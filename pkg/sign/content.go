@@ -25,7 +25,7 @@ import (
 type Content interface {
 	// Return the data to be signed
 	PreAuthEncoding() []byte
-	// Returns something that satisfies protobundle.isBundle_Content
+	// Add something that satisfies protobundle.isBundle_Content to bundle
 	Bundle(bundle *protobundle.Bundle, hashAlgorithm protocommon.HashAlgorithm, digest []byte, signature []byte)
 }
 

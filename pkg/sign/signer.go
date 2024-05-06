@@ -16,13 +16,6 @@ package sign
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha256"
-	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -37,8 +30,10 @@ import (
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 )
 
+const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
+
 type Signer interface {
-	Sign(content Content) (*protobundle.Bundle, error)
+	Sign(content Content, k Keypair) (*protobundle.Bundle, error)
 }
 
 type Fulcio struct {
@@ -56,7 +51,7 @@ type FulcioOptions struct {
 	LibraryVersion string
 }
 
-func SignerFulcio(opts *FulcioOptions) *Fulcio {
+func NewFulcio(opts *FulcioOptions) *Fulcio {
 	return &Fulcio{options: opts}
 }
 
@@ -65,12 +60,7 @@ type jsonWebToken struct {
 }
 
 type fulcioCertRequest struct {
-	Credentials      identityToken    `json:"credentials"`
 	PublicKeyRequest publicKeyRequest `json:"publicKeyRequest"`
-}
-
-type identityToken struct {
-	OIDCIdentityToken string `json:"oidcIdentityToken"`
 }
 
 type publicKeyRequest struct {
@@ -84,7 +74,7 @@ type publicKey struct {
 }
 
 type fulcioResponse struct {
-	SCT signedCertificateEmbeddedSct `json:"signedCertificateEmbeddedSct"`
+	SctCertWithChain signedCertificateEmbeddedSct `json:"signedCertificateEmbeddedSct"`
 }
 
 type signedCertificateEmbeddedSct struct {
@@ -95,8 +85,21 @@ type chain struct {
 	Certificates []string `json:"certificates"`
 }
 
-func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
+func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, error) {
+	// See if keypair was provided
+	if keypair == nil {
+		var err error
+		ephemeralKeypair, err := NewEphemeralKeypair(nil)
+		if err != nil {
+			return nil, err
+		}
+		keypair = ephemeralKeypair
+	}
+
 	// Get JWT from identity token
+	//
+	// Note that the contents of this token are untrusted. Fulcio will perform
+	// the token verification.
 	tokenParts := strings.Split(f.options.IdentityToken, ".")
 	if len(tokenParts) < 2 {
 		return nil, errors.New("Unable to get subject from identity token")
@@ -113,43 +116,23 @@ func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
 		return nil, err
 	}
 
-	// Generate ephemeral keypair
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKeyBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
-	if err != nil {
-		return nil, err
-	}
-
-	pemBlock := pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubKeyBytes,
-	}
-
-	var pemBytes bytes.Buffer
-	if err = pem.Encode(&pemBytes, &pemBlock); err != nil {
-		return nil, err
-	}
-
-	// Sign JWT subject with ephemeral key for proof of possession
-	subjectDigest := sha256.Sum256([]byte(jwt.Sub))
-	subjectSignature, err := privateKey.Sign(rand.Reader, subjectDigest[:], nil)
+	// Sign JWT subject for proof of possession
+	subjectSignature, _, err := keypair.SignData([]byte(jwt.Sub))
 	if err != nil {
 		return nil, err
 	}
 
 	// Make Fulcio certificate request
+	keypairPem, err := keypair.GetPublicKeyPem()
+	if err != nil {
+		return nil, err
+	}
+
 	certRequest := fulcioCertRequest{
-		Credentials: identityToken{
-			OIDCIdentityToken: f.options.IdentityToken,
-		},
 		PublicKeyRequest: publicKeyRequest{
 			PublicKey: publicKey{
-				Algorithm: "ECDSA",
-				Content:   pemBytes.String(),
+				Algorithm: keypair.GetKeyAlgorithm(),
+				Content:   keypairPem,
 			},
 			ProofOfPossession: base64.StdEncoding.EncodeToString(subjectSignature),
 		},
@@ -161,6 +144,10 @@ func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
 	}
 	requestBytes := bytes.NewBuffer(requestJSON)
 
+	// TODO: For now we are using our own HTTP client
+	//
+	// https://github.com/sigstore/fulcio/pkg/api's client could be used in the
+	// future, when it supports the v2 API
 	var client http.Client
 	if f.options.Timeout != 0 {
 		client.Timeout = f.options.Timeout
@@ -195,7 +182,7 @@ func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
 		return nil, err
 	}
 
-	certs := fulcioResp.SCT.Chain.Certificates
+	certs := fulcioResp.SctCertWithChain.Chain.Certificates
 	if len(certs) == 0 {
 		return nil, errors.New("Fulcio returned no certificates")
 	}
@@ -205,15 +192,13 @@ func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
 		return nil, errors.New("unable to parse Fulcio certificate")
 	}
 
-	data := content.PreAuthEncoding()
-	dataDigest := sha256.Sum256([]byte(data))
-	signature, err := ecdsa.SignASN1(rand.Reader, privateKey, dataDigest[:])
+	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
 	if err != nil {
 		return nil, err
 	}
 
 	bundle := &protobundle.Bundle{
-		MediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+		MediaType: bundleV03MediaType,
 		VerificationMaterial: &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_Certificate{
 				Certificate: &protocommon.X509Certificate{
@@ -223,56 +208,15 @@ func (f *Fulcio) Sign(content Content) (*protobundle.Bundle, error) {
 		},
 	}
 
-	content.Bundle(bundle, protocommon.HashAlgorithm_SHA2_256, dataDigest[:], signature)
+	content.Bundle(bundle, keypair.GetHashAlgorithm(), digest, signature)
 
 	return bundle, nil
 }
 
-type Keypair struct {
-	options *KeypairOptions
-}
+type KeySigner struct{}
 
-type KeypairOptions struct {
-	// Object that supports crypto.Signer.Sign, like crypto.PrivateKey
-	Signer crypto.Signer
-	// Hash algorithm to use to create digest of data provided to sign
-	HashAlgorithm protocommon.HashAlgorithm
-	// Optional hint of which signing key was used; will be included in bundle
-	PublicKeyHint []byte
-}
-
-func SignerKeypair(opts *KeypairOptions) (*Keypair, error) {
-	if opts.PublicKeyHint == nil {
-		pubKeyBytes, err := x509.MarshalPKIXPublicKey(opts.Signer.Public())
-		if err != nil {
-			return nil, err
-		}
-		hashedBytes := sha256.Sum256(pubKeyBytes)
-		opts.PublicKeyHint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
-	}
-
-	return &Keypair{options: opts}, nil
-}
-
-func (k Keypair) Sign(content Content) (*protobundle.Bundle, error) {
-	var hashFunc crypto.Hash
-
-	switch k.options.HashAlgorithm {
-	case protocommon.HashAlgorithm_SHA2_256:
-		hashFunc = crypto.Hash(crypto.SHA256)
-	case protocommon.HashAlgorithm_SHA2_384:
-		hashFunc = crypto.Hash(crypto.SHA384)
-	case protocommon.HashAlgorithm_SHA2_512:
-		hashFunc = crypto.Hash(crypto.SHA512)
-	default:
-		return nil, errors.New("Unsupported hash algorithm")
-	}
-
-	hasher := hashFunc.New()
-	hasher.Write(content.PreAuthEncoding())
-	digest := hasher.Sum(nil)
-
-	signature, err := k.options.Signer.Sign(rand.Reader, digest, hashFunc)
+func (ks *KeySigner) Sign(content Content, keypair Keypair) (*protobundle.Bundle, error) {
+	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
 	if err != nil {
 		return nil, err
 	}
@@ -282,13 +226,13 @@ func (k Keypair) Sign(content Content) (*protobundle.Bundle, error) {
 		VerificationMaterial: &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_PublicKey{
 				PublicKey: &protocommon.PublicKeyIdentifier{
-					Hint: string(k.options.PublicKeyHint),
+					Hint: string(keypair.GetHint()),
 				},
 			},
 		},
 	}
 
-	content.Bundle(bundle, k.options.HashAlgorithm, digest, signature)
+	content.Bundle(bundle, keypair.GetHashAlgorithm(), digest, signature)
 
 	return bundle, nil
 }
