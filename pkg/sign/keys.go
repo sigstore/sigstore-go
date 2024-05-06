@@ -23,10 +23,10 @@ import (
 	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"errors"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 type Keypair interface {
@@ -93,17 +93,12 @@ func (e *EphemeralKeypair) GetKeyAlgorithm() string {
 }
 
 func (e *EphemeralKeypair) GetPublicKeyPem() (string, error) {
-	pubKeyBytes, err := x509.MarshalPKIXPublicKey(e.privateKey.Public())
+	pubKeyBytes, err := cryptoutils.MarshalPublicKeyToPEM(e.privateKey.Public())
 	if err != nil {
 		return "", err
 	}
 
-	pemBlock := pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubKeyBytes,
-	}
-
-	return string(pem.EncodeToMemory(&pemBlock)), nil
+	return string(pubKeyBytes), nil
 }
 
 func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
