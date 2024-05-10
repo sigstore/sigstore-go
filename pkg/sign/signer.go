@@ -117,7 +117,13 @@ func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, er
 	}
 
 	// Sign JWT subject for proof of possession
-	subjectSignature, err := keypair.SignData([]byte(jwt.Sub))
+	subjectData := PlainData{Data: []byte(jwt.Sub)}
+	subjectDigest, err := subjectData.GetDigest(keypair.GetHashAlgorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	subjectSignature, err := keypair.SignDigest(subjectDigest)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +203,7 @@ func (f *Fulcio) Sign(content Content, keypair Keypair) (*protobundle.Bundle, er
 		return nil, err
 	}
 
-	signature, err := keypair.SignData(digest)
+	signature, err := keypair.SignDigest(digest)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +232,7 @@ func (ks *KeySigner) Sign(content Content, keypair Keypair) (*protobundle.Bundle
 		return nil, err
 	}
 
-	signature, err := keypair.SignData(digest)
+	signature, err := keypair.SignDigest(digest)
 	if err != nil {
 		return nil, err
 	}

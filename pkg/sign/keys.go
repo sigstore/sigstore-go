@@ -34,7 +34,7 @@ type Keypair interface {
 	GetHint() []byte
 	GetKeyAlgorithm() string
 	GetPublicKeyPem() (string, error)
-	SignData(data []byte) ([]byte, error)
+	SignDigest(digest []byte) ([]byte, error)
 }
 
 type EphemeralKeypairOptions struct {
@@ -115,13 +115,13 @@ func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
 	}
 }
 
-func (e *EphemeralKeypair) SignData(data []byte) ([]byte, error) {
+func (e *EphemeralKeypair) SignDigest(digest []byte) ([]byte, error) {
 	hashFunc, err := getHashFunc(e.options.HashAlgorithm)
 	if err != nil {
 		return nil, err
 	}
 
-	signature, err := e.privateKey.Sign(rand.Reader, data, hashFunc)
+	signature, err := e.privateKey.Sign(rand.Reader, digest, hashFunc)
 	if err != nil {
 		return nil, err
 	}
