@@ -64,38 +64,26 @@ func main() {
 		}
 	}
 
-	var signer sign.Signer
-	var keypair sign.Keypair
+	keypair, err := sign.NewEphemeralKeypair(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	publicKeyPem, err := keypair.GetPublicKeyPem()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Using public key:\n\n%s\n\n", publicKeyPem)
+
+	var fulcio *sign.Fulcio
 
 	if *idToken != "" {
 		fulcioOpts := &sign.FulcioOptions{
 			BaseURL:        "https://fulcio.sigstage.dev",
-			IdentityToken:  *idToken,
 			Timeout:        time.Duration(30 * time.Second),
 			LibraryVersion: Version,
 		}
 
-		signer = sign.NewFulcio(fulcioOpts)
-	} else {
-		// Create a keypair to sign with
-		var err error
-		keypair, err = sign.NewEphemeralKeypair(nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		publicKeyPem, err := keypair.GetPublicKeyPem()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Using public key:\n\n%s\n\n", publicKeyPem)
-
-		signer = &sign.KeySigner{}
-	}
-
-	bundle, err := signer.Sign(content, keypair)
-	if err != nil {
-		log.Fatal(err)
+		fulcio = sign.NewFulcio(fulcioOpts)
 	}
 
 	tsaOpts := &sign.TimestampAuthorityOptions{
@@ -105,7 +93,8 @@ func main() {
 	}
 
 	tsa := sign.NewTimestampAuthority(tsaOpts)
-	err = tsa.GetTimestamp(bundle)
+
+	bundle, err := sign.Bundle(content, keypair, fulcio, *idToken, &tsa)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -23,38 +23,26 @@ import (
 )
 
 type Content interface {
-	// Digest content with hash algorithm
-	GetDigest(hashAlgorithm protocommon.HashAlgorithm) ([]byte, error)
+	// Return the data to be signed
+	PreAuthEncoding() []byte
 	// Add something that satisfies protobundle.isBundle_Content to bundle
-	Bundle(bundle *protobundle.Bundle, signature []byte)
+	Bundle(bundle *protobundle.Bundle, signature, digest []byte, hashAlgorithm protocommon.HashAlgorithm)
 }
 
 type PlainData struct {
-	Data          []byte
-	hashAlgorithm protocommon.HashAlgorithm
-	digest        []byte
+	Data []byte
 }
 
-func (pd *PlainData) GetDigest(hashAlgorithm protocommon.HashAlgorithm) ([]byte, error) {
-	hashFunc, err := getHashFunc(hashAlgorithm)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	hasher := hashFunc.New()
-	hasher.Write(pd.Data)
-	pd.digest = hasher.Sum(nil)
-	pd.hashAlgorithm = hashAlgorithm
-
-	return pd.digest, nil
+func (pd *PlainData) PreAuthEncoding() []byte {
+	return pd.Data
 }
 
-func (pd *PlainData) Bundle(bundle *protobundle.Bundle, signature []byte) {
+func (pd *PlainData) Bundle(bundle *protobundle.Bundle, signature, digest []byte, hashAlgorithm protocommon.HashAlgorithm) {
 	bundle.Content = &protobundle.Bundle_MessageSignature{
 		MessageSignature: &protocommon.MessageSignature{
 			MessageDigest: &protocommon.HashOutput{
-				Algorithm: pd.hashAlgorithm,
-				Digest:    pd.digest,
+				Algorithm: hashAlgorithm,
+				Digest:    digest,
 			},
 			Signature: signature,
 		},
@@ -66,20 +54,12 @@ type DSSEData struct {
 	PayloadType string
 }
 
-func (d *DSSEData) GetDigest(hashAlgorithm protocommon.HashAlgorithm) ([]byte, error) {
+func (d *DSSEData) PreAuthEncoding() []byte {
 	pae := fmt.Sprintf("DSSEv1 %d %s %d %s", len(d.PayloadType), d.PayloadType, len(d.Data), d.Data)
-
-	hashFunc, err := getHashFunc(hashAlgorithm)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	hasher := hashFunc.New()
-	hasher.Write([]byte(pae))
-	return hasher.Sum(nil), nil
+	return []byte(pae)
 }
 
-func (d *DSSEData) Bundle(bundle *protobundle.Bundle, signature []byte) {
+func (d *DSSEData) Bundle(bundle *protobundle.Bundle, signature, _ []byte, _ protocommon.HashAlgorithm) {
 	sig := &protodsse.Signature{
 		Sig: signature,
 	}
