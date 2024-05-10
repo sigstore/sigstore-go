@@ -74,6 +74,7 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 	return &Fulcio{options: opts}
 }
 
+// Returns DER-encoded code signing certificate
 func (f *Fulcio) GetCertificate(keypair Keypair, identityToken string) ([]byte, error) {
 	// Get JWT from identity token
 	//

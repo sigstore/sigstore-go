@@ -56,6 +56,8 @@ func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, ti
 				},
 			},
 		}
+
+		// TODO: do verification of Fulcio certificate
 	} else {
 		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_PublicKey{
