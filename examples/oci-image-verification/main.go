@@ -262,8 +262,12 @@ func bundleFromOCIImage(imageRef string) (*bundle.ProtobufBundle, *string, error
 		return nil, nil, fmt.Errorf("error getting message signature: %w", err)
 	}
 	// 4. Construct and verify the bundle
+	bundleMediaType, err := bundle.MediaTypeString("0.1")
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting bundle media type: %w", err)
+	}
 	pb := protobundle.Bundle{
-		MediaType:            bundle.SigstoreBundleMediaType01,
+		MediaType:            bundleMediaType,
 		VerificationMaterial: verificationMaterial,
 		Content:              msgSignature,
 	}
