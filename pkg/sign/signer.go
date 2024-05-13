@@ -15,13 +15,31 @@
 package sign
 
 import (
+	"encoding/pem"
+
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 )
 
 const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 
-func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, timestampAuthority *TimestampAuthority) (*protobundle.Bundle, error) {
+type BundleOptions struct {
+	// Optional Fulcio instance to get code signing certificate from.
+	//
+	// Resulting bundle will contain a certificate for its verification
+	// material content, instead of a public key.
+	Fulcio *Fulcio
+	// Optional OIDC JWT to send to Fulcio; required if using Fulcio
+	IDToken string
+	// Optional list of timestamp authorities to contact for inclusion in bundle
+	TimestampAuthorities []*TimestampAuthority
+	// Optional Rekor instance to get transparency log entry from.
+	//
+	// Supports hashedrekord and dsse entry types
+	Rekor *Rekor
+}
+
+func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
 
 	// Sign content and add to bundle
@@ -33,8 +51,9 @@ func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, ti
 	content.Bundle(bundle, signature, digest, keypair.GetHashAlgorithm())
 
 	// Add verification information to bundle
-	if fulcio != nil {
-		certBytes, err := fulcio.GetCertificate(keypair, idToken)
+	var pubKeyPEM []byte
+	if opts.Fulcio != nil && opts.IDToken != "" {
+		pubKeyBytes, err := opts.Fulcio.GetCertificate(keypair, opts.IDToken)
 		if err != nil {
 			return nil, err
 		}
@@ -42,10 +61,15 @@ func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, ti
 		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_Certificate{
 				Certificate: &protocommon.X509Certificate{
-					RawBytes: certBytes,
+					RawBytes: pubKeyBytes,
 				},
 			},
 		}
+
+		pubKeyPEM = pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: pubKeyBytes,
+		})
 
 		// TODO: do verification of Fulcio certificate
 	} else {
@@ -56,9 +80,15 @@ func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, ti
 				},
 			},
 		}
+
+		pubKeyStr, err := keypair.GetPublicKeyPem()
+		if err != nil {
+			return nil, err
+		}
+		pubKeyPEM = []byte(pubKeyStr)
 	}
 
-	if timestampAuthority != nil {
+	for _, timestampAuthority := range opts.TimestampAuthorities {
 		timestampBytes, err := timestampAuthority.GetTimestamp(signature)
 		if err != nil {
 			return nil, err
@@ -68,10 +98,18 @@ func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, ti
 			SignedTimestamp: timestampBytes,
 		}
 
-		tsVerificationData := &protobundle.TimestampVerificationData{}
-		tsVerificationData.Rfc3161Timestamps = append(tsVerificationData.Rfc3161Timestamps, signedTimestamp)
+		if bundle.VerificationMaterial.TimestampVerificationData == nil {
+			bundle.VerificationMaterial.TimestampVerificationData = &protobundle.TimestampVerificationData{}
+		}
 
-		bundle.VerificationMaterial.TimestampVerificationData = tsVerificationData
+		bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps = append(bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps, signedTimestamp)
+	}
+
+	if opts.Rekor != nil {
+		err = opts.Rekor.GetTransparencyLog(pubKeyPEM, bundle)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return bundle, nil
