@@ -16,6 +16,7 @@ package sign
 
 import (
 	"encoding/pem"
+	"errors"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -33,13 +34,21 @@ type BundleOptions struct {
 	IDToken string
 	// Optional list of timestamp authorities to contact for inclusion in bundle
 	TimestampAuthorities []*TimestampAuthority
-	// Optional Rekor instance to get transparency log entry from.
+	// Optional list of Rekor instances to get transparency log entry from.
 	//
 	// Supports hashedrekord and dsse entry types
-	Rekor *Rekor
+	Rekors []*Rekor
 }
 
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
+	if keypair == nil {
+		return nil, errors.New("Must provide a keypair for signing, like EphemeralKeypair")
+	}
+
+	if opts.Fulcio != nil && opts.IDToken == "" {
+		return nil, errors.New("If opts.Fulcio is provided, must also supply opts.IDToken")
+	}
+
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
 
 	// Sign content and add to bundle
@@ -51,7 +60,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	content.Bundle(bundle, signature, digest, keypair.GetHashAlgorithm())
 
 	// Add verification information to bundle
-	var pubKeyPEM []byte
+	var verifierPEM []byte
 	if opts.Fulcio != nil && opts.IDToken != "" {
 		pubKeyBytes, err := opts.Fulcio.GetCertificate(keypair, opts.IDToken)
 		if err != nil {
@@ -66,7 +75,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			},
 		}
 
-		pubKeyPEM = pem.EncodeToMemory(&pem.Block{
+		verifierPEM = pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: pubKeyBytes,
 		})
@@ -85,7 +94,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		if err != nil {
 			return nil, err
 		}
-		pubKeyPEM = []byte(pubKeyStr)
+		verifierPEM = []byte(pubKeyStr)
 	}
 
 	for _, timestampAuthority := range opts.TimestampAuthorities {
@@ -105,10 +114,12 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps = append(bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps, signedTimestamp)
 	}
 
-	if opts.Rekor != nil {
-		err = opts.Rekor.GetTransparencyLog(pubKeyPEM, bundle)
-		if err != nil {
-			return nil, err
+	if len(opts.Rekors) > 0 {
+		for _, rekor := range opts.Rekors {
+			err = rekor.GetTransparencyLog(verifierPEM, bundle)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

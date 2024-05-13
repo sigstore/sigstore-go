@@ -105,7 +105,7 @@ func main() {
 			Timeout:        time.Duration(90 * time.Second),
 			LibraryVersion: Version,
 		}
-		opts.Rekor = sign.NewRekor(rekorOpts)
+		opts.Rekors = append(opts.Rekors, sign.NewRekor(rekorOpts))
 	}
 
 	bundle, err := sign.Bundle(content, keypair, opts)

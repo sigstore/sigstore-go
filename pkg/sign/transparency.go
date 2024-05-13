@@ -16,19 +16,18 @@ package sign
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
-	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client/entries"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
+	"github.com/sigstore/rekor/pkg/tle"
 	"github.com/sigstore/rekor/pkg/types"
 	"github.com/sigstore/rekor/pkg/types/dsse"
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
@@ -71,13 +70,10 @@ func (r *Rekor) GetTransparencyLog(pubKeyPEM []byte, b *protobundle.Bundle) erro
 	bundleCertificate := verificationMaterial.GetCertificate()
 
 	var proposedEntry models.ProposedEntry
-	var kind, version string
 
 	switch {
 	case dsseEnvelope != nil:
 		dsseType := dsse.New()
-		kind = dsse.KIND
-		version = dsseType.DefaultVersion()
 
 		artifactBytes, err := json.Marshal(dsseEnvelope)
 		if err != nil {
@@ -92,8 +88,6 @@ func (r *Rekor) GetTransparencyLog(pubKeyPEM []byte, b *protobundle.Bundle) erro
 		}
 	case messageSignature != nil:
 		hashedrekordType := hashedrekord.New()
-		kind = hashedrekord.KIND
-		version = hashedrekordType.DefaultVersion()
 
 		if bundleCertificate == nil {
 			return errors.New("hashedrekord requires X.509 certificate")
@@ -131,68 +125,16 @@ func (r *Rekor) GetTransparencyLog(pubKeyPEM []byte, b *protobundle.Bundle) erro
 	}
 
 	entry := resp.Payload[resp.ETag]
-	keyID, err := hex.DecodeString(*entry.LogID)
+	tlogEntry, err := tle.GenerateTransparencyLogEntry(entry)
 	if err != nil {
 		return err
 	}
 
-	set, err := base64.StdEncoding.DecodeString(entry.Verification.SignedEntryTimestamp.String())
-	if err != nil {
-		return err
+	if b.VerificationMaterial.TlogEntries == nil {
+		b.VerificationMaterial.TlogEntries = []*protorekor.TransparencyLogEntry{}
 	}
 
-	inclusionProof := entry.Verification.InclusionProof
-	rootHash, err := hex.DecodeString(*inclusionProof.RootHash)
-	if err != nil {
-		return err
-	}
-
-	hashes := make([][]byte, len(inclusionProof.Hashes))
-	for i := 0; i < len(inclusionProof.Hashes); i++ {
-		eachHash, err := hex.DecodeString(inclusionProof.Hashes[i])
-		if err != nil {
-			return err
-		}
-		hashes[i] = eachHash
-	}
-
-	body, ok := entry.Body.(string)
-	if !ok {
-		return errors.New("unable to understand rekor body")
-	}
-	canonicalizedBody, err := base64.StdEncoding.DecodeString(body)
-	if err != nil {
-		return err
-	}
-
-	tlogEntries := []*protorekor.TransparencyLogEntry{
-		{
-			LogIndex: *entry.LogIndex,
-			LogId: &protocommon.LogId{
-				KeyId: keyID,
-			},
-			KindVersion: &protorekor.KindVersion{
-				Kind:    kind,
-				Version: version,
-			},
-			IntegratedTime: *entry.IntegratedTime,
-			InclusionPromise: &protorekor.InclusionPromise{
-				SignedEntryTimestamp: set,
-			},
-			InclusionProof: &protorekor.InclusionProof{
-				LogIndex: *inclusionProof.LogIndex,
-				RootHash: rootHash,
-				TreeSize: *inclusionProof.TreeSize,
-				Hashes:   hashes,
-				Checkpoint: &protorekor.Checkpoint{
-					Envelope: *inclusionProof.Checkpoint,
-				},
-			},
-			CanonicalizedBody: canonicalizedBody,
-		},
-	}
-
-	b.VerificationMaterial.TlogEntries = tlogEntries
+	b.VerificationMaterial.TlogEntries = append(b.VerificationMaterial.TlogEntries, tlogEntry)
 
 	return nil
 }
