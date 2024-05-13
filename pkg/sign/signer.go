@@ -15,99 +15,64 @@
 package sign
 
 import (
-	"crypto"
-	"crypto/rand"
-	"crypto/sha256"
-	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
-	"crypto/x509"
-	"encoding/base64"
-	"errors"
-
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 )
 
-type Signer interface {
-	Sign(data []byte) (*protobundle.Bundle, error)
-}
+const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 
-// TODO: implement
-// type Fulcio struct {
-//	baseURL       string
-//	identityToken string
-// }
+func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, timestampAuthority *TimestampAuthority) (*protobundle.Bundle, error) {
+	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
 
-// func (f *Fulcio) Sign(data []byte) (*protobundle.Bundle, error) {}
-
-type Keypair struct {
-	options *KeypairOptions
-}
-
-type KeypairOptions struct {
-	// Object that supports crypto.Signer.Sign, like crypto.PrivateKey
-	Signer crypto.Signer
-	// Hash algorithm to use to create digest of data provided to sign
-	HashAlgorithm protocommon.HashAlgorithm
-	// Optional hint of which signing key was used; will be included in bundle
-	PublicKeyHint []byte
-}
-
-func SignerKeypair(opts *KeypairOptions) (*Keypair, error) {
-	if opts.PublicKeyHint == nil {
-		pubKeyBytes, err := x509.MarshalPKIXPublicKey(opts.Signer.Public())
-		if err != nil {
-			return nil, err
-		}
-		hashedBytes := sha256.Sum256(pubKeyBytes)
-		opts.PublicKeyHint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
-	}
-
-	return &Keypair{options: opts}, nil
-}
-
-func (k Keypair) Sign(data []byte) (*protobundle.Bundle, error) {
-	bundle := protobundle.Bundle{
-		MediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
-		VerificationMaterial: &protobundle.VerificationMaterial{
-			Content: &protobundle.VerificationMaterial_PublicKey{
-				PublicKey: &protocommon.PublicKeyIdentifier{
-					Hint: string(k.options.PublicKeyHint),
-				},
-			},
-		},
-	}
-
-	var hashFunc crypto.Hash
-
-	switch k.options.HashAlgorithm {
-	case protocommon.HashAlgorithm_SHA2_256:
-		hashFunc = crypto.Hash(crypto.SHA256)
-	case protocommon.HashAlgorithm_SHA2_384:
-		hashFunc = crypto.Hash(crypto.SHA384)
-	case protocommon.HashAlgorithm_SHA2_512:
-		hashFunc = crypto.Hash(crypto.SHA512)
-	default:
-		return nil, errors.New("Unsupported hash algorithm")
-	}
-
-	hasher := hashFunc.New()
-	hasher.Write(data)
-	digest := hasher.Sum(nil)
-
-	signature, err := k.options.Signer.Sign(rand.Reader, digest, hashFunc)
+	// Sign content and add to bundle
+	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
 	if err != nil {
 		return nil, err
 	}
 
-	bundle.Content = &protobundle.Bundle_MessageSignature{
-		MessageSignature: &protocommon.MessageSignature{
-			MessageDigest: &protocommon.HashOutput{
-				Algorithm: k.options.HashAlgorithm,
-				Digest:    digest,
+	content.Bundle(bundle, signature, digest, keypair.GetHashAlgorithm())
+
+	// Add verification information to bundle
+	if fulcio != nil {
+		certBytes, err := fulcio.GetCertificate(keypair, idToken)
+		if err != nil {
+			return nil, err
+		}
+
+		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
+			Content: &protobundle.VerificationMaterial_Certificate{
+				Certificate: &protocommon.X509Certificate{
+					RawBytes: certBytes,
+				},
 			},
-			Signature: signature,
-		},
+		}
+
+		// TODO: do verification of Fulcio certificate
+	} else {
+		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
+			Content: &protobundle.VerificationMaterial_PublicKey{
+				PublicKey: &protocommon.PublicKeyIdentifier{
+					Hint: string(keypair.GetHint()),
+				},
+			},
+		}
 	}
 
-	return &bundle, nil
+	if timestampAuthority != nil {
+		timestampBytes, err := timestampAuthority.GetTimestamp(signature)
+		if err != nil {
+			return nil, err
+		}
+
+		signedTimestamp := &protocommon.RFC3161SignedTimestamp{
+			SignedTimestamp: timestampBytes,
+		}
+
+		tsVerificationData := &protobundle.TimestampVerificationData{}
+		tsVerificationData.Rfc3161Timestamps = append(tsVerificationData.Rfc3161Timestamps, signedTimestamp)
+
+		bundle.VerificationMaterial.TimestampVerificationData = tsVerificationData
+	}
+
+	return bundle, nil
 }

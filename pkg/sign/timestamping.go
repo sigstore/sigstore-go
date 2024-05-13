@@ -22,8 +22,6 @@ import (
 	"time"
 
 	"github.com/digitorus/timestamp"
-	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
-	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
 	tsagenclient "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 )
@@ -44,33 +42,22 @@ func NewTimestampAuthority(opts *TimestampAuthorityOptions) TimestampAuthority {
 	}
 }
 
-func (ta *TimestampAuthority) GetTimestamp(b *protobundle.Bundle) error {
+func (ta *TimestampAuthority) GetTimestamp(signature []byte) ([]byte, error) {
+	signatureHash := sha256.Sum256(signature)
+
 	req := &timestamp.Request{
-		Certificates: true,
+		Certificates:  true,
+		HashAlgorithm: crypto.SHA256,
+		HashedMessage: signatureHash[:],
 	}
-
-	messageSignature := b.GetMessageSignature()
-
-	if messageSignature != nil {
-		signatureHash := sha256.Sum256(messageSignature.Signature)
-		req.HashAlgorithm = crypto.SHA256
-		req.HashedMessage = signatureHash[:]
-	}
-
 	reqBytes, err := req.Marshal()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	userAgent := "sigstore-go"
-	if ta.options.LibraryVersion != "" {
-		userAgent += "/"
-		userAgent += ta.options.LibraryVersion
-	}
-
-	client, err := tsaclient.GetTimestampClient(ta.options.BaseURL, tsaclient.WithUserAgent(userAgent), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
+	client, err := tsaclient.GetTimestampClient(ta.options.BaseURL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	clientParams := tsagenclient.NewGetTimestampResponseParams()
@@ -82,31 +69,23 @@ func (ta *TimestampAuthority) GetTimestamp(b *protobundle.Bundle) error {
 	var respBytes bytes.Buffer
 	_, err = client.Timestamp.GetTimestampResponse(clientParams, &respBytes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = timestamp.ParseResponse(respBytes.Bytes())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	signedTimestamp := &protocommon.RFC3161SignedTimestamp{
-		SignedTimestamp: respBytes.Bytes(),
+	return respBytes.Bytes(), nil
+}
+
+func constructUserAgent(version string) string {
+	userAgent := "sigstore-go"
+	if version != "" {
+		userAgent += "/"
+		userAgent += version
 	}
 
-	vm := b.GetVerificationMaterial()
-	if vm == nil {
-		vm = &protobundle.VerificationMaterial{}
-		b.VerificationMaterial = vm
-	}
-
-	tsVerificationData := vm.GetTimestampVerificationData()
-	if tsVerificationData == nil {
-		tsVerificationData = &protobundle.TimestampVerificationData{}
-		vm.TimestampVerificationData = tsVerificationData
-	}
-
-	tsVerificationData.Rfc3161Timestamps = append(tsVerificationData.Rfc3161Timestamps, signedTimestamp)
-
-	return nil
+	return userAgent
 }

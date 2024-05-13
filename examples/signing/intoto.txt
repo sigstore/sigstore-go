@@ -1,0 +1,1 @@
+{"_type":"https://in-toto.io/Statement/v0.1","subject":[{"name":"hello_world.txt","digest":{"sha256":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}}],"predicateType":"something","predicate":{}}

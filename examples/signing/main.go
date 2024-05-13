@@ -15,54 +15,75 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
+	"flag"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
-	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/sign"
 )
 
 var Version string
+var idToken *string
+var intoto *bool
+
+func init() {
+	idToken = flag.String("id-token", "", "OIDC token to send to Fulcio")
+	intoto = flag.Bool("in-toto", false, "Content to sign is in-toto document")
+	flag.Parse()
+	if flag.NArg() == 0 {
+		usage()
+		os.Exit(1)
+	}
+}
+
+func usage() {
+	fmt.Printf("Usage: %s [OPTIONS] FILE_TO_SIGN\n", os.Args[0])
+	flag.PrintDefaults()
+}
 
 func main() {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var content sign.Content
+
+	data, err := os.ReadFile(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Print out privateKey.PublicKey() in PEM format
-	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if *intoto {
+		content = &sign.DSSEData{
+			Data:        data,
+			PayloadType: "application/vnd.in-toto+json",
+		}
+	} else {
+		content = &sign.PlainData{
+			Data: data,
+		}
+	}
+
+	keypair, err := sign.NewEphemeralKeypair(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	pemBlock := pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pubKeyBytes,
-	}
-	fmt.Println(string(pem.EncodeToMemory(&pemBlock)))
-
-	keypairOpts := &sign.KeypairOptions{
-		Signer:        privateKey,
-		HashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
-		PublicKeyHint: []byte("someKeyHint"),
-	}
-	signer, err := sign.SignerKeypair(keypairOpts)
+	publicKeyPem, err := keypair.GetPublicKeyPem()
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Printf("Using public key:\n\n%s\n\n", publicKeyPem)
 
-	bundle, err := signer.Sign([]byte("hello world"))
-	if err != nil {
-		log.Fatal(err)
+	var fulcio *sign.Fulcio
+
+	if *idToken != "" {
+		fulcioOpts := &sign.FulcioOptions{
+			BaseURL:        "https://fulcio.sigstage.dev",
+			Timeout:        time.Duration(30 * time.Second),
+			LibraryVersion: Version,
+		}
+
+		fulcio = sign.NewFulcio(fulcioOpts)
 	}
 
 	tsaOpts := &sign.TimestampAuthorityOptions{
@@ -72,7 +93,8 @@ func main() {
 	}
 
 	tsa := sign.NewTimestampAuthority(tsaOpts)
-	err = tsa.GetTimestamp(bundle)
+
+	bundle, err := sign.Bundle(content, keypair, fulcio, *idToken, &tsa)
 	if err != nil {
 		log.Fatal(err)
 	}
