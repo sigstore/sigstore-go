@@ -22,16 +22,6 @@ import (
 const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 
 func Bundle(content Content, keypair Keypair, fulcio *Fulcio, idToken string, timestampAuthority *TimestampAuthority) (*protobundle.Bundle, error) {
-	// See if keypair was provided
-	if keypair == nil {
-		var err error
-		ephemeralKeypair, err := NewEphemeralKeypair(nil)
-		if err != nil {
-			return nil, err
-		}
-		keypair = ephemeralKeypair
-	}
-
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
 
 	// Sign content and add to bundle

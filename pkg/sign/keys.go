@@ -38,16 +38,15 @@ type Keypair interface {
 }
 
 type EphemeralKeypairOptions struct {
-	// Optional hash algorithm to use to create digest of data provided to sign
-	HashAlgorithm protocommon.HashAlgorithm
 	// Optional hint of for signing key
 	Hint []byte
 	// TODO: support additional key algorithms
 }
 
 type EphemeralKeypair struct {
-	options    *EphemeralKeypairOptions
-	privateKey *ecdsa.PrivateKey
+	options       *EphemeralKeypairOptions
+	privateKey    *ecdsa.PrivateKey
+	hashAlgorithm protocommon.HashAlgorithm
 }
 
 func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, error) {
@@ -60,10 +59,6 @@ func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, erro
 		return nil, err
 	}
 
-	if opts.HashAlgorithm == protocommon.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED {
-		opts.HashAlgorithm = protocommon.HashAlgorithm_SHA2_256
-	}
-
 	if opts.Hint == nil {
 		pubKeyBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
 		if err != nil {
@@ -74,15 +69,16 @@ func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, erro
 	}
 
 	ephemeralKeypair := EphemeralKeypair{
-		options:    opts,
-		privateKey: privateKey,
+		options:       opts,
+		privateKey:    privateKey,
+		hashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
 	}
 
 	return &ephemeralKeypair, nil
 }
 
 func (e *EphemeralKeypair) GetHashAlgorithm() protocommon.HashAlgorithm {
-	return e.options.HashAlgorithm
+	return e.hashAlgorithm
 }
 
 func (e *EphemeralKeypair) GetHint() []byte {
@@ -117,7 +113,7 @@ func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
 }
 
 func (e *EphemeralKeypair) SignData(data []byte) ([]byte, []byte, error) {
-	hashFunc, err := getHashFunc(e.options.HashAlgorithm)
+	hashFunc, err := getHashFunc(e.hashAlgorithm)
 	if err != nil {
 		return nil, nil, err
 	}
