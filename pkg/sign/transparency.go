@@ -39,7 +39,7 @@ import (
 )
 
 type Transparency interface {
-	GetTransparencyLog([]byte, *protobundle.Bundle) error
+	GetTransparencyLogEntry([]byte, *protobundle.Bundle) error
 }
 
 type Rekor struct {
@@ -59,7 +59,7 @@ func NewRekor(opts *RekorOptions) *Rekor {
 	return &Rekor{options: opts}
 }
 
-func (r *Rekor) GetTransparencyLog(pubKeyPEM []byte, b *protobundle.Bundle) error {
+func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle) error {
 	artifactProperties := types.ArtifactProperties{
 		PublicKeyBytes: [][]byte{pubKeyPEM},
 	}

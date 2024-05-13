@@ -116,7 +116,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	if len(opts.Rekors) > 0 {
 		for _, rekor := range opts.Rekors {
-			err = rekor.GetTransparencyLog(verifierPEM, bundle)
+			err = rekor.GetTransparencyLogEntry(verifierPEM, bundle)
 			if err != nil {
 				return nil, err
 			}
