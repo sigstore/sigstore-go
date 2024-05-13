@@ -25,7 +25,7 @@ build:
 
 .PHONY: build-examples
 build-examples:
-	go build $(LDFLAGS) -C -o oci-image-verification ./examples/oci-image-verification
+	go build -C $(LDFLAGS) -o oci-image-verification ./examples/oci-image-verification
 	go build $(LDFLAGS) -o sigstore-signing ./examples/signing
 
 .PHONY: test
