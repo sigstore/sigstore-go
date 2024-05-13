@@ -15,10 +15,18 @@
 VERSION := `git describe --tags`
 LDFLAGS = -ldflags "-X main.Version=$(VERSION)"
 
+.PHONY: all
+all: build build-examples
+
 .PHONY: build
 build:
 	go build $(LDFLAGS) ./cmd/sigstore-go
 	go build $(LDFLAGS) -o conformance ./cmd/conformance
+
+.PHONY: build-examples
+build-examples:
+	go build $(LDFLAGS) -o oci-image-verification ./examples/oci-image-verification
+	go build $(LDFLAGS) -o sigstore-signing ./examples/signing
 
 .PHONY: test
 test:
