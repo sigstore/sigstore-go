@@ -29,10 +29,14 @@ import (
 var Version string
 var idToken *string
 var intoto *bool
+var tsa *bool
+var rekor *bool
 
 func init() {
 	idToken = flag.String("id-token", "", "OIDC token to send to Fulcio")
 	intoto = flag.Bool("in-toto", false, "Content to sign is in-toto document")
+	tsa = flag.Bool("tsa", false, "Include signed timestamp from timestamp authority")
+	rekor = flag.Bool("rekor", false, "Including transparency log entry from Rekor")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		usage()
@@ -74,7 +78,7 @@ func main() {
 	}
 	fmt.Printf("Using public key:\n\n%s\n\n", publicKeyPem)
 
-	var fulcio *sign.Fulcio
+	opts := sign.BundleOptions{}
 
 	if *idToken != "" {
 		fulcioOpts := &sign.FulcioOptions{
@@ -82,19 +86,29 @@ func main() {
 			Timeout:        time.Duration(30 * time.Second),
 			LibraryVersion: Version,
 		}
-
-		fulcio = sign.NewFulcio(fulcioOpts)
+		opts.Fulcio = sign.NewFulcio(fulcioOpts)
+		opts.IDToken = *idToken
 	}
 
-	tsaOpts := &sign.TimestampAuthorityOptions{
-		BaseURL:        "https://timestamp.githubapp.com",
-		Timeout:        time.Duration(30 * time.Second),
-		LibraryVersion: Version,
+	if *tsa {
+		tsaOpts := &sign.TimestampAuthorityOptions{
+			BaseURL:        "https://timestamp.githubapp.com",
+			Timeout:        time.Duration(30 * time.Second),
+			LibraryVersion: Version,
+		}
+		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 	}
 
-	tsa := sign.NewTimestampAuthority(tsaOpts)
+	if *rekor {
+		rekorOpts := &sign.RekorOptions{
+			BaseURL:        "https://rekor.sigstage.dev",
+			Timeout:        time.Duration(90 * time.Second),
+			LibraryVersion: Version,
+		}
+		opts.Rekors = append(opts.Rekors, sign.NewRekor(rekorOpts))
+	}
 
-	bundle, err := sign.Bundle(content, keypair, fulcio, *idToken, &tsa)
+	bundle, err := sign.Bundle(content, keypair, opts)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -36,8 +36,8 @@ type TimestampAuthority struct {
 	options *TimestampAuthorityOptions
 }
 
-func NewTimestampAuthority(opts *TimestampAuthorityOptions) TimestampAuthority {
-	return TimestampAuthority{
+func NewTimestampAuthority(opts *TimestampAuthorityOptions) *TimestampAuthority {
+	return &TimestampAuthority{
 		options: opts,
 	}
 }
