@@ -23,25 +23,33 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
+var Version string
 var bundlePath *string
 var certPath *string
 var certOIDC *string
 var certSAN *string
+var identityToken *string
 var signaturePath *string
+var staging = false
 var trustedRootPath *string
 
 func usage() {
 	fmt.Println("Usage:")
+	fmt.Printf("\t%s sign --identity-token TOKEN --signature FILE --certificate FILE [--staging] FILE", os.Args[0])
+	fmt.Printf("\t%s sign-bundle --identity-token TOKEN --bundle FILE [--staging] FILE", os.Args[0])
 	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 }
@@ -93,33 +101,135 @@ func getTrustedRoot(staging bool) root.TrustedMaterial {
 	return tr
 }
 
+func parseArgs() {
+	for i := 2; i < len(os.Args); {
+		switch os.Args[i] {
+		case "--bundle":
+			bundlePath = &os.Args[i+1]
+			i += 2
+		case "--certificate":
+			certPath = &os.Args[i+1]
+			i += 2
+		case "--certificate-oidc-issuer":
+			certOIDC = &os.Args[i+1]
+			i += 2
+		case "--certificate-identity":
+			certSAN = &os.Args[i+1]
+			i += 2
+		case "--identity-token":
+			identityToken = &os.Args[i+1]
+			i += 2
+		case "--signature":
+			signaturePath = &os.Args[i+1]
+			i += 2
+		case "--staging":
+			staging = true
+			i++
+		case "--trusted-root":
+			trustedRootPath = &os.Args[i+1]
+			i += 2
+		default:
+			i++
+		}
+	}
+}
+
+func signBundle() (*protobundle.Bundle, error) {
+	timeout := time.Duration(60 * time.Second)
+
+	signingOptions := sign.BundleOptions{}
+
+	instance := "sigstore"
+	if staging {
+		instance = "sigstage"
+	}
+
+	fulcioOpts := &sign.FulcioOptions{
+		BaseURL:        fmt.Sprintf("https://fulcio.%s.dev", instance),
+		Timeout:        timeout,
+		LibraryVersion: Version,
+	}
+	signingOptions.Fulcio = sign.NewFulcio(fulcioOpts)
+	signingOptions.IDToken = *identityToken
+
+	rekorOpts := &sign.RekorOptions{
+		BaseURL:        fmt.Sprintf("https://rekor.%s.dev", instance),
+		Timeout:        timeout,
+		LibraryVersion: Version,
+	}
+	signingOptions.Rekors = append(signingOptions.Rekors, sign.NewRekor(rekorOpts))
+
+	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
+	if err != nil {
+		return nil, err
+	}
+	content := &sign.PlainData{Data: fileBytes}
+	keypair, err := sign.NewEphemeralKeypair(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	bundle, err := sign.Bundle(content, keypair, signingOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return bundle, nil
+}
+
 func main() {
-	if len(os.Args) < 8 {
+	if len(os.Args) < 2 {
 		usage()
 		os.Exit(1)
 	}
 
-	staging := false
+	parseArgs()
 
 	switch os.Args[1] {
-	case "verify":
-		for i := 2; i < len(os.Args); i += 2 {
-			switch os.Args[i] {
-			case "--certificate":
-				certPath = &os.Args[i+1]
-			case "--certificate-oidc-issuer":
-				certOIDC = &os.Args[i+1]
-			case "--certificate-identity":
-				certSAN = &os.Args[i+1]
-			case "--signature":
-				signaturePath = &os.Args[i+1]
-			case "--trusted-root":
-				trustedRootPath = &os.Args[i+1]
-			case "--staging":
-				staging = true
-			}
+	case "sign":
+		bundle, err := signBundle()
+		if err != nil {
+			log.Fatal(err)
 		}
 
+		messageSignature := bundle.GetMessageSignature()
+		if messageSignature == nil {
+			log.Fatal("unable to load signature")
+		}
+		b64MessageSignature := base64.StdEncoding.EncodeToString(messageSignature.Signature)
+		err = os.WriteFile(*signaturePath, []byte(b64MessageSignature), 0600)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		verificationMaterial := bundle.GetVerificationMaterial()
+		if verificationMaterial == nil {
+			log.Fatal("unable to load verification material")
+		}
+		certificate := verificationMaterial.GetCertificate()
+		if certificate == nil {
+			log.Fatal("unable to load certificate")
+		}
+		pemBlock := &pem.Block{Type: "certificate", Bytes: certificate.RawBytes}
+		err = os.WriteFile(*certPath, pem.EncodeToMemory(pemBlock), 0600)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case "sign-bundle":
+		bundle, err := signBundle()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		bundleBytes, err := protojson.Marshal(bundle)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = os.WriteFile(*bundlePath, bundleBytes, 0600)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case "verify":
 		// Load certificate
 		cert, err := os.ReadFile(*certPath)
 		if err != nil {
@@ -209,21 +319,6 @@ func main() {
 			log.Fatal(err)
 		}
 	case "verify-bundle":
-		for i := 2; i < len(os.Args); i += 2 {
-			switch os.Args[i] {
-			case "--bundle":
-				bundlePath = &os.Args[i+1]
-			case "--certificate-oidc-issuer":
-				certOIDC = &os.Args[i+1]
-			case "--certificate-identity":
-				certSAN = &os.Args[i+1]
-			case "--trusted-root":
-				trustedRootPath = &os.Args[i+1]
-			case "--staging":
-				staging = true
-			}
-		}
-
 		// Load bundle
 		b, err := bundle.LoadJSONFromPath(*bundlePath)
 		if err != nil {
