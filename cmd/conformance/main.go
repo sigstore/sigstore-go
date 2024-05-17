@@ -134,7 +134,7 @@ func parseArgs() {
 	}
 }
 
-func signBundle() (*protobundle.Bundle, error) {
+func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 	timeout := time.Duration(60 * time.Second)
 
 	signingOptions := sign.BundleOptions{}
@@ -152,12 +152,14 @@ func signBundle() (*protobundle.Bundle, error) {
 	signingOptions.Fulcio = sign.NewFulcio(fulcioOpts)
 	signingOptions.IDToken = *identityToken
 
-	rekorOpts := &sign.RekorOptions{
-		BaseURL:        fmt.Sprintf("https://rekor.%s.dev", instance),
-		Timeout:        timeout,
-		LibraryVersion: Version,
+	if withRekor {
+		rekorOpts := &sign.RekorOptions{
+			BaseURL:        fmt.Sprintf("https://rekor.%s.dev", instance),
+			Timeout:        timeout,
+			LibraryVersion: Version,
+		}
+		signingOptions.Rekors = append(signingOptions.Rekors, sign.NewRekor(rekorOpts))
 	}
-	signingOptions.Rekors = append(signingOptions.Rekors, sign.NewRekor(rekorOpts))
 
 	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
 	if err != nil {
@@ -187,7 +189,8 @@ func main() {
 
 	switch os.Args[1] {
 	case "sign":
-		bundle, err := signBundle()
+		// We don't need Rekor entries for detached materials
+		bundle, err := signBundle(false)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -216,7 +219,7 @@ func main() {
 			log.Fatal(err)
 		}
 	case "sign-bundle":
-		bundle, err := signBundle()
+		bundle, err := signBundle(true)
 		if err != nil {
 			log.Fatal(err)
 		}
