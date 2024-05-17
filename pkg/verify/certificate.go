@@ -24,10 +24,10 @@ import (
 
 func VerifyLeafCertificate(observerTimestamp time.Time, leafCert x509.Certificate, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	for _, ca := range trustedMaterial.FulcioCertificateAuthorities() {
-		if !ca.ValidityPeriodStart.IsZero() && leafCert.NotBefore.Before(ca.ValidityPeriodStart) {
+		if !ca.ValidityPeriodStart.IsZero() && observerTimestamp.Before(ca.ValidityPeriodStart) {
 			continue
 		}
-		if !ca.ValidityPeriodEnd.IsZero() && leafCert.NotAfter.After(ca.ValidityPeriodEnd) {
+		if !ca.ValidityPeriodEnd.IsZero() && observerTimestamp.After(ca.ValidityPeriodEnd) {
 			continue
 		}
 
