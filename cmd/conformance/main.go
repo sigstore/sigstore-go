@@ -39,6 +39,7 @@ var certOIDC *string
 var certSAN *string
 var signaturePath *string
 var trustedRootPath *string
+var signingAlgorithm *string
 
 func usage() {
 	fmt.Println("Usage:")
@@ -117,6 +118,8 @@ func main() {
 				trustedRootPath = &os.Args[i+1]
 			case "--staging":
 				staging = true
+			case "--signing-algorithm":
+				signingAlgorithm = &os.Args[i+1]
 			}
 		}
 
@@ -165,7 +168,7 @@ func main() {
 			Content: &protobundle.Bundle_MessageSignature{
 				MessageSignature: &protocommon.MessageSignature{
 					MessageDigest: &protocommon.HashOutput{
-						Algorithm: protocommon.HashAlgorithm_SHA2_256,
+						Algorithm: protocommon.HashAlgorithm(protocommon.HashAlgorithm_value[*signingAlgorithm]),
 						Digest:    fileDigest[:],
 					},
 					Signature: sigBytes,

@@ -20,13 +20,14 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
+	"crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"golang.org/x/crypto/sha3"
 )
 
 type Keypair interface {
@@ -39,8 +40,8 @@ type Keypair interface {
 
 type EphemeralKeypairOptions struct {
 	// Optional hint of for signing key
-	Hint []byte
-	// TODO: support additional key algorithms
+	Hint          []byte
+	HashAlgorithm protocommon.HashAlgorithm
 }
 
 type EphemeralKeypair struct {
@@ -51,7 +52,7 @@ type EphemeralKeypair struct {
 
 func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, error) {
 	if opts == nil {
-		opts = &EphemeralKeypairOptions{}
+		opts = &EphemeralKeypairOptions{HashAlgorithm: protocommon.HashAlgorithm_SHA2_256}
 	}
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -59,19 +60,35 @@ func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, erro
 		return nil, err
 	}
 
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
+	if err != nil {
+		return nil, err
+	}
+
 	if opts.Hint == nil {
-		pubKeyBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
-		if err != nil {
-			return nil, err
+		switch opts.HashAlgorithm {
+		case protocommon.HashAlgorithm_SHA2_384:
+			hashedBytes := sha512.Sum384(pubKeyBytes)
+			opts.Hint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
+		case protocommon.HashAlgorithm_SHA2_512:
+			hashedBytes := sha512.Sum512(pubKeyBytes)
+			opts.Hint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
+		case protocommon.HashAlgorithm_SHA3_256:
+			hashedBytes := sha3.Sum256(pubKeyBytes)
+			opts.Hint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
+		case protocommon.HashAlgorithm_SHA3_384:
+			hashedBytes := sha3.Sum384(pubKeyBytes)
+			opts.Hint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
+		default:
+			hashedBytes := sha256.Sum256(pubKeyBytes)
+			opts.Hint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
 		}
-		hashedBytes := sha256.Sum256(pubKeyBytes)
-		opts.Hint = []byte(base64.StdEncoding.EncodeToString(hashedBytes[:]))
 	}
 
 	ephemeralKeypair := EphemeralKeypair{
 		options:       opts,
 		privateKey:    privateKey,
-		hashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
+		hashAlgorithm: opts.HashAlgorithm,
 	}
 
 	return &ephemeralKeypair, nil
@@ -106,9 +123,13 @@ func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
 		return crypto.Hash(crypto.SHA384), nil
 	case protocommon.HashAlgorithm_SHA2_512:
 		return crypto.Hash(crypto.SHA512), nil
+	case protocommon.HashAlgorithm_SHA3_256:
+		return crypto.Hash(crypto.SHA3_256), nil
+	case protocommon.HashAlgorithm_SHA3_384:
+		return crypto.Hash(crypto.SHA3_384), nil
 	default:
 		var hash crypto.Hash
-		return hash, errors.New("Unsupported hash algorithm")
+		return hash, errors.New("unsupported hash algorithm")
 	}
 }
 

@@ -42,11 +42,11 @@ type BundleOptions struct {
 
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
 	if keypair == nil {
-		return nil, errors.New("Must provide a keypair for signing, like EphemeralKeypair")
+		return nil, errors.New("must provide a keypair for signing, like EphemeralKeypair")
 	}
 
 	if opts.Fulcio != nil && opts.IDToken == "" {
-		return nil, errors.New("If opts.Fulcio is provided, must also supply opts.IDToken")
+		return nil, errors.New("if opts.Fulcio is provided, must also supply opts.IDToken")
 	}
 
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
