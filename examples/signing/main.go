@@ -84,6 +84,7 @@ func main() {
 		fulcioOpts := &sign.FulcioOptions{
 			BaseURL:        "https://fulcio.sigstage.dev",
 			Timeout:        time.Duration(30 * time.Second),
+			Retries:        1,
 			LibraryVersion: Version,
 		}
 		opts.Fulcio = sign.NewFulcio(fulcioOpts)
@@ -94,6 +95,7 @@ func main() {
 		tsaOpts := &sign.TimestampAuthorityOptions{
 			BaseURL:        "https://timestamp.githubapp.com",
 			Timeout:        time.Duration(30 * time.Second),
+			Retries:        1,
 			LibraryVersion: Version,
 		}
 		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
@@ -103,6 +105,7 @@ func main() {
 		rekorOpts := &sign.RekorOptions{
 			BaseURL:        "https://rekor.sigstage.dev",
 			Timeout:        time.Duration(90 * time.Second),
+			Retries:        1,
 			LibraryVersion: Version,
 		}
 		opts.Rekors = append(opts.Rekors, sign.NewRekor(rekorOpts))

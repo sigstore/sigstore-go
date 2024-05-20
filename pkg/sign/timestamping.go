@@ -19,6 +19,7 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"io"
+	"math"
 	"time"
 
 	"github.com/digitorus/timestamp"
@@ -27,8 +28,13 @@ import (
 )
 
 type TimestampAuthorityOptions struct {
-	BaseURL        string
-	Timeout        time.Duration
+	// URL of Timestamp Authority instance
+	BaseURL string
+	// Optional timeout for network requests
+	Timeout time.Duration
+	// Optional number of times to retry on HTTP 5XX
+	Retries uint
+	// Optional version string for user agent
 	LibraryVersion string
 }
 
@@ -37,9 +43,7 @@ type TimestampAuthority struct {
 }
 
 func NewTimestampAuthority(opts *TimestampAuthorityOptions) *TimestampAuthority {
-	return &TimestampAuthority{
-		options: opts,
-	}
+	return &TimestampAuthority{options: opts}
 }
 
 func (ta *TimestampAuthority) GetTimestamp(signature []byte) ([]byte, error) {
@@ -60,14 +64,27 @@ func (ta *TimestampAuthority) GetTimestamp(signature []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	clientParams := tsagenclient.NewGetTimestampResponseParams()
-	if ta.options.Timeout != 0 {
-		clientParams.SetTimeout(ta.options.Timeout)
-	}
-	clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))
-
+	attempts := uint(0)
 	var respBytes bytes.Buffer
-	_, err = client.Timestamp.GetTimestampResponse(clientParams, &respBytes)
+
+	for attempts <= ta.options.Retries {
+		clientParams := tsagenclient.NewGetTimestampResponseParams()
+		if ta.options.Timeout != 0 {
+			clientParams.SetTimeout(ta.options.Timeout)
+		}
+		clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))
+
+		_, err = client.Timestamp.GetTimestampResponse(clientParams, &respBytes)
+		if err == nil {
+			break
+		}
+
+		respBytes.Reset()
+		attempts++
+		delay := time.Duration(math.Pow(2, float64(attempts)))
+		time.Sleep(delay * time.Second)
+	}
+
 	if err != nil {
 		return nil, err
 	}
