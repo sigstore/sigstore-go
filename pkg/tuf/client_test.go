@@ -167,6 +167,23 @@ func TestCache(t *testing.T) {
 	target, err = c.GetTarget("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, target, []byte("foo version 2"))
+
+	r.AddTarget("foo", []byte("foo version 3"))
+
+	// Delete config to show that client fetches fresh metadata when no config is present
+	if err = os.Remove(c.configPath()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create another new client with the same cache path
+	c, err = New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	// Cache contains new version
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.Equal(t, target, []byte("foo version 3"))
 }
 
 func TestExpiredTimestamp(t *testing.T) {

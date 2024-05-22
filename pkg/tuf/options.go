@@ -36,13 +36,20 @@ const (
 
 // Options represent the various options for a Sigstore TUF Client
 type Options struct {
-	// CacheValidity period in days (default 0). Note that the client will
-	// always refresh the cache if the metadata is expired, so this is not an
-	// optimal control for air-gapped environments. Use const MaxCache to only
-	// update the cache when the metadata is expired.
+	// CacheValidity period in days (default 0). The client will persist a
+	// timestamp with the cache after refresh. Note that the client will
+	// always refresh the cache if the metadata is expired or if the client is
+	// unable to find a persisted timestamp, so this is not an optimal control
+	// for air-gapped environments. Use const MaxCache to update the cache when
+	// the metadata is expired, though the first initialization will still
+	// refresh the cache.
 	CacheValidity int
 	// ForceCache controls if the cache should be used without update
-	// as long as the metadata is valid
+	// as long as the metadata is valid. Use ForceCache over CacheValidity
+	// if you want to always use the cache up until its expiration. Note that
+	// the client will refresh the cache once the metadata has expired, so this
+	// is not an optimal control for air-gapped environments. Clients instead
+	// should provide a trust root file directly to the client to bypass TUF.
 	ForceCache bool
 	// Root is the TUF trust anchor
 	Root []byte
