@@ -161,6 +161,11 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 		signingOptions.Rekors = append(signingOptions.Rekors, sign.NewRekor(rekorOpts))
 	}
 
+	if withRekor {
+		// Verification will only work with Rekor
+		signingOptions.TrustedRoot = getTrustedRoot(staging)
+	}
+
 	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
 	if err != nil {
 		return nil, err

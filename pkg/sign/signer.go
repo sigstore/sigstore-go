@@ -15,12 +15,17 @@
 package sign
 
 import (
+	"bytes"
 	"context"
 	"encoding/pem"
 	"errors"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+
+	verifyBundle "github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
@@ -41,6 +46,8 @@ type BundleOptions struct {
 	Rekors []*Rekor
 	// Optional context for retrying network requests
 	Context context.Context
+	// Optional trusted root to verify signed bundle
+	TrustedRoot root.TrustedMaterial
 }
 
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
@@ -57,6 +64,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	}
 
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
+	verifierOptions := []verify.VerifierOption{}
 
 	// Sign content and add to bundle
 	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
@@ -87,7 +95,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			Bytes: pubKeyBytes,
 		})
 
-		// TODO: do verification of Fulcio certificate
+		verifierOptions = append(verifierOptions, verify.WithSignedCertificateTimestamps(1))
 	} else {
 		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_PublicKey{
@@ -119,6 +127,8 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		}
 
 		bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps = append(bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps, signedTimestamp)
+
+		verifierOptions = append(verifierOptions, verify.WithSignedTimestamps(len(opts.TimestampAuthorities)))
 	}
 
 	if len(opts.Rekors) > 0 {
@@ -127,6 +137,27 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			if err != nil {
 				return nil, err
 			}
+		}
+
+		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.Rekors)), verify.WithIntegratedTimestamps(len(opts.Rekors)))
+	}
+
+	if opts.TrustedRoot != nil && len(verifierOptions) > 0 {
+		sev, err := verify.NewSignedEntityVerifier(opts.TrustedRoot, verifierOptions...)
+		if err != nil {
+			return nil, err
+		}
+
+		protobundle, err := verifyBundle.NewProtobufBundle(bundle)
+		if err != nil {
+			return nil, err
+		}
+
+		artifactOpts := verify.WithArtifact(bytes.NewReader(content.PreAuthEncoding()))
+		policy := verify.NewPolicy(artifactOpts, verify.WithoutIdentitiesUnsafe())
+		_, err = sev.Verify(protobundle, policy)
+		if err != nil {
+			return nil, err
 		}
 	}
 
