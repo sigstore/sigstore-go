@@ -16,6 +16,7 @@ package sign
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"io"
@@ -46,7 +47,7 @@ func NewTimestampAuthority(opts *TimestampAuthorityOptions) *TimestampAuthority 
 	return &TimestampAuthority{options: opts}
 }
 
-func (ta *TimestampAuthority) GetTimestamp(signature []byte) ([]byte, error) {
+func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte) ([]byte, error) {
 	signatureHash := sha256.Sum256(signature)
 
 	req := &timestamp.Request{
@@ -75,14 +76,20 @@ func (ta *TimestampAuthority) GetTimestamp(signature []byte) ([]byte, error) {
 		clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))
 
 		_, err = client.Timestamp.GetTimestampResponse(clientParams, &respBytes)
-		if err == nil {
+		if err == nil && attempts > 0 {
 			break
 		}
 
 		respBytes.Reset()
-		attempts++
 		delay := time.Duration(math.Pow(2, float64(attempts)))
-		time.Sleep(delay * time.Second)
+		timer := time.NewTimer(delay * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+		attempts++
 	}
 
 	if err != nil {

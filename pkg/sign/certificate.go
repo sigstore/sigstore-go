@@ -16,6 +16,7 @@ package sign
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -78,7 +79,7 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 }
 
 // Returns DER-encoded code signing certificate
-func (f *Fulcio) GetCertificate(keypair Keypair, identityToken string) ([]byte, error) {
+func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, identityToken string) ([]byte, error) {
 	// Get JWT from identity token
 	//
 	// Note that the contents of this token are untrusted. Fulcio will perform
@@ -152,14 +153,20 @@ func (f *Fulcio) GetCertificate(keypair Keypair, identityToken string) ([]byte, 
 			return nil, err
 		}
 
-		if !(response.StatusCode >= 500 && response.StatusCode < 600) {
-			// Not a HTTP 5XX error, don't retry
+		if !((response.StatusCode >= 500 && response.StatusCode < 600) || response.StatusCode == 429) {
+			// Not a retryable HTTP status code, so don't retry
 			break
 		}
 
-		attempts++
 		delay := time.Duration(math.Pow(2, float64(attempts)))
-		time.Sleep(delay * time.Second)
+		timer := time.NewTimer(delay * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+		attempts++
 	}
 
 	body, err := io.ReadAll(response.Body)
