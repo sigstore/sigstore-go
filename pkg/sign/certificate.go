@@ -16,12 +16,14 @@ package sign
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -36,6 +38,8 @@ type FulcioOptions struct {
 	BaseURL string
 	// Optional timeout for network requests
 	Timeout time.Duration
+	// Optional number of times to retry on HTTP 5XX
+	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
 }
@@ -75,7 +79,7 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 }
 
 // Returns DER-encoded code signing certificate
-func (f *Fulcio) GetCertificate(keypair Keypair, identityToken string) ([]byte, error) {
+func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, identityToken string) ([]byte, error) {
 	// Get JWT from identity token
 	//
 	// Note that the contents of this token are untrusted. Fulcio will perform
@@ -122,7 +126,6 @@ func (f *Fulcio) GetCertificate(keypair Keypair, identityToken string) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	requestBytes := bytes.NewBuffer(requestJSON)
 
 	// TODO: For now we are using our own HTTP client
 	//
@@ -133,17 +136,37 @@ func (f *Fulcio) GetCertificate(keypair Keypair, identityToken string) ([]byte, 
 		client.Timeout = f.options.Timeout
 	}
 
-	request, err := http.NewRequest("POST", f.options.BaseURL+"/api/v2/signingCert", requestBytes)
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Add("Authorization", "Bearer "+identityToken)
-	request.Header.Add("Content-Type", "application/json")
-	request.Header.Add("User-Agent", constructUserAgent(f.options.LibraryVersion))
+	attempts := uint(0)
+	var response *http.Response
 
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
+	for attempts <= f.options.Retries {
+		request, err := http.NewRequest("POST", f.options.BaseURL+"/api/v2/signingCert", bytes.NewBuffer(requestJSON))
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Add("Authorization", "Bearer "+identityToken)
+		request.Header.Add("Content-Type", "application/json")
+		request.Header.Add("User-Agent", constructUserAgent(f.options.LibraryVersion))
+
+		response, err = client.Do(request)
+		if err != nil {
+			return nil, err
+		}
+
+		if !((response.StatusCode >= 500 && response.StatusCode < 600) || response.StatusCode == 429) {
+			// Not a retryable HTTP status code, so don't retry
+			break
+		}
+
+		delay := time.Duration(math.Pow(2, float64(attempts)))
+		timer := time.NewTimer(delay * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+		attempts++
 	}
 
 	body, err := io.ReadAll(response.Body)

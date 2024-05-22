@@ -15,6 +15,7 @@
 package sign
 
 import (
+	"context"
 	"encoding/pem"
 	"errors"
 
@@ -38,6 +39,8 @@ type BundleOptions struct {
 	//
 	// Supports hashedrekord and dsse entry types
 	Rekors []*Rekor
+	// Optional context for retrying network requests
+	Context context.Context
 }
 
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
@@ -47,6 +50,10 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	if opts.Fulcio != nil && opts.IDToken == "" {
 		return nil, errors.New("If opts.Fulcio is provided, must also supply opts.IDToken")
+	}
+
+	if opts.Context == nil {
+		opts.Context = context.TODO()
 	}
 
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
@@ -62,7 +69,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	// Add verification information to bundle
 	var verifierPEM []byte
 	if opts.Fulcio != nil && opts.IDToken != "" {
-		pubKeyBytes, err := opts.Fulcio.GetCertificate(keypair, opts.IDToken)
+		pubKeyBytes, err := opts.Fulcio.GetCertificate(opts.Context, keypair, opts.IDToken)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +105,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	}
 
 	for _, timestampAuthority := range opts.TimestampAuthorities {
-		timestampBytes, err := timestampAuthority.GetTimestamp(signature)
+		timestampBytes, err := timestampAuthority.GetTimestamp(opts.Context, signature)
 		if err != nil {
 			return nil, err
 		}

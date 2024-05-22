@@ -51,6 +51,8 @@ type RekorOptions struct {
 	BaseURL string
 	// Optional timeout for network requests
 	Timeout time.Duration
+	// Optional number of times to retry
+	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
 }
@@ -114,7 +116,7 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 	}
 	params.SetProposedEntry(proposedEntry)
 
-	client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)))
+	client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)), client.WithRetryCount(r.options.Retries))
 	if err != nil {
 		return err
 	}
