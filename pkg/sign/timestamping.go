@@ -28,6 +28,10 @@ import (
 	tsagenclient "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 )
 
+type TSAClient interface {
+	GetTimestampResponse(params *tsagenclient.GetTimestampResponseParams, writer io.Writer, opts ...tsagenclient.ClientOption) (*tsagenclient.GetTimestampResponseCreated, error)
+}
+
 type TimestampAuthorityOptions struct {
 	// URL of Timestamp Authority instance
 	URL string
@@ -37,6 +41,8 @@ type TimestampAuthorityOptions struct {
 	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
+	// Optional client (for dependency injection)
+	Client TSAClient
 }
 
 type TimestampAuthority struct {
@@ -60,9 +66,12 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 		return nil, err
 	}
 
-	client, err := tsaclient.GetTimestampClient(ta.options.URL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
-	if err != nil {
-		return nil, err
+	if ta.options.Client == nil {
+		client, err := tsaclient.GetTimestampClient(ta.options.URL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
+		if err != nil {
+			return nil, err
+		}
+		ta.options.Client = client.Timestamp
 	}
 
 	attempts := uint(0)
@@ -75,7 +84,7 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 		}
 		clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))
 
-		_, err = client.Timestamp.GetTimestampResponse(clientParams, &respBytes)
+		_, err = ta.options.Client.GetTimestampResponse(clientParams, &respBytes)
 		if err == nil && attempts > 0 {
 			break
 		}

@@ -193,7 +193,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	entry, err := ca.generateTlogEntry(leafCert, envelope, sig, integratedTime.Unix())
+	entry, err := ca.GenerateTlogEntry(leafCert, envelope, sig, integratedTime.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 	}, nil
 }
 
-func (ca *VirtualSigstore) generateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
+func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
 		return nil, err
@@ -389,6 +389,10 @@ func createRekorBundle(logID string, integratedTime int64, logIndex int64, rekor
 		LogIndex:       logIndex,
 		Body:           rekorEntry,
 	}
+}
+
+func (ca *VirtualSigstore) TimestampResponse(sig []byte) ([]byte, error) {
+	return generateTimestampingResponse(sig, ca.tsaCA.Leaf, ca.tsaLeafKey)
 }
 
 func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey *ecdsa.PrivateKey) ([]byte, error) {

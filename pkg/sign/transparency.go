@@ -38,6 +38,10 @@ import (
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 )
 
+type RekorClient interface {
+	CreateLogEntry(params *entries.CreateLogEntryParams, opts ...entries.ClientOption) (*entries.CreateLogEntryCreated, error)
+}
+
 type Transparency interface {
 	GetTransparencyLogEntry([]byte, *protobundle.Bundle) error
 }
@@ -55,6 +59,8 @@ type RekorOptions struct {
 	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
+	// Optional client (for dependency injection)
+	Client RekorClient
 }
 
 func NewRekor(opts *RekorOptions) *Rekor {
@@ -116,12 +122,15 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 	}
 	params.SetProposedEntry(proposedEntry)
 
-	client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)), client.WithRetryCount(r.options.Retries))
-	if err != nil {
-		return err
+	if r.options.Client == nil {
+		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)), client.WithRetryCount(r.options.Retries))
+		if err != nil {
+			return err
+		}
+		r.options.Client = client.Entries
 	}
 
-	resp, err := client.Entries.CreateLogEntry(params)
+	resp, err := r.options.Client.CreateLogEntry(params)
 	if err != nil {
 		return err
 	}
