@@ -15,7 +15,6 @@
 package main
 
 import (
-	_ "embed"
 	"flag"
 	"fmt"
 	"log"
@@ -28,9 +27,6 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 )
-
-//go:embed staging_root.json
-var stagingRoot []byte
 
 var Version string
 var idToken *string
@@ -88,8 +84,8 @@ func main() {
 
 	// Get trusted_root.json
 	tufOptions := &tuf.Options{
-		Root:              stagingRoot,
-		RepositoryBaseURL: "https://tuf-repo-cdn.sigstage.dev",
+		Root:              tuf.StagingRoot(),
+		RepositoryBaseURL: tuf.StagingMirror,
 	}
 	tufClient, err := tuf.New(tufOptions)
 	if err != nil {

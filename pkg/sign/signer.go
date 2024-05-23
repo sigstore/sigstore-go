@@ -94,8 +94,6 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			Type:  "CERTIFICATE",
 			Bytes: pubKeyBytes,
 		})
-
-		verifierOptions = append(verifierOptions, verify.WithSignedCertificateTimestamps(1))
 	} else {
 		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_PublicKey{
