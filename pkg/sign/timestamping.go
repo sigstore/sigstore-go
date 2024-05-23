@@ -30,7 +30,7 @@ import (
 
 type TimestampAuthorityOptions struct {
 	// URL of Timestamp Authority instance
-	BaseURL string
+	URL string
 	// Optional timeout for network requests
 	Timeout time.Duration
 	// Optional number of times to retry on HTTP 5XX
@@ -60,7 +60,7 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 		return nil, err
 	}
 
-	client, err := tsaclient.GetTimestampClient(ta.options.BaseURL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
+	client, err := tsaclient.GetTimestampClient(ta.options.URL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
 	if err != nil {
 		return nil, err
 	}

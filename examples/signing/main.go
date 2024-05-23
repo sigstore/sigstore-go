@@ -93,7 +93,7 @@ func main() {
 
 	if *tsa {
 		tsaOpts := &sign.TimestampAuthorityOptions{
-			BaseURL:        "https://timestamp.githubapp.com",
+			URL:            "https://timestamp.githubapp.com/api/v1/timestamp",
 			Timeout:        time.Duration(30 * time.Second),
 			Retries:        1,
 			LibraryVersion: Version,
