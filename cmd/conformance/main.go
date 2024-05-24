@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
-	"runtime"
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -61,22 +59,11 @@ func getTrustedRoot(staging bool) root.TrustedMaterial {
 	if trustedRootPath != nil {
 		trustedRootJSON, err = os.ReadFile(*trustedRootPath)
 	} else {
-		_, filename, _, ok := runtime.Caller(1)
-		if !ok {
-			log.Fatal("unable to get path")
-		}
 		opts := tuf.DefaultOptions()
-		opts.CachePath = path.Join(path.Dir(filename), "tufdata")
 
 		if staging {
-			rootPath := path.Join(opts.CachePath, "tuf-repo-cdn.sigstage.dev", "root.json")
-			rootJSON, err := os.ReadFile(rootPath)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			opts.Root = rootJSON
-			opts.RepositoryBaseURL = "https://tuf-repo-cdn.sigstage.dev"
+			opts.Root = tuf.StagingRoot()
+			opts.RepositoryBaseURL = tuf.StagingMirror
 		}
 
 		client, err := tuf.New(opts)
@@ -159,6 +146,11 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 			LibraryVersion: Version,
 		}
 		signingOptions.Rekors = append(signingOptions.Rekors, sign.NewRekor(rekorOpts))
+	}
+
+	if withRekor {
+		// Verification will only work with Rekor
+		signingOptions.TrustedRoot = getTrustedRoot(staging)
 	}
 
 	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])

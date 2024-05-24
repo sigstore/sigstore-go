@@ -23,7 +23,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 )
 
 var Version string
@@ -80,6 +82,28 @@ func main() {
 
 	opts := sign.BundleOptions{}
 
+	// Get trusted_root.json
+	tufOptions := &tuf.Options{
+		Root:              tuf.StagingRoot(),
+		RepositoryBaseURL: tuf.StagingMirror,
+	}
+	tufClient, err := tuf.New(tufOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	trustedRootJSON, err := tufClient.GetTarget("trusted_root.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	trustedRoot, err := root.NewTrustedRootFromJSON(trustedRootJSON)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	opts.TrustedRoot = trustedRoot
+
 	if *idToken != "" {
 		fulcioOpts := &sign.FulcioOptions{
 			BaseURL:        "https://fulcio.sigstage.dev",
@@ -99,6 +123,9 @@ func main() {
 			LibraryVersion: Version,
 		}
 		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
+
+		// staging TUF repo doesn't have accessible timestamp authorities
+		opts.TrustedRoot = nil
 	}
 
 	if *rekor {

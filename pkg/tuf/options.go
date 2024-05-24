@@ -28,6 +28,7 @@ var embeddedRepo embed.FS
 
 const (
 	DefaultMirror = "https://tuf-repo-cdn.sigstore.dev"
+	StagingMirror = "https://tuf-repo-cdn.sigstage.dev"
 
 	// The following caching values can be used for the CacheValidity option
 	NoCache  = 0
@@ -138,6 +139,25 @@ func DefaultRoot() []byte {
 	// The embed file system always uses forward slashes as path separators,
 	// even on Windows
 	p := "repository/root.json"
+
+	b, err := embeddedRepo.ReadFile(p)
+	if err != nil {
+		// This should never happen.
+		// ReadFile from an embedded FS will never fail as long as
+		// the path is correct. If it fails, it would mean
+		// that the binary is not assembled as it should, and there
+		// is no way to recover from that.
+		panic(err)
+	}
+
+	return b
+}
+
+// StagingRoot returns the root.json for the staging instance
+func StagingRoot() []byte {
+	// The embed file system always uses forward slashes as path separators,
+	// even on Windows
+	p := "repository/staging_root.json"
 
 	b, err := embeddedRepo.ReadFile(p)
 	if err != nil {
