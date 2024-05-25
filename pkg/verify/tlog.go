@@ -26,7 +26,6 @@ import (
 	rekorClient "github.com/sigstore/rekor/pkg/client"
 	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
 	rekorEntries "github.com/sigstore/rekor/pkg/generated/client/entries"
-	rekorModels "github.com/sigstore/rekor/pkg/generated/models"
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 
@@ -131,13 +130,10 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 
 			logIndex := entry.LogIndex()
 
-			// TODO(issue#52): Change to GetLogEntryByIndex
-			searchParams := rekorEntries.NewSearchLogQueryParams()
-			searchLogQuery := rekorModels.SearchLogQuery{}
-			searchLogQuery.LogIndexes = []*int64{&logIndex}
-			searchParams.SetEntry(&searchLogQuery)
+			searchParams := rekorEntries.NewGetLogEntryByIndexParams()
+			searchParams.LogIndex = logIndex
 
-			resp, err := client.Entries.SearchLogQuery(searchParams)
+			resp, err := client.Entries.GetLogEntryByIndex(searchParams)
 			if err != nil {
 				return nil, err
 			}
@@ -148,7 +144,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				return nil, errors.New("too many log entries returned")
 			}
 
-			logEntry := resp.Payload[0]
+			logEntry := resp.Payload
 
 			for _, v := range logEntry {
 				v := v
