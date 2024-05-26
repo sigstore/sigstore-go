@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"testing"
 
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -121,6 +123,65 @@ func TestMediaTypeString(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res)
+		})
+	}
+}
+
+func Test_BundleValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		bundle  *ProtobufBundle
+		errMsg  string
+		wantErr bool
+	}{
+		{
+			name: "Empty verification material",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType:            "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					VerificationMaterial: &protobundle.VerificationMaterial{},
+					Content:              nil,
+				},
+			},
+			errMsg:  "bundle validation failed: missing required field: verification_material.public_key",
+			wantErr: true,
+		},
+		{
+			name: "No verification material",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					Content:   nil,
+				},
+			},
+			errMsg:  "bundle validation failed: missing required field: verification_material",
+			wantErr: true,
+		},
+		{
+			name: "Valid protobuf bundle",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					Content:   nil,
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &v1.PublicKeyIdentifier{},
+						},
+						TimestampVerificationData: &protobundle.TimestampVerificationData{},
+					},
+				},
+			},
+			errMsg:  "",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("name:%s", tt.name), func(t *testing.T) {
+			err := tt.bundle.validate()
+			if (err != nil) != tt.wantErr || (err != nil && tt.errMsg != err.Error()) {
+				t.Errorf("Protobuf.Bundle() error = %v, wantErr %v", err, tt.errMsg)
+				return
+			}
 		})
 	}
 }
