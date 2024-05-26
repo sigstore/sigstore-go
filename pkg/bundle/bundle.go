@@ -26,11 +26,11 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
-	"golang.org/x/mod/semver"
-	"google.golang.org/protobuf/encoding/protojson"
-
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore-go/pkg/verify"
+	"go.einride.tech/aip/fieldbehavior"
+	"golang.org/x/mod/semver"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var ErrValidation = errors.New("validation error")
@@ -110,6 +110,10 @@ func (b *ProtobufBundle) validate() error {
 	// if bundle version is >= v0.4, return error as this version is not supported
 	if semver.Compare(bundleVersion, "v0.4") >= 0 {
 		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
+	}
+
+	if err := fieldbehavior.ValidateRequiredFields(b.Bundle); err != nil {
+		return fmt.Errorf("bundle validation failed: %w", err)
 	}
 
 	return nil
