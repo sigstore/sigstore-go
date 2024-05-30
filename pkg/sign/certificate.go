@@ -37,7 +37,7 @@ type Fulcio struct {
 type FulcioOptions struct {
 	// URL of Fulcio instance
 	BaseURL string
-	// Optional timeout for network requests
+	// Optional timeout for network requests (default 30s)
 	Timeout time.Duration
 	// Optional number of times to retry on HTTP 5XX
 	Retries uint
@@ -82,6 +82,9 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 	fulcio.client = &http.Client{
 		Timeout:   opts.Timeout,
 		Transport: opts.Transport,
+	}
+	if fulcio.client.Timeout == 0 {
+		fulcio.client.Timeout = 30 * time.Second
 	}
 	return fulcio
 }
