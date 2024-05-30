@@ -38,6 +38,10 @@ import (
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 )
 
+type RekorClient interface {
+	CreateLogEntry(params *entries.CreateLogEntryParams, opts ...entries.ClientOption) (*entries.CreateLogEntryCreated, error)
+}
+
 type Transparency interface {
 	GetTransparencyLogEntry([]byte, *protobundle.Bundle) error
 }
@@ -49,12 +53,14 @@ type Rekor struct {
 type RekorOptions struct {
 	// URL of Fulcio instance
 	BaseURL string
-	// Optional timeout for network requests
+	// Optional timeout for network requests (default 30s; use negative value for no timeout)
 	Timeout time.Duration
 	// Optional number of times to retry
 	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
+	// Optional client (for dependency injection)
+	Client RekorClient
 }
 
 func NewRekor(opts *RekorOptions) *Rekor {
@@ -111,17 +117,23 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 	}
 
 	params := entries.NewCreateLogEntryParams()
-	if r.options.Timeout > 0 {
+	if r.options.Timeout >= 0 {
+		if r.options.Timeout == 0 {
+			r.options.Timeout = 30 * time.Second
+		}
 		params.SetTimeout(r.options.Timeout)
 	}
 	params.SetProposedEntry(proposedEntry)
 
-	client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)), client.WithRetryCount(r.options.Retries))
-	if err != nil {
-		return err
+	if r.options.Client == nil {
+		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)), client.WithRetryCount(r.options.Retries))
+		if err != nil {
+			return err
+		}
+		r.options.Client = client.Entries
 	}
 
-	resp, err := client.Entries.CreateLogEntry(params)
+	resp, err := r.options.Client.CreateLogEntry(params)
 	if err != nil {
 		return err
 	}

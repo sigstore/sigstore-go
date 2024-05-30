@@ -31,17 +31,20 @@ import (
 
 type Fulcio struct {
 	options *FulcioOptions
+	client  *http.Client
 }
 
 type FulcioOptions struct {
 	// URL of Fulcio instance
 	BaseURL string
-	// Optional timeout for network requests
+	// Optional timeout for network requests (default 30s; use negative value for no timeout)
 	Timeout time.Duration
 	// Optional number of times to retry on HTTP 5XX
 	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
+	// Optional Transport (for dependency injection)
+	Transport http.RoundTripper
 }
 
 type jsonWebToken struct {
@@ -75,7 +78,19 @@ type chain struct {
 }
 
 func NewFulcio(opts *FulcioOptions) *Fulcio {
-	return &Fulcio{options: opts}
+	fulcio := &Fulcio{options: opts}
+	fulcio.client = &http.Client{
+		Transport: opts.Transport,
+	}
+
+	if opts.Timeout >= 0 {
+		if opts.Timeout == 0 {
+			opts.Timeout = 30 * time.Second
+		}
+		fulcio.client.Timeout = opts.Timeout
+	}
+
+	return fulcio
 }
 
 // Returns DER-encoded code signing certificate
@@ -131,11 +146,6 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, identityTo
 	//
 	// https://github.com/sigstore/fulcio/pkg/api's client could be used in the
 	// future, when it supports the v2 API
-	var client http.Client
-	if f.options.Timeout != 0 {
-		client.Timeout = f.options.Timeout
-	}
-
 	attempts := uint(0)
 	var response *http.Response
 
@@ -148,7 +158,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, identityTo
 		request.Header.Add("Content-Type", "application/json")
 		request.Header.Add("User-Agent", constructUserAgent(f.options.LibraryVersion))
 
-		response, err = client.Do(request)
+		response, err = f.client.Do(request)
 		if err != nil {
 			return nil, err
 		}
