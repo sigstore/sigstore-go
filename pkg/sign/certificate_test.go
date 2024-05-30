@@ -21,6 +21,7 @@ import (
 	"encoding/pem"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,14 +30,15 @@ import (
 )
 
 var virtualSigstore *ca.VirtualSigstore
+var virtualSigstoreOnce sync.Once
+var virtualSigstoreErr error
 
 func getFulcioResponse() (*http.Response, error) {
-	var err error
-	if virtualSigstore == nil {
-		virtualSigstore, err = ca.NewVirtualSigstore()
-		if err != nil {
-			return nil, err
-		}
+	virtualSigstoreOnce.Do(func() {
+		virtualSigstore, virtualSigstoreErr = ca.NewVirtualSigstore()
+	})
+	if virtualSigstoreErr != nil {
+		return nil, virtualSigstoreErr
 	}
 
 	leafCert, _, err := virtualSigstore.GenerateLeafCert("identity", "issuer")
