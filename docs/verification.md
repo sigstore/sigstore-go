@@ -58,7 +58,12 @@ To verify a bundle with the Go API, you'll need to:
 Going through this step-by-step, we'll start by loading the trusted root from the Sigstore TUF repo:
 
 ```go
-	trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", "tufcache")
+	opts := tuf.DefaultOptions()
+	client, err := tuf.New(opts)
+	if err != nil {
+		panic(err)
+	}
+	trustedrootJSON, err := client.GetTarget("trusted_root.json")
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +192,12 @@ import (
 )
 
 func main() {
-	trustedrootJSON, err := tuf.GetTrustedrootJSON("tuf-repo-cdn.sigstore.dev", "tufcache")
+	opts := tuf.DefaultOptions()
+	client, err := tuf.New(opts)
+	if err != nil {
+		panic(err)
+	}
+	trustedrootJSON, err := client.GetTarget("trusted_root.json")
 	if err != nil {
 		panic(err)
 	}
