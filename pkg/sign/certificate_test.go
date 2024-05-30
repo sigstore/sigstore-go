@@ -70,9 +70,9 @@ func getFulcioResponse() (*http.Response, error) {
 	return response, nil
 }
 
-type mockFulcioClient struct{}
+type mockFulcio struct{}
 
-func (m *mockFulcioClient) Do(_ *http.Request) (*http.Response, error) {
+func (m *mockFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return getFulcioResponse()
 }
 
@@ -80,7 +80,7 @@ type failFirstFulcio struct {
 	Count int
 }
 
-func (f *failFirstFulcio) Do(_ *http.Request) (*http.Response, error) {
+func (f *failFirstFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
 	if f.Count <= 0 {
 		f.Count++
 		response := &http.Response{
@@ -95,7 +95,7 @@ func (f *failFirstFulcio) Do(_ *http.Request) (*http.Response, error) {
 
 func Test_GetCertificate(t *testing.T) {
 	// Test happy path
-	opts := &FulcioOptions{Retries: 1, Client: &mockFulcioClient{}}
+	opts := &FulcioOptions{Retries: 1, Transport: &mockFulcio{}}
 	fulcio := NewFulcio(opts)
 
 	ctx := context.TODO()
@@ -114,8 +114,8 @@ func Test_GetCertificate(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// Test successful retry
-	client := &failFirstFulcio{}
-	retryFulcioOpts := &FulcioOptions{Retries: 1, Client: client}
+	roundTripper := &failFirstFulcio{}
+	retryFulcioOpts := &FulcioOptions{Retries: 1, Transport: roundTripper}
 	retryFulcio := NewFulcio(retryFulcioOpts)
 
 	cert, err = retryFulcio.GetCertificate(ctx, keypair, idtoken)
@@ -123,7 +123,7 @@ func Test_GetCertificate(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Test unsuccessful retry
-	client.Count = -1
+	roundTripper.Count = -1
 	cert, err = retryFulcio.GetCertificate(ctx, keypair, idtoken)
 	assert.Nil(t, cert)
 	assert.NotNil(t, err)
