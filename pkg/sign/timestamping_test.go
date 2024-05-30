@@ -22,17 +22,12 @@ import (
 
 	tsagenclient "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 )
 
 func getTSAResponse(params *tsagenclient.GetTimestampResponseParams, writer io.Writer) (*tsagenclient.GetTimestampResponseCreated, error) {
-	var err error
-	if virtualSigstore == nil {
-		virtualSigstore, err = ca.NewVirtualSigstore()
-		if err != nil {
-			return nil, err
-		}
+	virtualSigstoreOnce.Do(setupVirtualSigstore)
+	if virtualSigstoreErr != nil {
+		return nil, virtualSigstoreErr
 	}
 
 	req, err := io.ReadAll(params.Request)

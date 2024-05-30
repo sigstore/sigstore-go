@@ -35,7 +35,7 @@ type TSAClient interface {
 type TimestampAuthorityOptions struct {
 	// URL of Timestamp Authority instance
 	URL string
-	// Optional timeout for network requests
+	// Optional timeout for network requests (default 30s; use negative value for no timeout)
 	Timeout time.Duration
 	// Optional number of times to retry on HTTP 5XX
 	Retries uint
@@ -79,7 +79,10 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 
 	for attempts <= ta.options.Retries {
 		clientParams := tsagenclient.NewGetTimestampResponseParams()
-		if ta.options.Timeout != 0 {
+		if ta.options.Timeout >= 0 {
+			if ta.options.Timeout == 0 {
+				ta.options.Timeout = 30 * time.Second
+			}
 			clientParams.SetTimeout(ta.options.Timeout)
 		}
 		clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))

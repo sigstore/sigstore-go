@@ -53,7 +53,7 @@ type Rekor struct {
 type RekorOptions struct {
 	// URL of Fulcio instance
 	BaseURL string
-	// Optional timeout for network requests
+	// Optional timeout for network requests (default 30s; use negative value for no timeout)
 	Timeout time.Duration
 	// Optional number of times to retry
 	Retries uint
@@ -117,7 +117,10 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 	}
 
 	params := entries.NewCreateLogEntryParams()
-	if r.options.Timeout > 0 {
+	if r.options.Timeout >= 0 {
+		if r.options.Timeout == 0 {
+			r.options.Timeout = 30 * time.Second
+		}
 		params.SetTimeout(r.options.Timeout)
 	}
 	params.SetProposedEntry(proposedEntry)

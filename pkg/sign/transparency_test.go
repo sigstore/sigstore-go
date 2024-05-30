@@ -30,8 +30,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 )
 
 var envelopeBody []byte
@@ -39,12 +37,9 @@ var envelopeBody []byte
 type mockRekor struct{}
 
 func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
-	var err error
-	if virtualSigstore == nil {
-		virtualSigstore, err = ca.NewVirtualSigstore()
-		if err != nil {
-			return nil, err
-		}
+	virtualSigstoreOnce.Do(setupVirtualSigstore)
+	if virtualSigstoreErr != nil {
+		return nil, virtualSigstoreErr
 	}
 
 	leafCert, leafPrivKey, err := virtualSigstore.GenerateLeafCert("identity", "issuer")

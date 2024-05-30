@@ -33,10 +33,14 @@ var virtualSigstore *ca.VirtualSigstore
 var virtualSigstoreOnce sync.Once
 var virtualSigstoreErr error
 
-func getFulcioResponse() (*http.Response, error) {
-	virtualSigstoreOnce.Do(func() {
+func setupVirtualSigstore() {
+	if virtualSigstore == nil {
 		virtualSigstore, virtualSigstoreErr = ca.NewVirtualSigstore()
-	})
+	}
+}
+
+func getFulcioResponse() (*http.Response, error) {
+	virtualSigstoreOnce.Do(setupVirtualSigstore)
 	if virtualSigstoreErr != nil {
 		return nil, virtualSigstoreErr
 	}
