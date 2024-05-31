@@ -29,8 +29,13 @@ import (
 	"time"
 )
 
-type Certificate interface {
-	GetCertificate(context.Context, Keypair, string) ([]byte, error)
+type CertificateAuthorityOptions struct {
+	// Optional OIDC JWT to send to certificate authority; required for Fulcio
+	IDToken string
+}
+
+type CertificateAuthority interface {
+	GetCertificate(context.Context, Keypair, *CertificateAuthorityOptions) ([]byte, error)
 }
 
 type Fulcio struct {
@@ -98,12 +103,16 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 }
 
 // Returns DER-encoded code signing certificate
-func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, identityToken string) ([]byte, error) {
+func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *CertificateAuthorityOptions) ([]byte, error) {
+	if opts.IDToken == "" {
+		return nil, errors.New("Fulcio requires IDToken to be set")
+	}
+
 	// Get JWT from identity token
 	//
 	// Note that the contents of this token are untrusted. Fulcio will perform
 	// the token verification.
-	tokenParts := strings.Split(identityToken, ".")
+	tokenParts := strings.Split(opts.IDToken, ".")
 	if len(tokenParts) < 2 {
 		return nil, errors.New("Unable to get subject from identity token")
 	}
@@ -158,7 +167,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, identityTo
 		if err != nil {
 			return nil, err
 		}
-		request.Header.Add("Authorization", "Bearer "+identityToken)
+		request.Header.Add("Authorization", "Bearer "+opts.IDToken)
 		request.Header.Add("Content-Type", "application/json")
 		request.Header.Add("User-Agent", constructUserAgent(f.options.LibraryVersion))
 

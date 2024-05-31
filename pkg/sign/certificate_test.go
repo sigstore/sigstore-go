@@ -100,7 +100,6 @@ func (f *failFirstFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
 }
 
 func Test_GetCertificate(t *testing.T) {
-	// Test happy path
 	opts := &FulcioOptions{Retries: 1, Transport: &mockFulcio{}}
 	fulcio := NewFulcio(opts)
 
@@ -108,29 +107,32 @@ func Test_GetCertificate(t *testing.T) {
 	keypair, err := NewEphemeralKeypair(nil)
 	assert.Nil(t, err)
 
-	idtoken := "idtoken.eyJzdWIiOiJzdWJqZWN0In0K.stuff" // #nosec G101
-
-	cert, err := fulcio.GetCertificate(ctx, keypair, idtoken)
-	assert.NotNil(t, cert)
-	assert.Nil(t, err)
-
 	// Test malformed idtoken
-	cert, err = fulcio.GetCertificate(ctx, keypair, "idtoken.notbase64.stuff")
+	certOpts := &CertificateAuthorityOptions{
+		IDToken: "idtoken.notbase64.stuff",
+	}
+	cert, err := fulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.Nil(t, cert)
 	assert.NotNil(t, err)
+
+	// Test happy path
+	certOpts.IDToken = "idtoken.eyJzdWIiOiJzdWJqZWN0In0K.stuff" // #nosec G101
+	cert, err = fulcio.GetCertificate(ctx, keypair, certOpts)
+	assert.NotNil(t, cert)
+	assert.Nil(t, err)
 
 	// Test successful retry
 	roundTripper := &failFirstFulcio{}
 	retryFulcioOpts := &FulcioOptions{Retries: 1, Transport: roundTripper}
 	retryFulcio := NewFulcio(retryFulcioOpts)
 
-	cert, err = retryFulcio.GetCertificate(ctx, keypair, idtoken)
+	cert, err = retryFulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.NotNil(t, cert)
 	assert.Nil(t, err)
 
 	// Test unsuccessful retry
 	roundTripper.Count = -1
-	cert, err = retryFulcio.GetCertificate(ctx, keypair, idtoken)
+	cert, err = retryFulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.Nil(t, cert)
 	assert.NotNil(t, err)
 }

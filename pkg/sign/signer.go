@@ -35,9 +35,11 @@ type BundleOptions struct {
 	//
 	// Typically a Fulcio instance; resulting bundle will contain a certificate
 	// for its verification material content instead of a public key.
-	Certificate Certificate
-	// Optional OIDC JWT to send to certificate authority; required for Fulcio
-	IDToken string
+	CertificateAuthority CertificateAuthority
+	// Optional options for certificate authority
+	//
+	// Some certificate authorities may require options to be set
+	CertificateAuthorityOptions *CertificateAuthorityOptions
 	// Optional list of timestamp authorities to contact for inclusion in bundle
 	TimestampAuthorities []*TimestampAuthority
 	// Optional list of Rekor instances to get transparency log entry from.
@@ -72,8 +74,8 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	// Add verification information to bundle
 	var verifierPEM []byte
-	if opts.Certificate != nil {
-		pubKeyBytes, err := opts.Certificate.GetCertificate(opts.Context, keypair, opts.IDToken)
+	if opts.CertificateAuthority != nil {
+		pubKeyBytes, err := opts.CertificateAuthority.GetCertificate(opts.Context, keypair, opts.CertificateAuthorityOptions)
 		if err != nil {
 			return nil, err
 		}
