@@ -31,18 +31,18 @@ import (
 const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 
 type BundleOptions struct {
-	// Optional Fulcio instance to get code signing certificate from.
+	// Optional certificate authority to get code signing certificate from.
 	//
-	// Resulting bundle will contain a certificate for its verification
-	// material content, instead of a public key.
-	Fulcio *Fulcio
-	// Optional OIDC JWT to send to Fulcio; required if using Fulcio
+	// Typically a Fulcio instance; resulting bundle will contain a certificate
+	// for its verification material content instead of a public key.
+	Certificate Certificate
+	// Optional OIDC JWT to send to certificate authority; required for Fulcio
 	IDToken string
 	// Optional list of timestamp authorities to contact for inclusion in bundle
 	TimestampAuthorities []*TimestampAuthority
 	// Optional list of Rekor instances to get transparency log entry from.
 	//
-	// Supports hashedrekord and dsse entry types
+	// Supports hashedrekord and dsse entry types.
 	Rekors []*Rekor
 	// Optional context for retrying network requests
 	Context context.Context
@@ -53,10 +53,6 @@ type BundleOptions struct {
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
 	if keypair == nil {
 		return nil, errors.New("Must provide a keypair for signing, like EphemeralKeypair")
-	}
-
-	if opts.Fulcio != nil && opts.IDToken == "" {
-		return nil, errors.New("If opts.Fulcio is provided, must also supply opts.IDToken")
 	}
 
 	if opts.Context == nil {
@@ -76,8 +72,8 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	// Add verification information to bundle
 	var verifierPEM []byte
-	if opts.Fulcio != nil && opts.IDToken != "" {
-		pubKeyBytes, err := opts.Fulcio.GetCertificate(opts.Context, keypair, opts.IDToken)
+	if opts.Certificate != nil {
+		pubKeyBytes, err := opts.Certificate.GetCertificate(opts.Context, keypair, opts.IDToken)
 		if err != nil {
 			return nil, err
 		}

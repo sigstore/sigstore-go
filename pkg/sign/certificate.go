@@ -29,6 +29,10 @@ import (
 	"time"
 )
 
+type Certificate interface {
+	GetCertificate(context.Context, Keypair, string) ([]byte, error)
+}
+
 type Fulcio struct {
 	options *FulcioOptions
 	client  *http.Client
