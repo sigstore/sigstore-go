@@ -28,7 +28,6 @@ import (
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore-go/pkg/verify"
-	"go.einride.tech/aip/fieldbehavior"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -70,6 +69,10 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
 }
 
 func (b *ProtobufBundle) validate() error {
+	err := validateBundle(b.Bundle)
+	if err != nil {
+		return fmt.Errorf("invalid bundle: %w", err)
+	}
 	bundleVersion, err := getBundleVersion(b.Bundle.MediaType)
 	if err != nil {
 		return fmt.Errorf("error getting bundle version: %w", err)
@@ -110,10 +113,6 @@ func (b *ProtobufBundle) validate() error {
 	// if bundle version is >= v0.4, return error as this version is not supported
 	if semver.Compare(bundleVersion, "v0.4") >= 0 {
 		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
-	}
-
-	if err := fieldbehavior.ValidateRequiredFields(b.Bundle); err != nil {
-		return fmt.Errorf("bundle validation failed: %w", err)
 	}
 
 	return nil
@@ -160,6 +159,38 @@ func getBundleVersion(mediaType string) (string, error) {
 		return "", fmt.Errorf("%w: invalid bundle version: %s", ErrUnsupportedMediaType, version)
 	}
 	return "", fmt.Errorf("%w: %s", ErrUnsupportedMediaType, mediaType)
+}
+
+func validateBundle(b *protobundle.Bundle) error {
+	if b == nil {
+		return fmt.Errorf("empty protobuf bundle")
+	}
+
+	if b.Content == nil {
+		return fmt.Errorf("missing bundle content")
+	}
+
+	switch b.Content.(type) {
+	case *protobundle.Bundle_DsseEnvelope, *protobundle.Bundle_MessageSignature:
+	default:
+		return fmt.Errorf("invalid bundle content: bundle content must be either a message signature or dsse envelope")
+	}
+
+	if b.VerificationMaterial == nil {
+		return fmt.Errorf("missing verification material")
+	}
+
+	if b.VerificationMaterial.Content == nil {
+		return fmt.Errorf("missing verification material content")
+	}
+
+	switch b.VerificationMaterial.Content.(type) {
+	case *protobundle.VerificationMaterial_PublicKey, *protobundle.VerificationMaterial_Certificate, *protobundle.VerificationMaterial_X509CertificateChain:
+	default:
+		return fmt.Errorf("invalid verififcation material content: verification material must be one of public key, x509 certificate and x509 certificate chain")
+	}
+
+	return nil
 }
 
 func LoadJSONFromPath(path string) (*ProtobufBundle, error) {

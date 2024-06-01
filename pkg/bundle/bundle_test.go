@@ -762,23 +762,37 @@ func Test_BundleValidation(t *testing.T) {
 			name: "Empty verification material",
 			bundle: &ProtobufBundle{
 				Bundle: &protobundle.Bundle{
-					MediaType:            "application/vnd.dev.sigstore.bundle+json;version=0.3",
-					VerificationMaterial: &protobundle.VerificationMaterial{},
-					Content:              nil,
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: nil,
+					},
+					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
-			errMsg:  "bundle validation failed: missing required field: verification_material.public_key",
+			errMsg:  "invalid bundle: missing verification material content",
 			wantErr: true,
 		},
 		{
-			name: "No verification material",
+			name: "No bundle content",
 			bundle: &ProtobufBundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					Content:   nil,
 				},
 			},
-			errMsg:  "bundle validation failed: missing required field: verification_material",
+			errMsg:  "invalid bundle: missing bundle content",
+			wantErr: true,
+		},
+		{
+			name: "Nil verification material",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType:            "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					Content:              &protobundle.Bundle_MessageSignature{},
+					VerificationMaterial: nil,
+				},
+			},
+			errMsg:  "invalid bundle: missing verification material",
 			wantErr: true,
 		},
 		{
@@ -786,7 +800,7 @@ func Test_BundleValidation(t *testing.T) {
 			bundle: &ProtobufBundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
-					Content:   nil,
+					Content:   &protobundle.Bundle_DsseEnvelope{},
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_PublicKey{
 							PublicKey: &v1.PublicKeyIdentifier{},
