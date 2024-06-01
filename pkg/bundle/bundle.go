@@ -26,10 +26,11 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
-	"github.com/sigstore/sigstore-go/pkg/tlog"
-	"github.com/sigstore/sigstore-go/pkg/verify"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
 var ErrValidation = errors.New("validation error")
