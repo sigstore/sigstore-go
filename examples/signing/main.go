@@ -111,8 +111,8 @@ func main() {
 			Retries:        1,
 			LibraryVersion: Version,
 		}
-		opts.CertificateAuthority = sign.NewFulcio(fulcioOpts)
-		opts.CertificateAuthorityOptions = &sign.CertificateAuthorityOptions{
+		opts.CertificateProvider = sign.NewFulcio(fulcioOpts)
+		opts.CertificateProviderOptions = &sign.CertificateProviderOptions{
 			IDToken: *idToken,
 		}
 	}

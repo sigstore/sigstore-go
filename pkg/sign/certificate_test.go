@@ -108,7 +108,7 @@ func Test_GetCertificate(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Test malformed idtoken
-	certOpts := &CertificateAuthorityOptions{
+	certOpts := &CertificateProviderOptions{
 		IDToken: "idtoken.notbase64.stuff",
 	}
 	cert, err := fulcio.GetCertificate(ctx, keypair, certOpts)

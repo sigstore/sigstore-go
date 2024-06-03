@@ -31,15 +31,15 @@ import (
 const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 
 type BundleOptions struct {
-	// Optional certificate authority to get code signing certificate from.
+	// Optional certificate provider to get code signing certificate from.
 	//
 	// Typically a Fulcio instance; resulting bundle will contain a certificate
 	// for its verification material content instead of a public key.
-	CertificateAuthority CertificateAuthority
-	// Optional options for certificate authority
+	CertificateProvider CertificateProvider
+	// Optional options for certificate provider
 	//
 	// Some certificate authorities may require options to be set
-	CertificateAuthorityOptions *CertificateAuthorityOptions
+	CertificateProviderOptions *CertificateProviderOptions
 	// Optional list of timestamp authorities to contact for inclusion in bundle
 	TimestampAuthorities []*TimestampAuthority
 	// Optional list of Rekor instances to get transparency log entry from.
@@ -74,8 +74,8 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	// Add verification information to bundle
 	var verifierPEM []byte
-	if opts.CertificateAuthority != nil {
-		pubKeyBytes, err := opts.CertificateAuthority.GetCertificate(opts.Context, keypair, opts.CertificateAuthorityOptions)
+	if opts.CertificateProvider != nil {
+		pubKeyBytes, err := opts.CertificateProvider.GetCertificate(opts.Context, keypair, opts.CertificateProviderOptions)
 		if err != nil {
 			return nil, err
 		}

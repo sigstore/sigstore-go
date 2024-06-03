@@ -29,13 +29,13 @@ import (
 	"time"
 )
 
-type CertificateAuthorityOptions struct {
-	// Optional OIDC JWT to send to certificate authority; required for Fulcio
+type CertificateProviderOptions struct {
+	// Optional OIDC JWT to send to certificate provider; required for Fulcio
 	IDToken string
 }
 
-type CertificateAuthority interface {
-	GetCertificate(context.Context, Keypair, *CertificateAuthorityOptions) ([]byte, error)
+type CertificateProvider interface {
+	GetCertificate(context.Context, Keypair, *CertificateProviderOptions) ([]byte, error)
 }
 
 type Fulcio struct {
@@ -103,7 +103,7 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 }
 
 // Returns DER-encoded code signing certificate
-func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *CertificateAuthorityOptions) ([]byte, error) {
+func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *CertificateProviderOptions) ([]byte, error) {
 	if opts.IDToken == "" {
 		return nil, errors.New("Fulcio requires IDToken to be set")
 	}

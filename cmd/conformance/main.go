@@ -136,8 +136,8 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 		Timeout:        timeout,
 		LibraryVersion: Version,
 	}
-	signingOptions.CertificateAuthority = sign.NewFulcio(fulcioOpts)
-	signingOptions.CertificateAuthorityOptions = &sign.CertificateAuthorityOptions{
+	signingOptions.CertificateProvider = sign.NewFulcio(fulcioOpts)
+	signingOptions.CertificateProviderOptions = &sign.CertificateProviderOptions{
 		IDToken: *identityToken,
 	}
 
