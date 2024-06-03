@@ -19,18 +19,14 @@ import (
 	"context"
 	"crypto"
 	"crypto/sha256"
+	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"time"
 
 	"github.com/digitorus/timestamp"
-	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
-	tsagenclient "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 )
-
-type TSAClient interface {
-	GetTimestampResponse(params *tsagenclient.GetTimestampResponseParams, writer io.Writer, opts ...tsagenclient.ClientOption) (*tsagenclient.GetTimestampResponseCreated, error)
-}
 
 type TimestampAuthorityOptions struct {
 	// URL of Timestamp Authority instance
@@ -41,16 +37,29 @@ type TimestampAuthorityOptions struct {
 	Retries uint
 	// Optional version string for user agent
 	LibraryVersion string
-	// Optional client (for dependency injection)
-	Client TSAClient
+	// Optional Transport (for dependency injection)
+	Transport http.RoundTripper
 }
 
 type TimestampAuthority struct {
 	options *TimestampAuthorityOptions
+	client  *http.Client
 }
 
 func NewTimestampAuthority(opts *TimestampAuthorityOptions) *TimestampAuthority {
-	return &TimestampAuthority{options: opts}
+	ta := &TimestampAuthority{options: opts}
+	ta.client = &http.Client{
+		Transport: opts.Transport,
+	}
+
+	if opts.Timeout >= 0 {
+		if opts.Timeout == 0 {
+			opts.Timeout = 30 * time.Second
+		}
+		ta.client.Timeout = opts.Timeout
+	}
+
+	return ta
 }
 
 func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte) ([]byte, error) {
@@ -66,33 +75,27 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 		return nil, err
 	}
 
-	if ta.options.Client == nil {
-		client, err := tsaclient.GetTimestampClient(ta.options.URL, tsaclient.WithUserAgent(constructUserAgent(ta.options.LibraryVersion)), tsaclient.WithContentType(tsaclient.TimestampQueryMediaType))
+	attempts := uint(0)
+	var response *http.Response
+
+	for attempts <= ta.options.Retries {
+		request, err := http.NewRequest("POST", ta.options.URL, bytes.NewReader(reqBytes))
 		if err != nil {
 			return nil, err
 		}
-		ta.options.Client = client.Timestamp
-	}
+		request.Header.Add("Content-Type", "application/timestamp-query")
+		request.Header.Add("User-Agent", constructUserAgent(ta.options.LibraryVersion))
 
-	attempts := uint(0)
-	var respBytes bytes.Buffer
-
-	for attempts <= ta.options.Retries {
-		clientParams := tsagenclient.NewGetTimestampResponseParams()
-		if ta.options.Timeout >= 0 {
-			if ta.options.Timeout == 0 {
-				ta.options.Timeout = 30 * time.Second
-			}
-			clientParams.SetTimeout(ta.options.Timeout)
+		response, err = ta.client.Do(request)
+		if err != nil {
+			return nil, err
 		}
-		clientParams.Request = io.NopCloser(bytes.NewReader(reqBytes))
 
-		_, err = ta.options.Client.GetTimestampResponse(clientParams, &respBytes)
-		if err == nil && attempts > 0 {
+		if !((response.StatusCode >= 500 && response.StatusCode < 600) || response.StatusCode == 429) {
+			// Not a retryable HTTP status code, so don't retry
 			break
 		}
 
-		respBytes.Reset()
 		delay := time.Duration(math.Pow(2, float64(attempts)))
 		timer := time.NewTimer(delay * time.Second)
 		select {
@@ -104,16 +107,21 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 		attempts++
 	}
 
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = timestamp.ParseResponse(respBytes.Bytes())
+	if response.StatusCode != 200 && response.StatusCode != 201 {
+		return nil, fmt.Errorf("Timestamp authority returned %d: %s", response.StatusCode, string(body))
+	}
+
+	_, err = timestamp.ParseResponse(body)
 	if err != nil {
 		return nil, err
 	}
 
-	return respBytes.Bytes(), nil
+	return body, nil
 }
 
 func constructUserAgent(version string) string {
