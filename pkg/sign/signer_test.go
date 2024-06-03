@@ -35,10 +35,4 @@ func Test_Bundle(t *testing.T) {
 	bundle, err = Bundle(content, keypair, opts)
 	assert.NotNil(t, bundle)
 	assert.Nil(t, err)
-
-	// Test requiring IDToken with Fulcio
-	opts.Fulcio = NewFulcio(&FulcioOptions{})
-	bundle, err = Bundle(content, keypair, opts)
-	assert.Nil(t, bundle)
-	assert.NotNil(t, err)
 }

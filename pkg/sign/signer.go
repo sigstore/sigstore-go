@@ -31,18 +31,20 @@ import (
 const bundleV03MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
 
 type BundleOptions struct {
-	// Optional Fulcio instance to get code signing certificate from.
+	// Optional certificate provider to get code signing certificate from.
 	//
-	// Resulting bundle will contain a certificate for its verification
-	// material content, instead of a public key.
-	Fulcio *Fulcio
-	// Optional OIDC JWT to send to Fulcio; required if using Fulcio
-	IDToken string
+	// Typically a Fulcio instance; resulting bundle will contain a certificate
+	// for its verification material content instead of a public key.
+	CertificateProvider CertificateProvider
+	// Optional options for certificate provider
+	//
+	// Some certificate authorities may require options to be set
+	CertificateProviderOptions *CertificateProviderOptions
 	// Optional list of timestamp authorities to contact for inclusion in bundle
 	TimestampAuthorities []*TimestampAuthority
 	// Optional list of Rekor instances to get transparency log entry from.
 	//
-	// Supports hashedrekord and dsse entry types
+	// Supports hashedrekord and dsse entry types.
 	Rekors []*Rekor
 	// Optional context for retrying network requests
 	Context context.Context
@@ -53,10 +55,6 @@ type BundleOptions struct {
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
 	if keypair == nil {
 		return nil, errors.New("Must provide a keypair for signing, like EphemeralKeypair")
-	}
-
-	if opts.Fulcio != nil && opts.IDToken == "" {
-		return nil, errors.New("If opts.Fulcio is provided, must also supply opts.IDToken")
 	}
 
 	if opts.Context == nil {
@@ -76,8 +74,8 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	// Add verification information to bundle
 	var verifierPEM []byte
-	if opts.Fulcio != nil && opts.IDToken != "" {
-		pubKeyBytes, err := opts.Fulcio.GetCertificate(opts.Context, keypair, opts.IDToken)
+	if opts.CertificateProvider != nil {
+		pubKeyBytes, err := opts.CertificateProvider.GetCertificate(opts.Context, keypair, opts.CertificateProviderOptions)
 		if err != nil {
 			return nil, err
 		}
