@@ -1,7 +1,6 @@
 module github.com/sigstore/sigstore-go
 
-go 1.21
-toolchain go1.22.3
+go 1.21.0
 
 require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
