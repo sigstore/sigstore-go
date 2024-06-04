@@ -66,7 +66,6 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 	signatureHash := sha256.Sum256(signature)
 
 	req := &timestamp.Request{
-		Certificates:  true,
 		HashAlgorithm: crypto.SHA256,
 		HashedMessage: signatureHash[:],
 	}
