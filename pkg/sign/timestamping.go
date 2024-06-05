@@ -29,7 +29,7 @@ import (
 )
 
 type TimestampAuthorityOptions struct {
-	// URL of Timestamp Authority instance
+	// Full URL (with path) of Timestamp Authority endpoint
 	URL string
 	// Optional timeout for network requests (default 30s; use negative value for no timeout)
 	Timeout time.Duration
