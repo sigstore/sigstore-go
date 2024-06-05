@@ -15,24 +15,19 @@
 package sign
 
 import (
+	"bytes"
 	"context"
-	"errors"
 	"io"
+	"net/http"
 	"testing"
 
-	tsagenclient "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 	"github.com/stretchr/testify/assert"
 )
 
-func getTSAResponse(params *tsagenclient.GetTimestampResponseParams, writer io.Writer) (*tsagenclient.GetTimestampResponseCreated, error) {
+func getTSAResponse(req []byte) (*http.Response, error) {
 	virtualSigstoreOnce.Do(setupVirtualSigstore)
 	if virtualSigstoreErr != nil {
 		return nil, virtualSigstoreErr
-	}
-
-	req, err := io.ReadAll(params.Request)
-	if err != nil {
-		return nil, err
 	}
 
 	tsBytes, err := virtualSigstore.TimestampResponse(req)
@@ -40,35 +35,49 @@ func getTSAResponse(params *tsagenclient.GetTimestampResponseParams, writer io.W
 		return nil, err
 	}
 
-	_, err = writer.Write(tsBytes)
-	if err != nil {
-		return nil, err
+	response := &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(bytes.NewReader(tsBytes)),
 	}
-	return nil, nil
+
+	return response, nil
 }
 
 type mockTSAClient struct{}
 
-func (m *mockTSAClient) GetTimestampResponse(params *tsagenclient.GetTimestampResponseParams, writer io.Writer, _ ...tsagenclient.ClientOption) (*tsagenclient.GetTimestampResponseCreated, error) {
-	return getTSAResponse(params, writer)
+func (m *mockTSAClient) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return getTSAResponse(reqBytes)
 }
 
 type failFirstTSA struct {
 	Count int
 }
 
-func (f *failFirstTSA) GetTimestampResponse(params *tsagenclient.GetTimestampResponseParams, writer io.Writer, _ ...tsagenclient.ClientOption) (*tsagenclient.GetTimestampResponseCreated, error) {
+func (f *failFirstTSA) RoundTrip(req *http.Request) (*http.Response, error) {
 	if f.Count <= 0 {
 		f.Count++
-		return nil, errors.New("if at first you do not succeed")
+		response := &http.Response{
+			StatusCode: 500,
+			Body:       io.NopCloser(bytes.NewReader([]byte(""))),
+		}
+		return response, nil
+	}
+	reqBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	return getTSAResponse(params, writer)
+	return getTSAResponse(reqBytes)
 }
 
 func Test_GetTimestamp(t *testing.T) {
 	// Test happy path
-	opts := &TimestampAuthorityOptions{Retries: 1, Client: &mockTSAClient{}}
+	opts := &TimestampAuthorityOptions{Retries: 1, Transport: &mockTSAClient{}}
 	tsa := NewTimestampAuthority(opts)
 	ctx := context.TODO()
 	signature := []byte("somestuff")
@@ -78,7 +87,7 @@ func Test_GetTimestamp(t *testing.T) {
 
 	// Test successful retry
 	failFirstClient := &failFirstTSA{}
-	retryOpts := &TimestampAuthorityOptions{Retries: 1, Client: failFirstClient}
+	retryOpts := &TimestampAuthorityOptions{Retries: 1, Transport: failFirstClient}
 	retryTSA := NewTimestampAuthority(retryOpts)
 	resp, err = retryTSA.GetTimestamp(ctx, signature)
 	assert.NotNil(t, resp)
