@@ -137,7 +137,7 @@ func main() {
 			Retries:        1,
 			LibraryVersion: Version,
 		}
-		opts.Rekors = append(opts.Rekors, sign.NewRekor(rekorOpts))
+		opts.Transparencies = append(opts.Transparencies, sign.NewRekor(rekorOpts))
 	}
 
 	bundle, err := sign.Bundle(content, keypair, opts)

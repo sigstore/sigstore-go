@@ -45,7 +45,7 @@ type BundleOptions struct {
 	// Optional list of Rekor instances to get transparency log entry from.
 	//
 	// Supports hashedrekord and dsse entry types.
-	Rekors []*Rekor
+	Transparencies []Transparency
 	// Optional context for retrying network requests
 	Context context.Context
 	// Optional trusted root to verify signed bundle
@@ -127,15 +127,15 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		verifierOptions = append(verifierOptions, verify.WithSignedTimestamps(len(opts.TimestampAuthorities)))
 	}
 
-	if len(opts.Rekors) > 0 {
-		for _, rekor := range opts.Rekors {
-			err = rekor.GetTransparencyLogEntry(verifierPEM, bundle)
+	if len(opts.Transparencies) > 0 {
+		for _, transparency := range opts.Transparencies {
+			err = transparency.GetTransparencyLogEntry(verifierPEM, bundle)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.Rekors)), verify.WithIntegratedTimestamps(len(opts.Rekors)))
+		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.Transparencies)), verify.WithIntegratedTimestamps(len(opts.Transparencies)))
 	}
 
 	if opts.TrustedRoot != nil && len(verifierOptions) > 0 {
