@@ -20,7 +20,7 @@ go install ./cmd/...
 
 This library supports verifying [Sigstore bundles](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto) encoded as JSON, which are composed of raw message signatures or attestations, combined with certificates, transparency log data, signed timestamps, and other metadata to form a single, verifiable artifact.
 
-Signing is not currently supported by this library, but you may use [`sigstore-js`](https://github.com/sigstore/sigstore-js) or [`sigstore-python`](https://github.com/sigstore/sigstore-python) to generate/sign a bundle and verify it with this library.
+See the [signing documentation](signing.md) for how to generate/sign a bundle.
 
 An example Sigstore bundle is included in this distribution at [`examples/bundle-provenance.json`](../examples/bundle-provenance.json). 
 
