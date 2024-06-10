@@ -147,7 +147,7 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 			Timeout:        timeout,
 			LibraryVersion: Version,
 		}
-		signingOptions.Transparencies = append(signingOptions.Transparencies, sign.NewRekor(rekorOpts))
+		signingOptions.TransparencyLogs = append(signingOptions.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
 
 	if withRekor {
