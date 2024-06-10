@@ -29,7 +29,6 @@ import (
 // leaf certificate, will extract SCTs from the leaf certificate and verify the
 // timestamps using the TrustedMaterial's FulcioCertificateAuthorities() and
 // CTLogs()
-// TODO(issue#46): Add unit tests
 func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	ctlogs := trustedMaterial.CTLogs()
 	fulcioCerts := trustedMaterial.FulcioCertificateAuthorities()
