@@ -186,7 +186,7 @@ func WithSignedCertificateTimestamps(threshold int) VerifierOption {
 	}
 }
 
-// WithoutAnyObserverTimestampsInsecure configures the SignedEntityVerifier to not expect
+// WithoutAnyObserverTimestampsUnsafe configures the SignedEntityVerifier to not expect
 // any timestamps from either a Timestamp Authority or a Transparency Log.
 //
 // A SignedEntity without a trusted "observer" timestamp to verify the attached
@@ -195,7 +195,7 @@ func WithSignedCertificateTimestamps(threshold int) VerifierOption {
 // Do not enable this if you don't know what you are doing; as the name implies,
 // using it defeats part of the security guarantees offered by Sigstore. This
 // option is only useful for testing.
-func WithoutAnyObserverTimestampsInsecure() VerifierOption {
+func WithoutAnyObserverTimestampsUnsafe() VerifierOption {
 	return func(c *VerifierConfig) error {
 		c.weDoNotExpectAnyObserverTimestamps = true
 		return nil
@@ -205,7 +205,7 @@ func WithoutAnyObserverTimestampsInsecure() VerifierOption {
 func (c *VerifierConfig) Validate() error {
 	if !c.requireObserverTimestamps && !c.weExpectSignedTimestamps && !c.requireIntegratedTimestamps && !c.weDoNotExpectAnyObserverTimestamps {
 		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one of " +
-			"WithObserverTimestamps(), WithSignedTimestamps(), WithIntegratedTimestamps(), or WithoutAnyObserverTimestampsInsecure()")
+			"WithObserverTimestamps(), WithSignedTimestamps(), WithIntegratedTimestamps(), or WithoutAnyObserverTimestampsUnsafe()")
 	}
 
 	return nil

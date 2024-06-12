@@ -295,7 +295,7 @@ func main() {
 		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsInsecure(), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
 		if len(tr.RekorLogs()) > 0 {
 			verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 		}
