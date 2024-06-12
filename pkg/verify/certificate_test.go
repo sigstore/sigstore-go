@@ -53,7 +53,7 @@ func TestVerifyValidityPeriod(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := verify.VerifyLeafCertificate(tt.observerTimestamp, *leaf, virtualSigstore); (err != nil) != tt.wantErr {
+			if err := verify.VerifyLeafCertificate(tt.observerTimestamp, leaf, virtualSigstore); (err != nil) != tt.wantErr {
 				t.Errorf("VerifyLeafCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

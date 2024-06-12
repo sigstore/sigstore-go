@@ -48,8 +48,8 @@ func (c *Certificate) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
 	return !(c.Certificate.NotAfter.Before(t) || c.Certificate.NotBefore.After(t))
 }
 
-func (c *Certificate) HasCertificate() (x509.Certificate, bool) {
-	return *c.Certificate, true
+func (c *Certificate) GetCertificate() *x509.Certificate {
+	return c.Certificate
 }
 
 func (c *Certificate) HasPublicKey() (verify.PublicKeyProvider, bool) {
@@ -79,8 +79,8 @@ func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
 	return verifier.ValidAtTime(t)
 }
 
-func (pk *PublicKey) HasCertificate() (x509.Certificate, bool) {
-	return x509.Certificate{}, false
+func (pk *PublicKey) GetCertificate() *x509.Certificate {
+	return nil
 }
 
 func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
