@@ -22,7 +22,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
-func VerifyLeafCertificate(observerTimestamp time.Time, leafCert x509.Certificate, trustedMaterial root.TrustedMaterial) error { // nolint: revive
+func VerifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certificate, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	for _, ca := range trustedMaterial.FulcioCertificateAuthorities() {
 		if !ca.ValidityPeriodStart.IsZero() && observerTimestamp.Before(ca.ValidityPeriodStart) {
 			continue
