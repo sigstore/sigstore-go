@@ -17,6 +17,8 @@ package root
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
@@ -136,6 +138,12 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 			return nil, fmt.Errorf("unsupported hash function for the tlog")
 		}
 
+		tlogEntry := &TransparencyLog{
+			BaseURL:  tlog.GetBaseUrl(),
+			ID:       tlog.GetLogId().GetKeyId(),
+			HashFunc: hashFunc,
+		}
+
 		switch tlog.GetPublicKey().GetKeyDetails() {
 		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256:
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
@@ -145,31 +153,53 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 			var ecKey *ecdsa.PublicKey
 			var ok bool
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
-				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
+				return nil, fmt.Errorf("tlog public key is not ECDSA: %s", tlog.GetPublicKey().GetKeyDetails())
 			}
-			transparencyLogs[encodedKeyID] = &TransparencyLog{
-				BaseURL:           tlog.GetBaseUrl(),
-				ID:                tlog.GetLogId().GetKeyId(),
-				HashFunc:          hashFunc,
-				PublicKey:         ecKey,
-				SignatureHashFunc: crypto.SHA256,
+			tlogEntry.PublicKey = ecKey
+			tlogEntry.SignatureHashFunc = crypto.SHA256
+		// This key format has public key in PKIX RSA format and PKCS1#1v1.5 or RSASSA-PSS signature
+		case protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PSS_2048_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PSS_3072_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PSS_4096_SHA256:
+			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
+			if err != nil {
+				return nil, err
 			}
+			var rsaKey *rsa.PublicKey
+			var ok bool
+			if rsaKey, ok = key.(*rsa.PublicKey); !ok {
+				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
+			}
+			tlogEntry.PublicKey = rsaKey
+			tlogEntry.SignatureHashFunc = crypto.SHA256
+		case protocommon.PublicKeyDetails_PKIX_ED25519, protocommon.PublicKeyDetails_PKIX_ED25519_PH:
+			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
+			if err != nil {
+				return nil, err
+			}
+			var edKey *ed25519.PublicKey
+			var ok bool
+			if edKey, ok = key.(*ed25519.PublicKey); !ok {
+				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
+			}
+			tlogEntry.PublicKey = edKey
+			tlogEntry.SignatureHashFunc = crypto.SHA512 // see RFC8032
 		// This key format is deprecated, but currently in use for Sigstore staging instance
 		case protocommon.PublicKeyDetails_PKCS1_RSA_PKCS1V5: //nolint:staticcheck
 			key, err := x509.ParsePKCS1PublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
 			}
-			transparencyLogs[encodedKeyID] = &TransparencyLog{
-				BaseURL:           tlog.GetBaseUrl(),
-				ID:                tlog.GetLogId().GetKeyId(),
-				HashFunc:          hashFunc,
-				PublicKey:         key,
-				SignatureHashFunc: crypto.SHA256,
-			}
+			tlogEntry.PublicKey = key
+			tlogEntry.SignatureHashFunc = crypto.SHA256
 		default:
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
+
+		transparencyLogs[encodedKeyID] = tlogEntry
 
 		if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 			if validFor.GetStart() != nil {
