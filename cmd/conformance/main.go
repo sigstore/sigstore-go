@@ -25,12 +25,14 @@ import (
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/util"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
@@ -60,6 +62,9 @@ func getTrustedRoot(staging bool) root.TrustedMaterial {
 		trustedRootJSON, err = os.ReadFile(*trustedRootPath)
 	} else {
 		opts := tuf.DefaultOptions()
+		fetcher := fetcher.DefaultFetcher{}
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent(Version))
+		opts.Fetcher = &fetcher
 
 		if staging {
 			opts.Root = tuf.StagingRoot()
@@ -295,7 +300,7 @@ func main() {
 		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithVersionString(Version), verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
 		if len(tr.RekorLogs()) > 0 {
 			verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 		}
@@ -344,7 +349,7 @@ func main() {
 		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithVersionString(Version), verify.WithSignedCertificateTimestamps(1))
 
 		// Check bundle and trusted root for signed timestamp information
 		bundleTimestamps, err := b.Timestamps()

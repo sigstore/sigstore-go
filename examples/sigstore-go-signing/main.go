@@ -21,11 +21,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 var Version string
@@ -83,9 +85,13 @@ func main() {
 	opts := sign.BundleOptions{}
 
 	// Get trusted_root.json
+	fetcher := fetcher.DefaultFetcher{}
+	fetcher.SetHTTPUserAgent(util.ConstructUserAgent(Version))
+
 	tufOptions := &tuf.Options{
 		Root:              tuf.StagingRoot(),
 		RepositoryBaseURL: tuf.StagingMirror,
+		Fetcher:           &fetcher,
 	}
 	tufClient, err := tuf.New(tufOptions)
 	if err != nil {

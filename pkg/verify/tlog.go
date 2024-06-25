@@ -32,6 +32,7 @@ import (
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
@@ -41,7 +42,7 @@ import (
 // that must be verified.
 //
 // If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]time.Time, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool, version string) ([]time.Time, error) { //nolint:revive
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -120,7 +121,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				continue
 			}
 
-			client, err := getRekorClient(tlogVerifier.BaseURL)
+			client, err := getRekorClient(tlogVerifier.BaseURL, version)
 			if err != nil {
 				return nil, err
 			}
@@ -198,8 +199,8 @@ func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.V
 	return &verifier, nil
 }
 
-func getRekorClient(baseURL string) (*rekorGeneratedClient.Rekor, error) {
-	client, err := rekorClient.GetRekorClient(baseURL)
+func getRekorClient(baseURL, version string) (*rekorGeneratedClient.Rekor, error) {
+	client, err := rekorClient.GetRekorClient(baseURL, rekorClient.WithUserAgent(util.ConstructUserAgent(version)))
 	if err != nil {
 		return nil, err
 	}

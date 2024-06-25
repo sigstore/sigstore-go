@@ -27,13 +27,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
+
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/util"
 	"github.com/sigstore/sigstore-go/pkg/verify"
-	"github.com/sigstore/sigstore/pkg/signature"
 )
 
+var Version string
 var artifact *string
 var artifactDigest *string
 var artifactDigestAlgorithm *string
@@ -101,6 +105,8 @@ func run() error {
 	identityPolicies := []verify.PolicyOption{}
 	var artifactPolicy verify.ArtifactPolicyOption
 
+	verifierConfig = append(verifierConfig, verify.WithVersionString(Version))
+
 	if *requireCTlog {
 		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 	}
@@ -129,6 +135,9 @@ func run() error {
 	if *tufRootURL != "" {
 		opts := tuf.DefaultOptions()
 		opts.RepositoryBaseURL = *tufRootURL
+		fetcher := fetcher.DefaultFetcher{}
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent(Version))
+		opts.Fetcher = &fetcher
 
 		// Load the tuf root.json if provided, if not use public good
 		if *tufTrustedRoot != "" {
