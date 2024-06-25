@@ -547,3 +547,93 @@ func TestVerificationContent(t *testing.T) {
 		})
 	}
 }
+
+func TestSignatureContent(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		pb            ProtobufBundle
+		wantEnvelope  bool
+		wantSignature bool
+	}{
+		{
+			name: "dsse envelope",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{},
+				},
+			},
+			wantEnvelope: true,
+		},
+		{
+			name: "message signature",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_MessageSignature{
+						MessageSignature: &protocommon.MessageSignature{
+							MessageDigest: &protocommon.HashOutput{},
+						},
+					},
+				},
+			},
+			wantSignature: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.pb.SignatureContent()
+			require.NoError(t, gotErr)
+			if tt.wantEnvelope {
+				require.NotNil(t, got.EnvelopeContent())
+				return
+			}
+			if tt.wantSignature {
+				require.NotNil(t, got.MessageSignatureContent())
+				return
+			}
+		})
+	}
+}
+
+func TestEnvelope(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pb      ProtobufBundle
+		wantErr bool
+	}{
+		{
+			name: "dsse envelope",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{},
+				},
+			},
+		},
+		{
+			name: "message signature",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_MessageSignature{
+						MessageSignature: &protocommon.MessageSignature{
+							MessageDigest: &protocommon.HashOutput{},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			_, gotErr := tt.pb.Envelope()
+			if tt.wantErr {
+				require.Error(t, gotErr)
+				return
+			}
+			require.NoError(t, gotErr)
+		})
+	}
+}
