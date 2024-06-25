@@ -15,8 +15,12 @@
 package bundle
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -370,6 +374,175 @@ func Test_validate(t *testing.T) {
 			got := tt.pb.validate()
 			if (got != nil) != tt.wantErr {
 				t.Errorf("validate() error = %v, wantErr = %v", got, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestVerificationContent(t *testing.T) {
+	t.Parallel()
+	caCert := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+	}
+	leafCert := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+	}
+	caKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	require.NoError(t, err)
+	leafKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	require.NoError(t, err)
+	caDer, err := x509.CreateCertificate(rand.Reader, caCert, caCert, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+	leafDer, err := x509.CreateCertificate(rand.Reader, leafCert, caCert, &leafKey.PublicKey, caKey)
+	require.NoError(t, err)
+	tests := []struct {
+		name            string
+		pb              ProtobufBundle
+		wantCertificate bool
+		wantPublicKey   bool
+		wantErr         bool
+	}{
+		{
+			name: "no verification material",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "certificate chain with zero certs",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: &protocommon.X509CertificateChain{},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "certificate chain with self-signed cert",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: &protocommon.X509CertificateChain{
+								Certificates: []*protocommon.X509Certificate{
+									{
+										RawBytes: caDer,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantCertificate: true,
+		},
+		{
+			name: "certificate chain",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: &protocommon.X509CertificateChain{
+								Certificates: []*protocommon.X509Certificate{
+									{
+										RawBytes: leafDer,
+									},
+									{
+										RawBytes: caDer,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantCertificate: true,
+		},
+		{
+			name: "certificate chain with invalid cert",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: &protocommon.X509CertificateChain{
+								Certificates: []*protocommon.X509Certificate{
+									{
+										RawBytes: []byte("hello"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "certificate",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_Certificate{
+							Certificate: &protocommon.X509Certificate{
+								RawBytes: leafDer,
+							},
+						},
+					},
+				},
+			},
+			wantCertificate: true,
+		},
+		{
+			name: "invalid certificate",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_Certificate{
+							Certificate: &protocommon.X509Certificate{
+								RawBytes: []byte("hello"),
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "public key",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &protocommon.PublicKeyIdentifier{},
+						},
+					},
+				},
+			},
+			wantPublicKey: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.pb.VerificationContent()
+			if tt.wantErr {
+				require.Error(t, gotErr)
+				return
+			}
+			require.NoError(t, gotErr)
+			if tt.wantCertificate {
+				require.NotNil(t, got.GetCertificate())
+				return
+			}
+			if tt.wantPublicKey {
+				_, hasPubKey := got.HasPublicKey()
+				require.True(t, hasPubKey)
+				return
 			}
 		})
 	}
