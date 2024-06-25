@@ -637,3 +637,82 @@ func TestEnvelope(t *testing.T) {
 		})
 	}
 }
+
+func TestTimestamps(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		pb             ProtobufBundle
+		wantTimestamps [][]byte
+		wantErr        bool
+	}{
+		{
+			name:    "missing verification material",
+			pb:      ProtobufBundle{Bundle: &protobundle.Bundle{}},
+			wantErr: true,
+		},
+		{
+			name: "empty timestamp data",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{},
+				},
+			},
+			wantTimestamps: make([][]byte, 0),
+		},
+		{
+			name: "one timestamp",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						TimestampVerificationData: &protobundle.TimestampVerificationData{
+							Rfc3161Timestamps: []*protocommon.RFC3161SignedTimestamp{
+								{
+									SignedTimestamp: []byte("sometime yesterday"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantTimestamps: [][]byte{
+				[]byte("sometime yesterday"),
+			},
+		},
+		{
+			name: "multiple timestamps",
+			pb: ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						TimestampVerificationData: &protobundle.TimestampVerificationData{
+							Rfc3161Timestamps: []*protocommon.RFC3161SignedTimestamp{
+								{
+									SignedTimestamp: []byte("sometime yesterday"),
+								},
+								{
+									SignedTimestamp: []byte("last week"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantTimestamps: [][]byte{
+				[]byte("sometime yesterday"),
+				[]byte("last week"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.pb.Timestamps()
+			if tt.wantErr {
+				require.Error(t, gotErr)
+				return
+			}
+			require.NoError(t, gotErr)
+			require.Equal(t, tt.wantTimestamps, got)
+		})
+	}
+}
