@@ -117,7 +117,7 @@ func TestCompareExtensions(t *testing.T) {
 	}
 
 	// Only the specified fields are expected to match
-	assert.True(t, certificate.CompareExtensions(expectedExt, actualExt))
+	assert.NoError(t, certificate.CompareExtensions(expectedExt, actualExt))
 
 	// Blank fields are ignored
 	expectedExt = certificate.Extensions{
@@ -125,7 +125,7 @@ func TestCompareExtensions(t *testing.T) {
 		GithubWorkflowName: "",
 	}
 
-	assert.True(t, certificate.CompareExtensions(expectedExt, actualExt))
+	assert.NoError(t, certificate.CompareExtensions(expectedExt, actualExt))
 
 	// but if any of the fields don't match, it should return false
 	expectedExt = certificate.Extensions{
@@ -133,5 +133,7 @@ func TestCompareExtensions(t *testing.T) {
 		GithubWorkflowName: "Final",
 	}
 
-	assert.False(t, certificate.CompareExtensions(expectedExt, actualExt))
+	errCompareExtensions := &certificate.ErrCompareExtensions{}
+	assert.ErrorAs(t, certificate.CompareExtensions(expectedExt, actualExt), &errCompareExtensions)
+	assert.Equal(t, errCompareExtensions.Error(), "expected GithubWorkflowName to be \"Final\", got \"Release\"")
 }

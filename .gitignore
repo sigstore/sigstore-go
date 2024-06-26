@@ -4,3 +4,4 @@
 /sigstore-go
 /tufdata
 /conformance
+/pkg/tuf/testing.local.json
