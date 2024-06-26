@@ -99,6 +99,10 @@ func TestCertificateIdentityVerify(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, "no matching CertificateIdentity found, last error: expected Issuer to be \"https://token.actions.example.com\", got \"https://token.actions.githubusercontent.com\"", err.Error())
 	assert.Nil(t, ci)
+	// test err unwrap for previous error
+	errCompareExtensions = &certificate.ErrCompareExtensions{}
+	assert.ErrorAs(t, err, &errCompareExtensions)
+	assert.Equal(t, "expected Issuer to be \"https://token.actions.example.com\", got \"https://token.actions.githubusercontent.com\"", errCompareExtensions.Error())
 
 	// if no certIDs are specified, we fail
 	_, err = CertificateIdentities{}.Verify(actualCert)
