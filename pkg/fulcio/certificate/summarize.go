@@ -17,6 +17,7 @@ package certificate
 import (
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -34,7 +35,7 @@ const (
 )
 
 type SubjectAlternativeName struct {
-	Type  SubjectAlternativeNameType `json:"type,omitempty""`
+	Type  SubjectAlternativeNameType `json:"type,omitempty"`
 	Value string                     `json:"value,omitempty"`
 }
 
@@ -42,6 +43,16 @@ type Summary struct {
 	CertificateIssuer      string                 `json:"certificateIssuer"`
 	SubjectAlternativeName SubjectAlternativeName `json:"subjectAlternativeName"`
 	Extensions
+}
+
+type ErrCompareExtensions struct {
+	field    string
+	expected string
+	actual   string
+}
+
+func (e *ErrCompareExtensions) Error() string {
+	return fmt.Sprintf("expected %s to be \"%s\", got \"%s\"", e.field, e.expected, e.actual)
 }
 
 func SummarizeCertificate(cert *x509.Certificate) (Summary, error) {
@@ -68,10 +79,10 @@ func SummarizeCertificate(cert *x509.Certificate) (Summary, error) {
 	return Summary{CertificateIssuer: cert.Issuer.String(), SubjectAlternativeName: san, Extensions: extensions}, nil
 }
 
-// CompareExtensions compares two Extensions structs and returns true if their
-// public fields are equal. It returns false otherwise. Empty fields in the
+// CompareExtensions compares two Extensions structs and returns an error if
+// any set values in the expected struct not equal. Empty fields in the
 // expectedExt struct are ignored.
-func CompareExtensions(expectedExt, actualExt Extensions) bool {
+func CompareExtensions(expectedExt, actualExt Extensions) error {
 	expExtValue := reflect.ValueOf(expectedExt)
 	actExtValue := reflect.ValueOf(actualExt)
 
@@ -84,11 +95,11 @@ func CompareExtensions(expectedExt, actualExt Extensions) bool {
 			actualFieldVal := actExtValue.FieldByName(field.Name)
 			if actualFieldVal.IsValid() {
 				if expectedFieldVal.Interface() != actualFieldVal.Interface() {
-					return false
+					return &ErrCompareExtensions{field.Name, fmt.Sprintf("%v", expectedFieldVal.Interface()), fmt.Sprintf("%v", actualFieldVal.Interface())}
 				}
 			}
 		}
 	}
 
-	return true
+	return nil
 }

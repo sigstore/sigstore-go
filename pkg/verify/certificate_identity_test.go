@@ -58,36 +58,56 @@ func TestCertificateIdentityVerify(t *testing.T) {
 
 	// First, let's test happy paths:
 	issuerOnlyID, _ := certIDForTesting("", "", "", ActionsIssuerValue, "")
-	assert.True(t, issuerOnlyID.Verify(actualCert))
+	assert.NoError(t, issuerOnlyID.Verify(actualCert))
 
 	sanValueOnly, _ := certIDForTesting(SigstoreSanValue, "", "", "", "")
-	assert.True(t, sanValueOnly.Verify(actualCert))
+	assert.NoError(t, sanValueOnly.Verify(actualCert))
 
 	sanRegexOnly, _ := certIDForTesting("", "", SigstoreSanRegex, "", "")
-	assert.True(t, sanRegexOnly.Verify(actualCert))
+	assert.NoError(t, sanRegexOnly.Verify(actualCert))
 
 	// multiple values can be specified
 	sanRegexAndIssuer, _ := certIDForTesting("", "", SigstoreSanRegex, ActionsIssuerValue, "github-hosted")
-	assert.True(t, sanRegexAndIssuer.Verify(actualCert))
+	assert.NoError(t, sanRegexAndIssuer.Verify(actualCert))
 
 	// unhappy paths:
 	// wrong issuer
 	sanRegexAndWrongIssuer, _ := certIDForTesting("", "", SigstoreSanRegex, "https://token.actions.example.com", "")
-	assert.False(t, sanRegexAndWrongIssuer.Verify(actualCert))
+	errCompareExtensions := &certificate.ErrCompareExtensions{}
+	assert.ErrorAs(t, sanRegexAndWrongIssuer.Verify(actualCert), &errCompareExtensions)
+	assert.Equal(t, "expected Issuer to be \"https://token.actions.example.com\", got \"https://token.actions.githubusercontent.com\"", errCompareExtensions.Error())
+
+	// bad san regex
+	badRegex, _ := certIDForTesting("", "", "^badregex.*", "", "")
+	errSANValueRegexMismatch := &ErrSANValueRegexMismatch{}
+	assert.ErrorAs(t, badRegex.Verify(actualCert), &errSANValueRegexMismatch)
+	assert.Equal(t, "expected SAN value to match regex \"^badregex.*\", got \"https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main\"", errSANValueRegexMismatch.Error())
 
 	// right san value, wrong san type
+	errSANTypeMismatch := &ErrSANTypeMismatch{}
 	sanValueAndWrongType, _ := certIDForTesting(SigstoreSanValue, "DNS", "", "", "")
-	assert.False(t, sanValueAndWrongType.Verify(actualCert))
+	assert.ErrorAs(t, sanValueAndWrongType.Verify(actualCert), &errSANTypeMismatch)
+	assert.Equal(t, "expected SAN type DNS, got URI", errSANTypeMismatch.Error())
 
 	// if we have an array of certIDs, only one needs to match
 	ci, err := CertificateIdentities{sanRegexAndWrongIssuer, sanRegexAndIssuer}.Verify(actualCert)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, *ci, sanRegexAndIssuer)
 
 	// if none match, we fail
 	ci, err = CertificateIdentities{sanValueAndWrongType, sanRegexAndWrongIssuer}.Verify(actualCert)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
+	assert.Equal(t, "no matching CertificateIdentity found, last error: expected Issuer to be \"https://token.actions.example.com\", got \"https://token.actions.githubusercontent.com\"", err.Error())
 	assert.Nil(t, ci)
+	// test err unwrap for previous error
+	errCompareExtensions = &certificate.ErrCompareExtensions{}
+	assert.ErrorAs(t, err, &errCompareExtensions)
+	assert.Equal(t, "expected Issuer to be \"https://token.actions.example.com\", got \"https://token.actions.githubusercontent.com\"", errCompareExtensions.Error())
+
+	// if no certIDs are specified, we fail
+	_, err = CertificateIdentities{}.Verify(actualCert)
+	assert.Error(t, err)
+	assert.Equal(t, "no matching CertificateIdentity found", err.Error())
 }
 
 func TestThatCertIDsAreFullySpecified(t *testing.T) {

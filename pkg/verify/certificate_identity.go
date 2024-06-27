@@ -17,6 +17,7 @@ package verify
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
@@ -33,6 +34,48 @@ type CertificateIdentity struct {
 }
 
 type CertificateIdentities []CertificateIdentity
+
+type ErrSANTypeMismatch struct {
+	expected string
+	actual   string
+}
+
+func (e *ErrSANTypeMismatch) Error() string {
+	return fmt.Sprintf("expected SAN type %s, got %s", e.expected, e.actual)
+}
+
+type ErrSANValueMismatch struct {
+	expected string
+	actual   string
+}
+
+func (e *ErrSANValueMismatch) Error() string {
+	return fmt.Sprintf("expected SAN value \"%s\", got \"%s\"", e.expected, e.actual)
+}
+
+type ErrSANValueRegexMismatch struct {
+	regex string
+	value string
+}
+
+func (e *ErrSANValueRegexMismatch) Error() string {
+	return fmt.Sprintf("expected SAN value to match regex \"%s\", got \"%s\"", e.regex, e.value)
+}
+
+type ErrNoMatchingCertificateIdentity struct {
+	errors []error
+}
+
+func (e *ErrNoMatchingCertificateIdentity) Error() string {
+	if len(e.errors) > 0 {
+		return fmt.Sprintf("no matching CertificateIdentity found, last error: %v", e.errors[len(e.errors)-1])
+	}
+	return "no matching CertificateIdentity found"
+}
+
+func (e *ErrNoMatchingCertificateIdentity) Unwrap() []error {
+	return e.errors
+}
 
 // NewSANMatcher provides an easier way to create a SubjectAlternativeNameMatcher.
 // If the regexpStr fails to compile into a Regexp, an error is returned.
@@ -63,31 +106,22 @@ func (s *SubjectAlternativeNameMatcher) MarshalJSON() ([]byte, error) {
 
 // Verify checks if the actualCert matches the SANMatcher's Type, Value, and
 // Regexp – if those values have been provided.
-func (s SubjectAlternativeNameMatcher) Verify(actualCert certificate.Summary) bool {
-	var typeMatches bool
-	var valueMatches bool
-	var regexMatches bool
-
-	// if a {SAN Type, Value, Regexp} was not specified, default to true
-	if s.SubjectAlternativeName.Type != "" {
-		typeMatches = s.Type == actualCert.SubjectAlternativeName.Type
-	} else {
-		typeMatches = true
+func (s SubjectAlternativeNameMatcher) Verify(actualCert certificate.Summary) error {
+	if s.SubjectAlternativeName.Type != "" &&
+		actualCert.SubjectAlternativeName.Type != s.SubjectAlternativeName.Type {
+		return &ErrSANTypeMismatch{string(s.SubjectAlternativeName.Type), string(actualCert.SubjectAlternativeName.Type)}
 	}
 
-	if s.SubjectAlternativeName.Value != "" {
-		valueMatches = s.Value == actualCert.SubjectAlternativeName.Value
-	} else {
-		valueMatches = true
+	if s.SubjectAlternativeName.Value != "" &&
+		actualCert.SubjectAlternativeName.Value != s.SubjectAlternativeName.Value {
+		return &ErrSANValueMismatch{string(s.SubjectAlternativeName.Value), string(actualCert.SubjectAlternativeName.Value)}
 	}
 
-	if s.Regexp.String() != "" {
-		regexMatches = s.Regexp.MatchString(actualCert.SubjectAlternativeName.Value)
-	} else {
-		regexMatches = true
+	if s.Regexp.String() != "" &&
+		!s.Regexp.MatchString(actualCert.SubjectAlternativeName.Value) {
+		return &ErrSANValueRegexMismatch{string(s.Regexp.String()), string(actualCert.SubjectAlternativeName.Value)}
 	}
-
-	return typeMatches && valueMatches && regexMatches
+	return nil
 }
 
 func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, extensions certificate.Extensions) (CertificateIdentity, error) {
@@ -116,21 +150,31 @@ func NewShortCertificateIdentity(issuer, sanValue, sanType, sanRegex string) (Ce
 	return NewCertificateIdentity(sanMatcher, certificate.Extensions{Issuer: issuer})
 }
 
+// Verify verifies the CertificateIdentities, and if ANY of them match the cert,
+// it returns the CertificateIdentity that matched. If none match, it returns an
+// error.
 func (i CertificateIdentities) Verify(cert certificate.Summary) (*CertificateIdentity, error) {
+	multierr := &ErrNoMatchingCertificateIdentity{}
+	var err error
 	for _, ci := range i {
-		if ci.Verify(cert) {
+		if err = ci.Verify(cert); err == nil {
 			return &ci, nil
 		}
+		multierr.errors = append(multierr.errors, err)
 	}
-
-	return nil, errors.New("no matching certificate identity found")
+	return nil, multierr
 }
 
 // Verify checks if the actualCert matches the CertificateIdentity's SAN and
 // any of the provided OID extension values. Any empty values are ignored.
-func (c CertificateIdentity) Verify(actualCert certificate.Summary) bool {
-	sanMatches := c.SubjectAlternativeName.Verify(actualCert)
-	extensionsMatch := certificate.CompareExtensions(c.Extensions, actualCert.Extensions)
+func (c CertificateIdentity) Verify(actualCert certificate.Summary) error {
+	var err error
+	if err = c.SubjectAlternativeName.Verify(actualCert); err != nil {
+		return err
+	}
+	if err = certificate.CompareExtensions(c.Extensions, actualCert.Extensions); err != nil {
+		return err
+	}
 
-	return sanMatches && extensionsMatch
+	return nil
 }
