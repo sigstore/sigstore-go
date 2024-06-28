@@ -104,7 +104,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
-	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName.Value, "foofighters@example.com")
+	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName, "foofighters@example.com")
 	assert.Equal(t, result.VerifiedTimestamps[0].Type, "Tlog")
 
 	// should fail to verify with a different artifact

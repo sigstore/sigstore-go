@@ -21,27 +21,9 @@ import (
 	"reflect"
 )
 
-// Normally, we would make this an int and use iota to assign values. However,
-// our goal is to allow users to evaluate this data with a policy engine.
-// Defining the types as strings should make it easier for end users to discover
-// and use the NameType field.
-type SubjectAlternativeNameType string
-
-const (
-	SubjectAlternativeNameTypeUnspecified SubjectAlternativeNameType = "Unspecified"
-	SubjectAlternativeNameTypeEmail       SubjectAlternativeNameType = "Email"
-	SubjectAlternativeNameTypeURI         SubjectAlternativeNameType = "URI"
-	SubjectAlternativeNameTypeOther       SubjectAlternativeNameType = "Other"
-)
-
-type SubjectAlternativeName struct {
-	Type  SubjectAlternativeNameType `json:"type,omitempty"`
-	Value string                     `json:"value,omitempty"`
-}
-
 type Summary struct {
-	CertificateIssuer      string                 `json:"certificateIssuer"`
-	SubjectAlternativeName SubjectAlternativeName `json:"subjectAlternativeName"`
+	CertificateIssuer      string `json:"certificateIssuer"`
+	SubjectAlternativeName string `json:"subjectAlternativeName"`
 	Extensions
 }
 
@@ -62,15 +44,13 @@ func SummarizeCertificate(cert *x509.Certificate) (Summary, error) {
 		return Summary{}, err
 	}
 
-	san := SubjectAlternativeName{}
+	var san string
 
 	switch {
 	case len(cert.URIs) > 0:
-		san.Type = SubjectAlternativeNameTypeURI
-		san.Value = cert.URIs[0].String()
+		san = cert.URIs[0].String()
 	case len(cert.EmailAddresses) > 0:
-		san.Type = SubjectAlternativeNameTypeEmail
-		san.Value = cert.EmailAddresses[0]
+		san = cert.EmailAddresses[0]
 	default:
 		// TODO: Support OtherName SANs i.e. https://github.com/sigstore/fulcio/blob/main/docs/oid-info.md#1361415726417--othername-san
 		return Summary{}, errors.New("No Subject Alternative Name found")

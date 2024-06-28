@@ -24,8 +24,8 @@ import (
 )
 
 type SubjectAlternativeNameMatcher struct {
-	certificate.SubjectAlternativeName
-	Regexp regexp.Regexp `json:"regexp,omitempty"`
+	SubjectAlternativeName string        `json:"subjectAlternativeName"`
+	Regexp                 regexp.Regexp `json:"regexp,omitempty"`
 }
 
 type CertificateIdentity struct {
@@ -79,53 +79,45 @@ func (e *ErrNoMatchingCertificateIdentity) Unwrap() []error {
 
 // NewSANMatcher provides an easier way to create a SubjectAlternativeNameMatcher.
 // If the regexpStr fails to compile into a Regexp, an error is returned.
-func NewSANMatcher(sanValue string, sanType string, regexpStr string) (SubjectAlternativeNameMatcher, error) {
+func NewSANMatcher(sanValue string, regexpStr string) (SubjectAlternativeNameMatcher, error) {
 	r, err := regexp.Compile(regexpStr)
 	if err != nil {
 		return SubjectAlternativeNameMatcher{}, err
 	}
 
 	return SubjectAlternativeNameMatcher{
-		SubjectAlternativeName: certificate.SubjectAlternativeName{
-			Value: sanValue,
-			Type:  certificate.SubjectAlternativeNameType(sanType),
-		},
-		Regexp: *r}, nil
+		SubjectAlternativeName: sanValue,
+		Regexp:                 *r}, nil
 }
 
 // The default Regexp json marshal is quite ugly, so we override it here.
 func (s *SubjectAlternativeNameMatcher) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		certificate.SubjectAlternativeName
-		Regexp string `json:"regexp,omitempty"`
+		SubjectAlternativeName string `json:"subjectAlternativeName"`
+		Regexp                 string `json:"regexp,omitempty"`
 	}{
 		SubjectAlternativeName: s.SubjectAlternativeName,
 		Regexp:                 s.Regexp.String(),
 	})
 }
 
-// Verify checks if the actualCert matches the SANMatcher's Type, Value, and
+// Verify checks if the actualCert matches the SANMatcher's Value and
 // Regexp – if those values have been provided.
 func (s SubjectAlternativeNameMatcher) Verify(actualCert certificate.Summary) error {
-	if s.SubjectAlternativeName.Type != "" &&
-		actualCert.SubjectAlternativeName.Type != s.SubjectAlternativeName.Type {
-		return &ErrSANTypeMismatch{string(s.SubjectAlternativeName.Type), string(actualCert.SubjectAlternativeName.Type)}
-	}
-
-	if s.SubjectAlternativeName.Value != "" &&
-		actualCert.SubjectAlternativeName.Value != s.SubjectAlternativeName.Value {
-		return &ErrSANValueMismatch{string(s.SubjectAlternativeName.Value), string(actualCert.SubjectAlternativeName.Value)}
+	if s.SubjectAlternativeName != "" &&
+		actualCert.SubjectAlternativeName != s.SubjectAlternativeName {
+		return &ErrSANValueMismatch{string(s.SubjectAlternativeName), string(actualCert.SubjectAlternativeName)}
 	}
 
 	if s.Regexp.String() != "" &&
-		!s.Regexp.MatchString(actualCert.SubjectAlternativeName.Value) {
-		return &ErrSANValueRegexMismatch{string(s.Regexp.String()), string(actualCert.SubjectAlternativeName.Value)}
+		!s.Regexp.MatchString(actualCert.SubjectAlternativeName) {
+		return &ErrSANValueRegexMismatch{string(s.Regexp.String()), string(actualCert.SubjectAlternativeName)}
 	}
 	return nil
 }
 
 func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, extensions certificate.Extensions) (CertificateIdentity, error) {
-	if sanMatcher.SubjectAlternativeName.Value == "" && sanMatcher.Regexp.String() == "" {
+	if sanMatcher.SubjectAlternativeName == "" && sanMatcher.Regexp.String() == "" {
 		return CertificateIdentity{}, errors.New("when verifying a certificate identity, there must be subject alternative name criteria")
 	}
 
@@ -141,8 +133,8 @@ func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, extensions
 // NewShortCertificateIdentity provides a more convenient way of initializing
 // a CertificiateIdentity with a SAN and the Issuer OID extension. If you need
 // to check more OID extensions, use NewCertificateIdentity instead.
-func NewShortCertificateIdentity(issuer, sanValue, sanType, sanRegex string) (CertificateIdentity, error) {
-	sanMatcher, err := NewSANMatcher(sanValue, sanType, sanRegex)
+func NewShortCertificateIdentity(issuer, sanValue, sanRegex string) (CertificateIdentity, error) {
+	sanMatcher, err := NewSANMatcher(sanValue, sanRegex)
 	if err != nil {
 		return CertificateIdentity{}, err
 	}

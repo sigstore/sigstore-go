@@ -92,7 +92,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	assert.Equal(t, "https://slsa.dev/provenance/v1", res.Statement.PredicateType)
 	assert.NotNil(t, res.Signature)
 	assert.NotNil(t, res.Signature.Certificate)
-	assert.Equal(t, "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main", res.Signature.Certificate.SubjectAlternativeName.Value)
+	assert.Equal(t, "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main", res.Signature.Certificate.SubjectAlternativeName)
 	assert.NotEmpty(t, res.VerifiedTimestamps)
 
 	// verifies with integrated timestamp threshold too
@@ -209,7 +209,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
-	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
+	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", verify.SigstoreSanRegex)
 	assert.Nil(t, err)
 
 	digest, _ := hex.DecodeString("46d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
@@ -300,8 +300,8 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
-	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "BadSANValue", "", "")
+	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", verify.SigstoreSanRegex)
+	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "BadSANValue", "")
 
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 
