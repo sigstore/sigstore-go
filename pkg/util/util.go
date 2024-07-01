@@ -14,11 +14,23 @@
 
 package util
 
-func ConstructUserAgent(version string) string {
+import (
+	"runtime/debug"
+)
+
+func ConstructUserAgent() string {
 	userAgent := "sigstore-go"
-	if version != "" {
-		userAgent += "/"
-		userAgent += version
+
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return userAgent
+	}
+
+	for _, eachDep := range buildInfo.Deps {
+		if eachDep.Path == "github.com/sigstore/sigstore-go" {
+			userAgent += "/"
+			userAgent += eachDep.Version
+		}
 	}
 
 	return userAgent

@@ -36,7 +36,6 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
-var Version string
 var bundlePath *string
 var certPath *string
 var certOIDC *string
@@ -63,7 +62,7 @@ func getTrustedRoot(staging bool) root.TrustedMaterial {
 	} else {
 		opts := tuf.DefaultOptions()
 		fetcher := fetcher.DefaultFetcher{}
-		fetcher.SetHTTPUserAgent(util.ConstructUserAgent(Version))
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
 		opts.Fetcher = &fetcher
 
 		if staging {
@@ -137,9 +136,8 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 	}
 
 	fulcioOpts := &sign.FulcioOptions{
-		BaseURL:        fmt.Sprintf("https://fulcio.%s.dev", instance),
-		Timeout:        timeout,
-		LibraryVersion: Version,
+		BaseURL: fmt.Sprintf("https://fulcio.%s.dev", instance),
+		Timeout: timeout,
 	}
 	signingOptions.CertificateProvider = sign.NewFulcio(fulcioOpts)
 	signingOptions.CertificateProviderOptions = &sign.CertificateProviderOptions{
@@ -148,9 +146,8 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 
 	if withRekor {
 		rekorOpts := &sign.RekorOptions{
-			BaseURL:        fmt.Sprintf("https://rekor.%s.dev", instance),
-			Timeout:        timeout,
-			LibraryVersion: Version,
+			BaseURL: fmt.Sprintf("https://rekor.%s.dev", instance),
+			Timeout: timeout,
 		}
 		signingOptions.TransparencyLogs = append(signingOptions.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
@@ -300,7 +297,7 @@ func main() {
 		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithVersionString(Version), verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
 		if len(tr.RekorLogs()) > 0 {
 			verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 		}
@@ -349,7 +346,7 @@ func main() {
 		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithVersionString(Version), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 
 		// Check bundle and trusted root for signed timestamp information
 		bundleTimestamps, err := b.Timestamps()

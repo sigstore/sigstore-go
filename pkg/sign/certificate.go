@@ -52,8 +52,6 @@ type FulcioOptions struct {
 	Timeout time.Duration
 	// Optional number of times to retry on HTTP 5XX
 	Retries uint
-	// Optional version string for user agent
-	LibraryVersion string
 	// Optional Transport (for dependency injection)
 	Transport http.RoundTripper
 }
@@ -171,7 +169,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 		}
 		request.Header.Add("Authorization", "Bearer "+opts.IDToken)
 		request.Header.Add("Content-Type", "application/json")
-		request.Header.Add("User-Agent", util.ConstructUserAgent(f.options.LibraryVersion))
+		request.Header.Add("User-Agent", util.ConstructUserAgent())
 
 		response, err = f.client.Do(request)
 		if err != nil {

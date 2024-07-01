@@ -61,7 +61,7 @@ func New(opts *Options) (*Client, error) {
 		c.cfg.Fetcher = opts.Fetcher
 	} else {
 		fetcher := fetcher.DefaultFetcher{}
-		fetcher.SetHTTPUserAgent(util.ConstructUserAgent(""))
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
 		c.cfg.Fetcher = &fetcher
 	}
 

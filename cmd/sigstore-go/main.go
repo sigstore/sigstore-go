@@ -37,7 +37,6 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
-var Version string
 var artifact *string
 var artifactDigest *string
 var artifactDigestAlgorithm *string
@@ -105,8 +104,6 @@ func run() error {
 	identityPolicies := []verify.PolicyOption{}
 	var artifactPolicy verify.ArtifactPolicyOption
 
-	verifierConfig = append(verifierConfig, verify.WithVersionString(Version))
-
 	if *requireCTlog {
 		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 	}
@@ -136,7 +133,7 @@ func run() error {
 		opts := tuf.DefaultOptions()
 		opts.RepositoryBaseURL = *tufRootURL
 		fetcher := fetcher.DefaultFetcher{}
-		fetcher.SetHTTPUserAgent(util.ConstructUserAgent(Version))
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
 		opts.Fetcher = &fetcher
 
 		// Load the tuf root.json if provided, if not use public good

@@ -36,12 +36,12 @@ func TestTlogVerifier(t *testing.T) {
 	assert.NoError(t, err)
 
 	var ts []time.Time
-	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false, "")
+	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
 	assert.NoError(t, err)
 	// 1 verified timestamp
 	assert.Len(t, ts, 1)
 
-	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false, false, "")
+	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, false, false)
 	assert.NoError(t, err)
 	// 0 verified timestamps, since integrated timestamps are ignored
 	assert.Len(t, ts, 0)
@@ -49,7 +49,7 @@ func TestTlogVerifier(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore2, 1, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore2, 1, true, false)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 
 	// Attempt to use tlog with integrated time outside certificate validity.
@@ -59,7 +59,7 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err = virtualSigstore.AttestAtTime("foo@fighters.com", "issuer", statement, time.Now().Add(30*time.Minute))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
 	assert.Error(t, err)
 }
 
@@ -96,11 +96,11 @@ func TestIgnoredTLogEntries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// success: entry that cannot be verified is ignored
-	_, err = verify.VerifyArtifactTransparencyLog(&oneTrustedOneUntrustedLogEntry{entity, untrustedEntity}, virtualSigstore, 1, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(&oneTrustedOneUntrustedLogEntry{entity, untrustedEntity}, virtualSigstore, 1, true, false)
 	assert.NoError(t, err)
 
 	// failure: threshold of 2 is not met since 1 untrusted entry is ignored
-	_, err = verify.VerifyArtifactTransparencyLog(&oneTrustedOneUntrustedLogEntry{entity, untrustedEntity}, virtualSigstore, 2, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(&oneTrustedOneUntrustedLogEntry{entity, untrustedEntity}, virtualSigstore, 2, true, false)
 	assert.Error(t, err)
 }
 
@@ -138,7 +138,7 @@ func TestInvalidTLogEntries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// failure: threshold of 1 is not met with invalid entry
-	_, err = verify.VerifyArtifactTransparencyLog(&invalidTLogEntity{entity}, virtualSigstore, 1, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(&invalidTLogEntity{entity}, virtualSigstore, 1, true, false)
 	assert.Error(t, err)
 	if err.Error() != "entry must contain an inclusion proof and/or promise" {
 		t.Errorf("expected error with missing proof/promises, got: %v", err.Error())
@@ -162,7 +162,7 @@ func TestNoTLogEntries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// failure: threshold of 1 is not met with no entries
-	_, err = verify.VerifyArtifactTransparencyLog(&noTLogEntity{entity}, virtualSigstore, 1, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(&noTLogEntity{entity}, virtualSigstore, 1, true, false)
 	assert.Error(t, err)
 	if !strings.Contains(err.Error(), "not enough verified log entries from transparency log") {
 		t.Errorf("expected error with timestamp threshold, got: %v", err.Error())
@@ -190,6 +190,6 @@ func TestDuplicateTlogEntries(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foofighters@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyArtifactTransparencyLog(&dupTlogEntity{entity}, virtualSigstore, 1, true, false, "")
+	_, err = verify.VerifyArtifactTransparencyLog(&dupTlogEntity{entity}, virtualSigstore, 1, true, false)
 	assert.Error(t, err) // duplicate tlog entries should fail to verify
 }

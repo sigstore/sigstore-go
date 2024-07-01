@@ -12,21 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION := `git describe --tags`
-LDFLAGS = -ldflags "-X main.Version=$(VERSION)"
-
 .PHONY: all
 all: build build-examples
 
 .PHONY: build
 build:
-	go build $(LDFLAGS) ./cmd/sigstore-go
-	go build $(LDFLAGS) -o conformance ./cmd/conformance
+	go build ./cmd/sigstore-go
+	go build -o conformance ./cmd/conformance
 
 .PHONY: build-examples
 build-examples:
-	go build -C ./examples/oci-image-verification $(LDFLAGS) -o oci-image-verification .
-	go build -C ./examples/sigstore-go-signing $(LDFLAGS) -o sigstore-go-signing .
+	go build -C ./examples/oci-image-verification -o oci-image-verification .
+	go build -C ./examples/sigstore-go-signing -o sigstore-go-signing .
 
 .PHONY: test
 test:

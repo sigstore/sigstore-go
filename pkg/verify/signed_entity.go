@@ -70,8 +70,6 @@ type VerifierConfig struct { // nolint: revive
 	// rather than a provided signed or log timestamp. Most workflows will
 	// not use this option
 	weDoNotExpectAnyObserverTimestamps bool
-	// optional sigstore-go version to use in user agent for outbound requests
-	version string
 }
 
 type VerifierOption func(*VerifierConfig) error
@@ -200,15 +198,6 @@ func WithSignedCertificateTimestamps(threshold int) VerifierOption {
 func WithoutAnyObserverTimestampsUnsafe() VerifierOption {
 	return func(c *VerifierConfig) error {
 		c.weDoNotExpectAnyObserverTimestamps = true
-		return nil
-	}
-}
-
-// WithVersionString is used to optionally specify a specific version of
-// sigstore-go, to use in user agent for outbound requests
-func WithVersionString(version string) VerifierOption {
-	return func(c *VerifierConfig) error {
-		c.version = version
 		return nil
 	}
 }
@@ -627,7 +616,7 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 	if v.config.weExpectTlogEntries {
 		// log timestamps should be verified if with WithIntegratedTimestamps or WithObserverTimestamps is used
 		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
-			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps, v.config.performOnlineVerification, v.config.version)
+			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps, v.config.performOnlineVerification)
 		if err != nil {
 			return nil, err
 		}
