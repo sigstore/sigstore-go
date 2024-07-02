@@ -32,6 +32,7 @@ import (
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
@@ -199,7 +200,7 @@ func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.V
 }
 
 func getRekorClient(baseURL string) (*rekorGeneratedClient.Rekor, error) {
-	client, err := rekorClient.GetRekorClient(baseURL)
+	client, err := rekorClient.GetRekorClient(baseURL, rekorClient.WithUserAgent(util.ConstructUserAgent()))
 	if err != nil {
 		return nil, err
 	}

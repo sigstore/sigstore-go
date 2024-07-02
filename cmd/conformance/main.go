@@ -25,16 +25,17 @@ import (
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/util"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
-var Version string
 var bundlePath *string
 var certPath *string
 var certOIDC *string
@@ -60,6 +61,9 @@ func getTrustedRoot(staging bool) root.TrustedMaterial {
 		trustedRootJSON, err = os.ReadFile(*trustedRootPath)
 	} else {
 		opts := tuf.DefaultOptions()
+		fetcher := fetcher.DefaultFetcher{}
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
+		opts.Fetcher = &fetcher
 
 		if staging {
 			opts.Root = tuf.StagingRoot()
@@ -132,9 +136,8 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 	}
 
 	fulcioOpts := &sign.FulcioOptions{
-		BaseURL:        fmt.Sprintf("https://fulcio.%s.dev", instance),
-		Timeout:        timeout,
-		LibraryVersion: Version,
+		BaseURL: fmt.Sprintf("https://fulcio.%s.dev", instance),
+		Timeout: timeout,
 	}
 	signingOptions.CertificateProvider = sign.NewFulcio(fulcioOpts)
 	signingOptions.CertificateProviderOptions = &sign.CertificateProviderOptions{
@@ -143,9 +146,8 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 
 	if withRekor {
 		rekorOpts := &sign.RekorOptions{
-			BaseURL:        fmt.Sprintf("https://rekor.%s.dev", instance),
-			Timeout:        timeout,
-			LibraryVersion: Version,
+			BaseURL: fmt.Sprintf("https://rekor.%s.dev", instance),
+			Timeout: timeout,
 		}
 		signingOptions.TransparencyLogs = append(signingOptions.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}

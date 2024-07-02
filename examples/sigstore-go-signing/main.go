@@ -21,14 +21,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
-var Version string
 var idToken *string
 var intoto *bool
 var tsa *bool
@@ -83,9 +84,13 @@ func main() {
 	opts := sign.BundleOptions{}
 
 	// Get trusted_root.json
+	fetcher := fetcher.DefaultFetcher{}
+	fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
+
 	tufOptions := &tuf.Options{
 		Root:              tuf.StagingRoot(),
 		RepositoryBaseURL: tuf.StagingMirror,
+		Fetcher:           &fetcher,
 	}
 	tufClient, err := tuf.New(tufOptions)
 	if err != nil {
@@ -109,7 +114,6 @@ func main() {
 			BaseURL:        "https://fulcio.sigstage.dev",
 			Timeout:        time.Duration(30 * time.Second),
 			Retries:        1,
-			LibraryVersion: Version,
 		}
 		opts.CertificateProvider = sign.NewFulcio(fulcioOpts)
 		opts.CertificateProviderOptions = &sign.CertificateProviderOptions{
@@ -122,7 +126,6 @@ func main() {
 			URL:            "https://timestamp.githubapp.com/api/v1/timestamp",
 			Timeout:        time.Duration(30 * time.Second),
 			Retries:        1,
-			LibraryVersion: Version,
 		}
 		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 
@@ -135,7 +138,6 @@ func main() {
 			BaseURL:        "https://rekor.sigstage.dev",
 			Timeout:        time.Duration(90 * time.Second),
 			Retries:        1,
-			LibraryVersion: Version,
 		}
 		opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}

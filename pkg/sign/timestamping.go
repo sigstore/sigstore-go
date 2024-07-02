@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/digitorus/timestamp"
+
+	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 type TimestampAuthorityOptions struct {
@@ -35,8 +37,6 @@ type TimestampAuthorityOptions struct {
 	Timeout time.Duration
 	// Optional number of times to retry on HTTP 5XX
 	Retries uint
-	// Optional version string for user agent
-	LibraryVersion string
 	// Optional Transport (for dependency injection)
 	Transport http.RoundTripper
 }
@@ -83,7 +83,7 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 			return nil, err
 		}
 		request.Header.Add("Content-Type", "application/timestamp-query")
-		request.Header.Add("User-Agent", constructUserAgent(ta.options.LibraryVersion))
+		request.Header.Add("User-Agent", util.ConstructUserAgent())
 
 		response, err = ta.client.Do(request)
 		if err != nil {
@@ -121,14 +121,4 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 	}
 
 	return body, nil
-}
-
-func constructUserAgent(version string) string {
-	userAgent := "sigstore-go"
-	if version != "" {
-		userAgent += "/"
-		userAgent += version
-	}
-
-	return userAgent
 }

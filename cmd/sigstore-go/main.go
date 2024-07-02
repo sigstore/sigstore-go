@@ -27,11 +27,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
+
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/util"
 	"github.com/sigstore/sigstore-go/pkg/verify"
-	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 var artifact *string
@@ -129,6 +132,9 @@ func run() error {
 	if *tufRootURL != "" {
 		opts := tuf.DefaultOptions()
 		opts.RepositoryBaseURL = *tufRootURL
+		fetcher := fetcher.DefaultFetcher{}
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
+		opts.Fetcher = &fetcher
 
 		// Load the tuf root.json if provided, if not use public good
 		if *tufTrustedRoot != "" {

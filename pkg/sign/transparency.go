@@ -31,11 +31,13 @@ import (
 	"github.com/sigstore/rekor/pkg/types"
 	"github.com/sigstore/rekor/pkg/types/dsse"
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
-	"github.com/sigstore/rekor/pkg/util"
+	rekorUtil "github.com/sigstore/rekor/pkg/util"
 
 	// To initialize rekor types
 	_ "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
+
+	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 type RekorClient interface {
@@ -57,8 +59,6 @@ type RekorOptions struct {
 	Timeout time.Duration
 	// Optional number of times to retry
 	Retries uint
-	// Optional version string for user agent
-	LibraryVersion string
 	// Optional client (for dependency injection)
 	Client RekorClient
 }
@@ -105,7 +105,7 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 
 		artifactProperties.PKIFormat = string(pki.X509)
 		artifactProperties.SignatureBytes = messageSignature.Signature
-		artifactProperties.ArtifactHash = util.PrefixSHA(hexDigest)
+		artifactProperties.ArtifactHash = rekorUtil.PrefixSHA(hexDigest)
 
 		var err error
 		proposedEntry, err = hashedrekordType.CreateProposedEntry(context.TODO(), "", artifactProperties)
@@ -126,7 +126,7 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 	params.SetProposedEntry(proposedEntry)
 
 	if r.options.Client == nil {
-		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(constructUserAgent(r.options.LibraryVersion)), client.WithRetryCount(r.options.Retries))
+		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(util.ConstructUserAgent()), client.WithRetryCount(r.options.Retries))
 		if err != nil {
 			return err
 		}
