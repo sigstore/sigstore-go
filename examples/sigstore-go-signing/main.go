@@ -111,9 +111,9 @@ func main() {
 
 	if *idToken != "" {
 		fulcioOpts := &sign.FulcioOptions{
-			BaseURL:        "https://fulcio.sigstage.dev",
-			Timeout:        time.Duration(30 * time.Second),
-			Retries:        1,
+			BaseURL: "https://fulcio.sigstage.dev",
+			Timeout: time.Duration(30 * time.Second),
+			Retries: 1,
 		}
 		opts.CertificateProvider = sign.NewFulcio(fulcioOpts)
 		opts.CertificateProviderOptions = &sign.CertificateProviderOptions{
@@ -123,9 +123,9 @@ func main() {
 
 	if *tsa {
 		tsaOpts := &sign.TimestampAuthorityOptions{
-			URL:            "https://timestamp.githubapp.com/api/v1/timestamp",
-			Timeout:        time.Duration(30 * time.Second),
-			Retries:        1,
+			URL:     "https://timestamp.githubapp.com/api/v1/timestamp",
+			Timeout: time.Duration(30 * time.Second),
+			Retries: 1,
 		}
 		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 
@@ -135,9 +135,9 @@ func main() {
 
 	if *rekor {
 		rekorOpts := &sign.RekorOptions{
-			BaseURL:        "https://rekor.sigstage.dev",
-			Timeout:        time.Duration(90 * time.Second),
-			Retries:        1,
+			BaseURL: "https://rekor.sigstage.dev",
+			Timeout: time.Duration(90 * time.Second),
+			Retries: 1,
 		}
 		opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
