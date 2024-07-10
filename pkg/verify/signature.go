@@ -104,7 +104,7 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {
 	dsseEnv := envelope.RawEnvelope()
 
-	// An DSSE envelope in a Sigstore bundle MUST only contain one
+	// A DSSE envelope in a Sigstore bundle MUST only contain one
 	// signature, even though DSSE is more permissive.
 	if len(dsseEnv.Signatures) != 1 {
 		return ErrInvSigCount
