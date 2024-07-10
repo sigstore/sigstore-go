@@ -106,6 +106,39 @@ func Test_getBundleVersion(t *testing.T) {
 	}
 }
 
+func TestMinVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name            string
+		mediaType       string
+		expectedVersion string
+		ret             bool
+	}{
+		{"old-format", "application/vnd.dev.sigstore.bundle+json;version=0.1", "v0.1", true},
+		{"old-format-unexpected", "application/vnd.dev.sigstore.bundle+json;version=0.1", "v0.2", false},
+		{"old-format-without-v", "application/vnd.dev.sigstore.bundle+json;version=0.1", "0.1", true},
+		{"new-format", "application/vnd.dev.sigstore.bundle.v0.3+json", "v0.1", true},
+		{"new-format-exact", "application/vnd.dev.sigstore.bundle.v0.3+json", "v0.3", true},
+		{"new-format-unexpected", "application/vnd.dev.sigstore.bundle.v0.2+json", "v0.3", false},
+		{"new-format-without-v", "application/vnd.dev.sigstore.bundle.v0.3+json", "0.3", true},
+		{"new-format-without-v-unexpected", "application/vnd.dev.sigstore.bundle.v0.2+json", "0.3", false},
+		{"blank", "", "", false},
+		{"invalid", "garbage", "v0.1", false},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := &ProtobufBundle{Bundle: &protobundle.Bundle{
+				MediaType: tc.mediaType,
+			}}
+			ret := b.MinVersion(tc.expectedVersion)
+			if tc.ret != ret {
+				t.Fatalf("expected %v, got %v", tc.ret, ret)
+			}
+		})
+	}
+}
+
 func TestMediaTypeString(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
