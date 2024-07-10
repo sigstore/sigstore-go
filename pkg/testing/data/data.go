@@ -40,9 +40,14 @@ func Unmarshal[T any](t *testing.T, data []byte) T {
 //go:embed sigstoreBundle.json
 var SigstoreBundleRaw []byte
 
+//go:embed sigstoreBundle2Sig.json
+var SigstoreBundle2SigRaw []byte
+
 //go:embed sigstore.js@2.0.0-provenanceBundle.json
 var SigstoreJS200ProvenanceBundleRaw []byte
 
+// TestBundle creates *bundle.ProtobufBundle from a raw byte stream
+// containing a JSON encoded protobuf bundle.
 func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
 	var b protobundle.Bundle
 	err := protojson.Unmarshal(raw, &b)
@@ -56,15 +61,23 @@ func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
 	return bun
 }
 
-// SigstoreBundle returns a test *sigstore.Bundle
+// SigstoreBundle returns a test *sigstore.Bundle.
 func SigstoreBundle(t *testing.T) *bundle.ProtobufBundle {
 	return TestBundle(t, SigstoreBundleRaw)
 }
 
+// SigstoreBundle2Sig returns a test *sigstore.Bundle with two signatures.
+func SigstoreBundle2Sig(t *testing.T) *bundle.ProtobufBundle {
+	return TestBundle(t, SigstoreBundle2SigRaw)
+}
+
+// SigstoreJS200ProvenanceBundle returns a test *sigstore.Bundle that
+// contains a complete sigstore-js build provenance.
 func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.ProtobufBundle {
 	return TestBundle(t, SigstoreJS200ProvenanceBundleRaw)
 }
 
+// PublicGoodTrustedMaterialRoot retruns a *root.TrustedRoot for PGI.
 func PublicGoodTrustedMaterialRoot(t *testing.T) *root.TrustedRoot {
 	trustedrootJSON, _ := os.ReadFile("../../examples/trusted-root-public-good.json")
 	trustedRoot, _ := root.NewTrustedRootFromJSON(trustedrootJSON)

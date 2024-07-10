@@ -15,6 +15,7 @@
 package verify_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"unicode"
@@ -366,4 +367,16 @@ func ensureKeysBeginWithLowercase(t *testing.T, obj interface{}) {
 			ensureKeysBeginWithLowercase(t, val)
 		}
 	}
+}
+
+func TestSigstoreBundle2Sig(t *testing.T) {
+	tr := data.PublicGoodTrustedMaterialRoot(t)
+	entity := data.SigstoreBundle2Sig(t)
+
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
+
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.True(t, errors.Is(err, verify.ErrInvSigCount))
+	assert.Nil(t, res)
 }
