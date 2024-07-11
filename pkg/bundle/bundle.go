@@ -313,13 +313,18 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 	return signedTimestamps, nil
 }
 
-func (b *ProtobufBundle) MinVersion(version string) bool {
-	mediaTypeParts := strings.Split(b.Bundle.MediaType, "version=")
-	if len(mediaTypeParts) < 2 {
+// MinVersion returns true if the bundle version is greater than or equal to the expected version.
+func (b *ProtobufBundle) MinVersion(expectVersion string) bool {
+	version, err := getBundleVersion(b.Bundle.MediaType)
+	if err != nil {
 		return false
 	}
 
-	return semver.Compare("v"+mediaTypeParts[1], "v"+version) >= 0
+	if !strings.HasPrefix(expectVersion, "v") {
+		expectVersion = "v" + expectVersion
+	}
+
+	return semver.Compare(version, expectVersion) >= 0
 }
 
 func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {
