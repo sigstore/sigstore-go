@@ -31,6 +31,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
+var ErrDSSEInvalidSignatureCount = errors.New("exactly one signature is required")
+
 func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	var verifier signature.Verifier
 	var err error
@@ -100,6 +102,13 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 }
 
 func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {
+	dsseEnv := envelope.RawEnvelope()
+
+	// A DSSE envelope in a Sigstore bundle MUST only contain one
+	// signature, even though DSSE is more permissive.
+	if len(dsseEnv.Signatures) != 1 {
+		return ErrDSSEInvalidSignatureCount
+	}
 	pub, err := verifier.PublicKey()
 	if err != nil {
 		return fmt.Errorf("could not fetch verifier public key: %w", err)
@@ -113,7 +122,7 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 		return fmt.Errorf("could not load envelope verifier: %w", err)
 	}
 
-	_, err = envVerifier.Verify(context.TODO(), envelope.RawEnvelope())
+	_, err = envVerifier.Verify(context.TODO(), dsseEnv)
 	if err != nil {
 		return fmt.Errorf("could not verify envelope: %w", err)
 	}
