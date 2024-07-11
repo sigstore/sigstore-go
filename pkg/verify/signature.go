@@ -31,7 +31,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
-var ErrInvSigCount = errors.New("exactly one signature is required")
+var ErrDSSEInvalidSignatureCount = errors.New("exactly one signature is required")
 
 func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	var verifier signature.Verifier
@@ -107,7 +107,7 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 	// A DSSE envelope in a Sigstore bundle MUST only contain one
 	// signature, even though DSSE is more permissive.
 	if len(dsseEnv.Signatures) != 1 {
-		return ErrInvSigCount
+		return ErrDSSEInvalidSignatureCount
 	}
 	pub, err := verifier.PublicKey()
 	if err != nil {

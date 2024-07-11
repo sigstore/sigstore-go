@@ -377,6 +377,6 @@ func TestSigstoreBundle2Sig(t *testing.T) {
 	assert.NoError(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
-	assert.True(t, errors.Is(err, verify.ErrInvSigCount))
+	assert.True(t, errors.Is(err, verify.ErrDSSEInvalidSignatureCount))
 	assert.Nil(t, res)
 }

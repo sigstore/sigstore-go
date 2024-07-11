@@ -52,7 +52,7 @@ func (e *envelopeContent) RawEnvelope() *dsse.Envelope {
 	return e.e
 }
 
-func TestVerifyEnvelope(t *testing.T) {
+func TestVerifyEnvelopeSignatureCount(t *testing.T) {
 	privk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	pubk := privk.Public().(*ecdsa.PublicKey)
 	assert.NoError(t, err)
@@ -115,7 +115,7 @@ func TestVerifyEnvelope(t *testing.T) {
 				)
 
 				if tc.fail {
-					assert.True(t, errors.Is(err, ErrInvSigCount))
+					assert.True(t, errors.Is(err, ErrDSSEInvalidSignatureCount))
 				} else {
 					assert.NoError(t, err)
 				}
