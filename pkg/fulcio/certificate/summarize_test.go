@@ -101,6 +101,30 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 	assert.Equal(t, expected, cs)
 }
 
+func TestSummarizeCertificateWithOtherNameSAN(t *testing.T) {
+	entity := data.OthernameBundle(t)
+	vc, err := entity.VerificationContent()
+	if err != nil {
+		t.Fatalf("failed to get verification content: %v", err)
+	}
+
+	leaf := vc.GetCertificate()
+
+	if leaf == nil {
+		t.Fatalf("expected verification content to be a certificate chain")
+	}
+	cs, err := certificate.SummarizeCertificate(leaf)
+	assert.NoError(t, err)
+	expected := certificate.Summary{
+		CertificateIssuer:      "O=Linux Foundation,POSTALCODE=57274,STREET=548 Market St,L=San Francisco,ST=California,C=USA",
+		SubjectAlternativeName: "foo!oidc.local",
+		Extensions: certificate.Extensions{
+			Issuer: "http://oidc.local:8080",
+		},
+	}
+	assert.Equal(t, expected, cs)
+}
+
 func TestCompareExtensions(t *testing.T) {
 	// Test that the extensions are equal
 	actualExt := certificate.Extensions{

@@ -200,6 +200,32 @@ func TestEntitySignedByPublicGoodWithHighObserverTimestampThresholdFails(t *test
 	}
 }
 
+func TestEntityWithOthernameSan(t *testing.T) {
+	tr := data.ScaffoldingTrustedMaterialRoot(t)
+	entity := data.OthernameBundle(t)
+
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsUnsafe())
+	assert.NoError(t, err)
+
+	digest, err := hex.DecodeString("bc103b4a84971ef6459b294a2b98568a2bfb72cded09d4acd1e16366a401f95b")
+	assert.NoError(t, err)
+
+	certID, err := verify.NewShortCertificateIdentity("http://oidc.local:8080", "foo!oidc.local", "")
+	assert.NoError(t, err)
+	res, err := v.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+
+	assert.Equal(t, res.VerifiedIdentity.Issuer, "http://oidc.local:8080")
+	assert.Equal(t, res.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName, "foo!oidc.local")
+
+	// an email address doesn't verify
+	certID, err = verify.NewShortCertificateIdentity("http://oidc.local:8080", "foo@oidc.local", "")
+	assert.NoError(t, err)
+	_, err = v.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
+	assert.Error(t, err)
+}
+
 // Now we test policy:
 
 func TestVerifyPolicyOptionErors(t *testing.T) {

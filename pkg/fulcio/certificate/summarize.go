@@ -19,6 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 type Summary struct {
@@ -51,8 +53,11 @@ func SummarizeCertificate(cert *x509.Certificate) (Summary, error) {
 		san = cert.URIs[0].String()
 	case len(cert.EmailAddresses) > 0:
 		san = cert.EmailAddresses[0]
-	default:
-		// TODO: Support OtherName SANs i.e. https://github.com/sigstore/fulcio/blob/main/docs/oid-info.md#1361415726417--othername-san
+	}
+	if san == "" {
+		san, _ = cryptoutils.UnmarshalOtherNameSAN(cert.Extensions)
+	}
+	if san == "" {
 		return Summary{}, errors.New("No Subject Alternative Name found")
 	}
 
