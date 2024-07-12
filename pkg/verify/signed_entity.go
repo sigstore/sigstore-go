@@ -15,6 +15,7 @@
 package verify
 
 import (
+	"encoding/asn1"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 const (
@@ -525,10 +527,30 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 		signedWithCertificate = true
 
+		// Get the summary before modifying the cert extensions
+		certSummary, err = certificate.SummarizeCertificate(leafCert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to summarize certificate: %w", err)
+		}
+
 		// From spec:
 		// > ## Certificate
 		// > …
 		// > The Verifier MUST perform certification path validation (RFC 5280 §6) of the certificate chain with the pre-distributed Fulcio root certificate(s) as a trust anchor, but with a fake “current time.” If a timestamp from the timestamping service is available, the Verifier MUST perform path validation using the timestamp from the Timestamping Service. If a timestamp from the Transparency Service is available, the Verifier MUST perform path validation using the timestamp from the Transparency Service. If both are available, the Verifier performs path validation twice. If either fails, verification fails.
+
+		// Go does not support the OtherName GeneralName SAN extension. If
+		// Fulcio issued the certificate with an OtherName SAN, it will be
+		// handled by SummarizeCertificate above, and it must be removed here
+		// or the X.509 verification will fail.
+		if len(leafCert.UnhandledCriticalExtensions) > 0 {
+			var unhandledExts []asn1.ObjectIdentifier
+			for _, oid := range leafCert.UnhandledCriticalExtensions {
+				if !oid.Equal(cryptoutils.SANOID) {
+					unhandledExts = append(unhandledExts, oid)
+				}
+			}
+			leafCert.UnhandledCriticalExtensions = unhandledExts
+		}
 
 		for _, verifiedTs := range verifiedTimestamps {
 			// verify the leaf certificate against the root
@@ -546,11 +568,6 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify signed certificate timestamp: %w", err)
 			}
-		}
-
-		certSummary, err = certificate.SummarizeCertificate(leafCert)
-		if err != nil {
-			return nil, fmt.Errorf("failed to summarize certificate: %w", err)
 		}
 	}
 

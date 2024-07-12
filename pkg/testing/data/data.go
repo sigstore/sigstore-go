@@ -46,6 +46,9 @@ var SigstoreBundle2SigRaw []byte
 //go:embed sigstore.js@2.0.0-provenanceBundle.json
 var SigstoreJS200ProvenanceBundleRaw []byte
 
+//go:embed othernameBundle.json
+var OthernameBundleRaw []byte
+
 // TestBundle creates *bundle.ProtobufBundle from a raw byte stream
 // containing a JSON encoded protobuf bundle.
 func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
@@ -77,9 +80,26 @@ func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.ProtobufBundle {
 	return TestBundle(t, SigstoreJS200ProvenanceBundleRaw)
 }
 
-// PublicGoodTrustedMaterialRoot retruns a *root.TrustedRoot for PGI.
+// OthernameBundle returns a test *sigstore.Bundle that contains verification
+// content for an artifact signed with an Othername identity.
+func OthernameBundle(t *testing.T) *bundle.ProtobufBundle {
+	return TestBundle(t, OthernameBundleRaw)
+}
+
+// PublicGoodTrustedMaterialRoot returns a *root.TrustedRoot for PGI.
 func PublicGoodTrustedMaterialRoot(t *testing.T) *root.TrustedRoot {
 	trustedrootJSON, _ := os.ReadFile("../../examples/trusted-root-public-good.json")
+	trustedRoot, _ := root.NewTrustedRootFromJSON(trustedrootJSON)
+
+	assert.NotNil(t, trustedRoot)
+
+	return trustedRoot
+}
+
+// ScaffoldingTrustedMaterialRoot returns a *root.TrustedRoot for a private
+// sigstore deployment.
+func ScaffoldingTrustedMaterialRoot(t *testing.T) *root.TrustedRoot {
+	trustedrootJSON, _ := os.ReadFile("../testing/data/trusted-root-scaffolding.json")
 	trustedRoot, _ := root.NewTrustedRootFromJSON(trustedrootJSON)
 
 	assert.NotNil(t, trustedRoot)
