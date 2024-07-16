@@ -83,14 +83,18 @@ Next, we'll create a verifier with some options, which will enable SCT verificat
 	}
 ```
 
-Then, we need to prepare the expected artifact digest and certificate identity. Note that these options may be omitted, but only if the options `WithoutIdentitiesUnsafe`/`WithoutArtifactUnsafe` are provided. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific identity and artifact.
+Then, we need to prepare the expected artifact digest. Note that this option has an alternative option `WithoutArtifactUnsafe`. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific artifact.
 
 ```go
 	digest, err := hex.DecodeString("76176ffa33808b54602c7c35de5c6e9a4deb96066dba6533f50ac234f4f1f4c6b3527515dc17c06fbe2860030f410eee69ea20079bd3a2c6f3dcf3b329b10751")
 	if err != nil {
 		panic(err)
 	}
+```
 
+In this case, we also need to prepare the expected certificate identity. Note that this option has an alternative option `WithoutIdentitiesUnsafe`. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific identity. If your bundle was signed with a key, and thus does not have a certificate identity, a better choice is to use the `WithKey` option.
+
+```go
 	certID, err := verify.NewShortCertificateIdentity("https://token.actions.githubusercontent.com", "", "", "^https://github.com/sigstore/sigstore-js/")
 	if err != nil {
 		panic(err)

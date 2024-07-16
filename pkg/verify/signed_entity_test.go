@@ -243,6 +243,16 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.True(t, p.WeExpectAnArtifact())
 	assert.False(t, p.WeExpectIdentities())
 
+	// ---
+
+	noArtifactKeyHappyPath := verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithKey())
+	p, err = noArtifactKeyHappyPath.BuildConfig()
+	assert.Nil(t, err)
+	assert.NotNil(t, p)
+
+	assert.True(t, p.WeExpectSigningKey())
+	assert.False(t, p.WeExpectIdentities())
+
 	// let's exercise the different error cases!
 	// 1. can't combine WithoutArtifactUnsafe with other Artifact options
 	// technically a hack that requires casting but better safe than sorry:
@@ -278,6 +288,11 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.NotNil(t, err)
 
 	_, err = verifier.Verify(entity, badIdentityPolicyCombo)
+	assert.NotNil(t, err)
+
+	// 5. can't expect certificate and key signature
+	badIdentityPolicyCombo2 := verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithCertificateIdentity(goodCertID), verify.WithKey())
+	_, err = badIdentityPolicyCombo2.BuildConfig()
 	assert.NotNil(t, err)
 }
 

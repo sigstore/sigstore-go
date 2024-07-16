@@ -271,6 +271,7 @@ func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
 type PolicyConfig struct {
 	weDoNotExpectAnArtifact bool
 	weDoNotExpectIdentities bool
+	weExpectSigningKey      bool
 	certificateIdentities   CertificateIdentities
 	verifyArtifact          bool
 	artifact                io.Reader
@@ -315,6 +316,12 @@ func (p *PolicyConfig) WeExpectAnArtifact() bool {
 // main Verify loop, this function therefore just wraps the double negative.
 func (p *PolicyConfig) WeExpectIdentities() bool {
 	return !p.weDoNotExpectIdentities
+}
+
+// WeExpectSigningKey returns true if we expect the SignedEntity to be signed
+// with a key and not a certificate.
+func (p *PolicyConfig) WeExpectSigningKey() bool {
+	return p.weExpectSigningKey
 }
 
 func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) PolicyBuilder {
@@ -365,8 +372,25 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 		if p.weDoNotExpectIdentities {
 			return errors.New("can't use WithCertificateIdentity while using WithoutIdentitiesUnsafe")
 		}
+		if p.weExpectSigningKey {
+			return errors.New("can't use WithCertificateIdentity while using WithKey")
+		}
 
 		p.certificateIdentities = append(p.certificateIdentities, identity)
+		return nil
+	}
+}
+
+// WithKey allows the caller of Verify to require the SignedEntity being
+// verified was signed with a key and not a certificate.
+func WithKey() PolicyOption {
+	return func(p *PolicyConfig) error {
+		if len(p.certificateIdentities) > 0 {
+			return errors.New("can't use WithKey while using WithCertificateIdentity")
+		}
+
+		p.weExpectSigningKey = true
+		p.weDoNotExpectIdentities = true
 		return nil
 	}
 }
@@ -495,6 +519,10 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	// If the bundle was signed with a long-lived key, and does not have a Fulcio certificate,
 	// then skip the certificate verification steps
 	if leafCert := verificationContent.GetCertificate(); leafCert != nil {
+		if policy.WeExpectSigningKey() {
+			return nil, errors.New("expected key signature, not certificate")
+		}
+
 		signedWithCertificate = true
 
 		// From spec:
