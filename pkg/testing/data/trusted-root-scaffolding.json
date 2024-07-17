@@ -1,0 +1,53 @@
+{
+  "mediaType": "application/vnd.dev.sigstore.trustedroot+json;version=0.1",
+  "tlogs": [
+    {
+      "baseUrl": "http://rekor.rekor-system.172.18.255.1.sslip.io",
+      "hashAlgorithm": "SHA2_256",
+      "publicKey": {
+        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnPyeVMLRWPJQpCHcUdG41k+oJiQEjX4uGSX7ujPH7Iv5zQD3VYiHhyQ/oMJvc1vx+2Zk2DBcBhN9IT0eZjB2RQ==",
+        "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+        "validFor": {
+          "start": "2024-07-12T18:35:53Z"
+        }
+      },
+      "logId": {
+        "keyId": "9vs1fkgdlblPyMuWiLRAQbEg0hmDHE6UwC92VxyLS8g="
+      }
+    }
+  ],
+  "certificateAuthorities": [
+    {
+      "subject": {
+        "organization": "Linux Foundation"
+      },
+      "uri": "http://fulcio.fulcio-system.172.18.255.1.sslip.io",
+      "certChain": {
+        "certificates": [
+          {
+            "rawBytes": "MIIFwzCCA6ugAwIBAgIIGOK4JTIvAnQwDQYJKoZIhvcNAQELBQAwfjEMMAoGA1UEBhMDVVNBMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNpc2NvMRYwFAYDVQQJEw01NDggTWFya2V0IFN0MQ4wDAYDVQQREwU1NzI3NDEZMBcGA1UEChMQTGludXggRm91bmRhdGlvbjAeFw0yNDA3MTEyMjI4NDFaFw0yNTA3MTEyMjI4NDFaMH4xDDAKBgNVBAYTA1VTQTETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzEWMBQGA1UECRMNNTQ4IE1hcmtldCBTdDEOMAwGA1UEERMFNTcyNzQxGTAXBgNVBAoTEExpbnV4IEZvdW5kYXRpb24wggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCrq2z5byNpomZGJsrEloYzae0zU6bZK2x+9C16DdocsLavJNX2MaxQ28imb5YYp4z6M52SDPW4NZKCtJRSOp4Z+jK6194z6r08SCbU4JdU6qhBWhzb5PqDN8JYImnWAsUAg2MHu8DWDHsNVfyivxkqeeyTf/c4aAJX0YqVv8WnvEnI6rstV6CO3/Q7VqZrK3vfUH4rFuiIBwCO1TLnVh9RHARM43oDdeKAQLKh2p4PD6VoOVPNEw8uxuokG8qyJZOUVgUETovR8E3puTVn3iopea2BvMADZQA1u6MT4MCjY/Hqv+RdQ6W4c2eyey/ZZSoiQUZmkO2YTqtYPH2B+ucDmIOJ07MtraFeB1CXfRlPa5sv02N6NzZN/iD66GQ/fV2PiuMyJVmhnYJp0Yf3onVmmpxIEOkUDnWudUtMJHZuLy0rhu/hAid6l0KEGjXlBvXu7txZHw1AMerQbvn5VJdPgm4PT/5xK5f1PpPGxVZwGkjmBMZmj9+hRt0OHH59aK31vqGqPbQtIXguAlF89O1UaZv4JGnpdaJl4K3huXnahcI16+8s+Vu9sJ4dfZT/NlFV26a4aU7q+E7yH3n8+zmsk3+l06BWxz7R6SSp6Fx4yPB/3SBs2c5SJ5k6a+/3SssqVHWwgSZD6cXDt1ByYDMjkHFExV0oLDr0Q057l/ainQIDAQABo0UwQzAOBgNVHQ8BAf8EBAMCAQYwEgYDVR0TAQH/BAgwBgEB/wIBATAdBgNVHQ4EFgQUjw+b5R2l1TEQ+FJdF/svzgCRJe0wDQYJKoZIhvcNAQELBQADggIBAECAX4HbC+MWJS5+D6aZmu7P85ZDzHMpIk5LJiAJwLUIOZwF4K0z9AOHE/nqg5+PnZGWWI3a9UheuzsZauerz/jaP8thBWjVDJCROJZpMMvALAjJfgIFJw3YLNPUup0EL4UohZ7iWoD6e/vfY64DKzCpdfGDRfcBCnWqBIYeSSPNqH+i0L059oR9kXv3jwR4os0CWk8TUMBYGeDADeE27QuZ4qafLkmOaqp//yWXwOoe4MZBxettZz/Nib5RRhCxRQ88hbs/zH3T5bBgp+DZ0anjy2iVhOj2x02mdD6Zcb32JgEJLQHCTAdGamcdulQDXC+YS9N2U0ap8J3tZCrEPQkdkeRzJ2EzQx38NIiY16BPlAqnnRpOZiXqee4O7bni4qdyVAYpkArSRNvKQbTyLHYLiQ+TEMs0SboajbQtC38I4ztZXr2ozM2b1MU0d3rBLsozmAhqT99od8wiBValo0EEi2mSxArRHy0puIOMs1i4kIz2yTbyeEI5pnkq/2uaX+RPmS2UB83SmbZ7Ex9eNe6QjnMhCv5fU0wcjtwwPp0GMMRulErGvnZ39PRMjEH79C8Nfhx9nZZoEN5VCG9qrM1KMlDLwNc09W5RJTYRQ7d41sC2hdMgwmxVJ08Ai3XMn7xiJ9JwnaypClc14XsQERoy2afgBUME9CL00G20nVYb"
+          }
+        ]
+      },
+      "validFor": {
+        "start": "2024-07-12T18:35:53Z"
+      }
+    }
+  ],
+  "ctlogs": [
+    {
+      "baseUrl": "http://ctlog.ctlog-system.172.18.255.1.sslip.io",
+      "hashAlgorithm": "SHA2_256",
+      "publicKey": {
+        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ7v1OnMWwYi4O5oaycBsWKom3McZBDzNqXsIOq9AXc3z2HOeWVbaDd1V/9c91WRFyAv77Ao9hS9D9MEboT7lZg==",
+        "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+        "validFor": {
+          "start": "2024-07-12T18:35:53Z"
+        }
+      },
+      "logId": {
+        "keyId": "3rBw2B85Mj0hjOM3hqbD44tPhZLqOSutNQ8ESVFkA1w="
+      }
+    }
+  ]
+}

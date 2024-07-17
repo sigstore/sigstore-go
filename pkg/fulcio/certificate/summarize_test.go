@@ -43,7 +43,7 @@ func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
 
 	expected := certificate.Summary{
 		CertificateIssuer:      "CN=sigstore-intermediate,O=sigstore.dev",
-		SubjectAlternativeName: certificate.SubjectAlternativeName{Type: "URI", Value: "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main"},
+		SubjectAlternativeName: "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
 		Extensions: certificate.Extensions{
 			Issuer:                              "https://token.actions.githubusercontent.com",
 			GithubWorkflowTrigger:               "push",
@@ -92,12 +92,36 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 
 	expected := certificate.Summary{
 		CertificateIssuer:      "CN=sigstore-intermediate,O=sigstore.dev",
-		SubjectAlternativeName: certificate.SubjectAlternativeName{Type: "Email", Value: "brian@dehamer.com"},
+		SubjectAlternativeName: "brian@dehamer.com",
 		Extensions: certificate.Extensions{
 			Issuer: "https://github.com/login/oauth",
 		},
 	}
 
+	assert.Equal(t, expected, cs)
+}
+
+func TestSummarizeCertificateWithOtherNameSAN(t *testing.T) {
+	entity := data.OthernameBundle(t)
+	vc, err := entity.VerificationContent()
+	if err != nil {
+		t.Fatalf("failed to get verification content: %v", err)
+	}
+
+	leaf := vc.GetCertificate()
+
+	if leaf == nil {
+		t.Fatalf("expected verification content to be a certificate chain")
+	}
+	cs, err := certificate.SummarizeCertificate(leaf)
+	assert.NoError(t, err)
+	expected := certificate.Summary{
+		CertificateIssuer:      "O=Linux Foundation,POSTALCODE=57274,STREET=548 Market St,L=San Francisco,ST=California,C=USA",
+		SubjectAlternativeName: "foo!oidc.local",
+		Extensions: certificate.Extensions{
+			Issuer: "http://oidc.local:8080",
+		},
+	}
 	assert.Equal(t, expected, cs)
 }
 
