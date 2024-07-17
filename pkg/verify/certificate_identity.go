@@ -172,9 +172,5 @@ func (c CertificateIdentity) Verify(actualCert certificate.Summary) error {
 	if err = c.SubjectAlternativeName.Verify(actualCert); err != nil {
 		return err
 	}
-	if err = certificate.CompareExtensions(c.Extensions, actualCert.Extensions); err != nil {
-		return err
-	}
-
-	return nil
+	return certificate.CompareExtensions(c.Extensions, actualCert.Extensions)
 }

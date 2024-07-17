@@ -83,14 +83,18 @@ Next, we'll create a verifier with some options, which will enable SCT verificat
 	}
 ```
 
-Then, we need to prepare the expected artifact digest and certificate identity. Note that these options may be omitted, but only if the options `WithoutIdentitiesUnsafe`/`WithoutArtifactUnsafe` are provided. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific identity and artifact.
+Then, we need to prepare the expected artifact digest. Note that this option has an alternative option `WithoutArtifactUnsafe`. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific artifact.
 
 ```go
 	digest, err := hex.DecodeString("76176ffa33808b54602c7c35de5c6e9a4deb96066dba6533f50ac234f4f1f4c6b3527515dc17c06fbe2860030f410eee69ea20079bd3a2c6f3dcf3b329b10751")
 	if err != nil {
 		panic(err)
 	}
+```
 
+In this case, we also need to prepare the expected certificate identity. Note that this option has an alternative option `WithoutIdentitiesUnsafe`. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific identity. If your bundle was signed with a key, and thus does not have a certificate identity, a better choice is to use the `WithKey` option.
+
+```go
 	certID, err := verify.NewShortCertificateIdentity("https://token.actions.githubusercontent.com", "", "", "^https://github.com/sigstore/sigstore-js/")
 	if err != nil {
 		panic(err)
@@ -236,6 +240,105 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(string(marshaled))
+}
+```
+
+And here is a complete example of verifying a bundle signed with a key:
+
+```go
+package main
+
+import (
+	"crypto"
+	_ "crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/sigstore/sigstore/pkg/signature"
+
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/verify"
+)
+
+type verifyTrustedMaterial struct {
+	root.TrustedMaterial
+	keyTrustedMaterial root.TrustedMaterial
+}
+
+func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstrainedVerifier, error) {
+	return v.keyTrustedMaterial.PublicKeyVerifier(hint)
+}
+
+func main() {
+	b, err := bundle.LoadJSONFromPath("./examples/bundle-publish.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// This bundle uses public good instance with an added signing key
+	trustedRoot, err := root.FetchTrustedRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	keyData, err := os.ReadFile("examples/publish_key.pub")
+	if err != nil {
+		panic(err)
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		panic("unable to PEM decode provided key")
+	}
+
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	verifier, err := signature.LoadVerifier(pubKey, crypto.SHA256)
+	if err != nil {
+		panic(err)
+	}
+
+	newExpiringKey := root.NewExpiringKey(verifier, time.Time{}, time.Time{})
+
+	trustedMaterial := &verifyTrustedMaterial{
+		TrustedMaterial: trustedRoot,
+		keyTrustedMaterial: root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+			return newExpiringKey, nil
+		}),
+	}
+
+	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	if err != nil {
+		panic(err)
+	}
+
+	digest, err := hex.DecodeString("76176ffa33808b54602c7c35de5c6e9a4deb96066dba6533f50ac234f4f1f4c6b3527515dc17c06fbe2860030f410eee69ea20079bd3a2c6f3dcf3b329b10751")
+	if err != nil {
+		panic(err)
+	}
+
+	result, err := sev.Verify(b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithKey()))
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Verification successful!\n")
+
+	marshaled, err := json.MarshalIndent(result, "", "   ")
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Println(string(marshaled))
 }
 ```
