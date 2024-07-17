@@ -244,4 +244,103 @@ func main() {
 }
 ```
 
+And here is a complete example of verifying a bundle signed with a key:
+
+```go
+package main
+
+import (
+	"crypto"
+	_ "crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/sigstore/sigstore/pkg/signature"
+
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/verify"
+)
+
+type verifyTrustedMaterial struct {
+	root.TrustedMaterial
+	keyTrustedMaterial root.TrustedMaterial
+}
+
+func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstrainedVerifier, error) {
+	return v.keyTrustedMaterial.PublicKeyVerifier(hint)
+}
+
+func main() {
+	b, err := bundle.LoadJSONFromPath("./examples/bundle-publish.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// This bundle uses public good instance with an added signing key
+	trustedRoot, err := root.FetchTrustedRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	keyData, err := os.ReadFile("examples/publish_key.pub")
+	if err != nil {
+		panic(err)
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		panic("unable to PEM decode provided key")
+	}
+
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	verifier, err := signature.LoadVerifier(pubKey, crypto.SHA256)
+	if err != nil {
+		panic(err)
+	}
+
+	newExpiringKey := root.NewExpiringKey(verifier, time.Time{}, time.Time{})
+
+	trustedMaterial := &verifyTrustedMaterial{
+		TrustedMaterial: trustedRoot,
+		keyTrustedMaterial: root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+			return newExpiringKey, nil
+		}),
+	}
+
+	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	if err != nil {
+		panic(err)
+	}
+
+	digest, err := hex.DecodeString("76176ffa33808b54602c7c35de5c6e9a4deb96066dba6533f50ac234f4f1f4c6b3527515dc17c06fbe2860030f410eee69ea20079bd3a2c6f3dcf3b329b10751")
+	if err != nil {
+		panic(err)
+	}
+
+	result, err := sev.Verify(b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithKey()))
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Verification successful!\n")
+
+	marshaled, err := json.MarshalIndent(result, "", "   ")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(marshaled))
+}
+```
+
 To explore a more advanced/configurable verification process, see the CLI implementation in [`cmd/sigstore-go/main.go`](../cmd/sigstore-go/main.go).
