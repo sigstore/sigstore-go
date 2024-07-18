@@ -210,7 +210,7 @@ func TestEntityWithOthernameSan(t *testing.T) {
 	digest, err := hex.DecodeString("bc103b4a84971ef6459b294a2b98568a2bfb72cded09d4acd1e16366a401f95b")
 	assert.NoError(t, err)
 
-	certID, err := verify.NewShortCertificateIdentity("http://oidc.local:8080", "foo!oidc.local", "")
+	certID, err := verify.NewShortCertificateIdentity("http://oidc.local:8080", "", "foo!oidc.local", "")
 	assert.NoError(t, err)
 	res, err := v.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
 	assert.NoError(t, err)
@@ -220,7 +220,7 @@ func TestEntityWithOthernameSan(t *testing.T) {
 	assert.Equal(t, res.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName, "foo!oidc.local")
 
 	// an email address doesn't verify
-	certID, err = verify.NewShortCertificateIdentity("http://oidc.local:8080", "foo@oidc.local", "")
+	certID, err = verify.NewShortCertificateIdentity("http://oidc.local:8080", "", "foo@oidc.local", "")
 	assert.NoError(t, err)
 	_, err = v.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
 	assert.Error(t, err)
@@ -235,7 +235,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
-	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", verify.SigstoreSanRegex)
+	goodCertID, err := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
 	assert.Nil(t, err)
 
 	digest, _ := hex.DecodeString("46d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
@@ -326,8 +326,8 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", verify.SigstoreSanRegex)
-	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "BadSANValue", "")
+	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
+	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "BadSANValue", "")
 
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 

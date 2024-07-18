@@ -134,7 +134,7 @@ func run() error {
 	}
 
 	if *expectedOIDIssuer != "" || *expectedSAN != "" || *expectedSANRegex != "" {
-		certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, *expectedSANRegex)
+		certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, "", *expectedSAN, *expectedSANRegex)
 		if err != nil {
 			return err
 		}

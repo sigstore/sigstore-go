@@ -15,6 +15,7 @@
 package verify
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
@@ -23,6 +24,7 @@ import (
 
 const (
 	ActionsIssuerValue = "https://token.actions.githubusercontent.com"
+	ActionsIssuerRegex = "githubusercontent.com$"
 	SigstoreSanValue   = "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main"
 	SigstoreSanRegex   = "^https://github.com/sigstore/sigstore-js/"
 )
@@ -57,31 +59,38 @@ func TestCertificateIdentityVerify(t *testing.T) {
 	}
 
 	// First, let's test happy paths:
-	issuerOnlyID, _ := certIDForTesting("", "", ActionsIssuerValue, "")
+	issuerOnlyID, _ := certIDForTesting("", "", ActionsIssuerValue, "", "")
 	assert.NoError(t, issuerOnlyID.Verify(actualCert))
 
-	sanValueOnly, _ := certIDForTesting(SigstoreSanValue, "", "", "")
+	issuerOnlyRegex, _ := certIDForTesting("", "", "", ActionsIssuerRegex, "")
+	assert.NoError(t, issuerOnlyRegex.Verify(actualCert))
+
+	sanValueOnly, _ := certIDForTesting(SigstoreSanValue, "", "", "", "")
 	assert.NoError(t, sanValueOnly.Verify(actualCert))
 
-	sanRegexOnly, _ := certIDForTesting("", SigstoreSanRegex, "", "")
+	sanRegexOnly, _ := certIDForTesting("", SigstoreSanRegex, "", "", "")
 	assert.NoError(t, sanRegexOnly.Verify(actualCert))
 
 	// multiple values can be specified
-	sanRegexAndIssuer, _ := certIDForTesting("", SigstoreSanRegex, ActionsIssuerValue, "github-hosted")
+	sanRegexAndIssuer, _ := certIDForTesting("", SigstoreSanRegex, ActionsIssuerValue, "", "github-hosted")
 	assert.NoError(t, sanRegexAndIssuer.Verify(actualCert))
 
 	// unhappy paths:
 	// wrong issuer
-	sanRegexAndWrongIssuer, _ := certIDForTesting("", SigstoreSanRegex, "https://token.actions.example.com", "")
+	sanRegexAndWrongIssuer, _ := certIDForTesting("", SigstoreSanRegex, "https://token.actions.example.com", "", "")
 	errCompareExtensions := &certificate.ErrCompareExtensions{}
 	assert.ErrorAs(t, sanRegexAndWrongIssuer.Verify(actualCert), &errCompareExtensions)
 	assert.Equal(t, "expected Issuer to be \"https://token.actions.example.com\", got \"https://token.actions.githubusercontent.com\"", errCompareExtensions.Error())
 
 	// bad san regex
-	badRegex, _ := certIDForTesting("", "^badregex.*", "", "")
+	badRegex, _ := certIDForTesting("", "^badregex.*", "", "", "")
 	errSANValueRegexMismatch := &ErrSANValueRegexMismatch{}
 	assert.ErrorAs(t, badRegex.Verify(actualCert), &errSANValueRegexMismatch)
 	assert.Equal(t, "expected SAN value to match regex \"^badregex.*\", got \"https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main\"", errSANValueRegexMismatch.Error())
+
+	// bad issuer regex
+	badIssuerRegex, _ := certIDForTesting("", "", "", "^badregex$", "")
+	assert.Error(t, badIssuerRegex.Verify(actualCert))
 
 	// if we have an array of certIDs, only one needs to match
 	ci, err := CertificateIdentities{sanRegexAndWrongIssuer, sanRegexAndIssuer}.Verify(actualCert)
@@ -105,24 +114,38 @@ func TestCertificateIdentityVerify(t *testing.T) {
 }
 
 func TestThatCertIDsAreFullySpecified(t *testing.T) {
-	_, err := NewShortCertificateIdentity("", "", "")
+	_, err := NewShortCertificateIdentity("", "", "", "")
 	assert.Error(t, err)
 
-	_, err = NewShortCertificateIdentity("foobar", "", "")
+	_, err = NewShortCertificateIdentity("foobar", "", "", "")
 	assert.Error(t, err)
 
-	_, err = NewShortCertificateIdentity("", "", SigstoreSanRegex)
+	_, err = NewShortCertificateIdentity("", ActionsIssuerRegex, "", "")
 	assert.Error(t, err)
 
-	_, err = NewShortCertificateIdentity("foobar", "", SigstoreSanRegex)
+	_, err = NewShortCertificateIdentity("", "", "", SigstoreSanRegex)
+	assert.Error(t, err)
+
+	_, err = NewShortCertificateIdentity("foobar", "", "", SigstoreSanRegex)
+	assert.Nil(t, err)
+
+	_, err = NewShortCertificateIdentity("", ActionsIssuerRegex, "", SigstoreSanRegex)
 	assert.Nil(t, err)
 }
 
-func certIDForTesting(sanValue, sanRegex, issuer, runnerEnv string) (CertificateIdentity, error) {
+func certIDForTesting(sanValue, sanRegex, issuer, issuerRegex, runnerEnv string) (CertificateIdentity, error) {
 	san, err := NewSANMatcher(sanValue, sanRegex)
 	if err != nil {
 		return CertificateIdentity{}, err
 	}
 
-	return CertificateIdentity{SubjectAlternativeName: san, Extensions: certificate.Extensions{Issuer: issuer, RunnerEnvironment: runnerEnv}}, nil
+	var r *regexp.Regexp
+	if issuerRegex != "" {
+		r, err = regexp.Compile(issuerRegex)
+		if err != nil {
+			return CertificateIdentity{}, err
+		}
+	}
+
+	return CertificateIdentity{SubjectAlternativeName: san, IssuerRegexp: r, Extensions: certificate.Extensions{Issuer: issuer, RunnerEnvironment: runnerEnv}}, nil
 }

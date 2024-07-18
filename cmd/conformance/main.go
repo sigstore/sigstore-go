@@ -284,7 +284,7 @@ func main() {
 
 		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
-			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "")
+			certID, err := verify.NewShortCertificateIdentity(*certOIDC, "", *certSAN, "")
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
@@ -333,7 +333,7 @@ func main() {
 		// Configure verification options
 		identityPolicies := []verify.PolicyOption{}
 		if *certOIDC != "" || *certSAN != "" {
-			certID, err := verify.NewShortCertificateIdentity(*certOIDC, *certSAN, "")
+			certID, err := verify.NewShortCertificateIdentity(*certOIDC, "", *certSAN, "")
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)

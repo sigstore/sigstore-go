@@ -120,7 +120,7 @@ func run() error {
 		verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 	}
 
-	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedSAN, *expectedSANRegex)
+	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, "", *expectedSAN, *expectedSANRegex)
 	if err != nil {
 		return err
 	}

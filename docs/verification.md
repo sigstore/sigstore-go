@@ -95,7 +95,7 @@ Then, we need to prepare the expected artifact digest. Note that this option has
 In this case, we also need to prepare the expected certificate identity. Note that this option has an alternative option `WithoutIdentitiesUnsafe`. This is a failsafe to ensure that the caller is aware that simply verifying the bundle is not enough, you must also verify the contents of the bundle against a specific identity. If your bundle was signed with a key, and thus does not have a certificate identity, a better choice is to use the `WithKey` option.
 
 ```go
-	certID, err := verify.NewShortCertificateIdentity("https://token.actions.githubusercontent.com", "", "^https://github.com/sigstore/sigstore-js/")
+	certID, err := verify.NewShortCertificateIdentity("https://token.actions.githubusercontent.com", "", "", "^https://github.com/sigstore/sigstore-js/")
 	if err != nil {
 		panic(err)
 	}
@@ -221,7 +221,7 @@ func main() {
 		panic(err)
 	}
 
-	certID, err := verify.NewShortCertificateIdentity("https://token.actions.githubusercontent.com", "", "^https://github.com/sigstore/sigstore-js/")
+	certID, err := verify.NewShortCertificateIdentity("https://token.actions.githubusercontent.com", "", "", "^https://github.com/sigstore/sigstore-js/")
 	if err != nil {
 		panic(err)
 	}
