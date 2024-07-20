@@ -15,12 +15,15 @@
 package verify
 
 import (
+	"crypto/x509"
 	"encoding/asn1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/google/certificate-transparency-go/x509util"
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -214,11 +217,13 @@ func (c *VerifierConfig) Validate() error {
 }
 
 type VerificationResult struct {
-	MediaType          string                        `json:"mediaType"`
-	Statement          *in_toto.Statement            `json:"statement,omitempty"`
-	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
-	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
-	VerifiedIdentity   *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
+	MediaType            string                        `json:"mediaType"`
+	Statement            *in_toto.Statement            `json:"statement,omitempty"`
+	Signature            *SignatureVerificationResult  `json:"signature,omitempty"`
+	VerifiedTimestamps   []TimestampVerificationResult `json:"verifiedTimestamps"`
+	VerifiedIdentity     *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
+	UnverifiedTimestamps [][]byte                      `json:"unverifiedTimestamps"`
+	UnverifiedCTLogIDs   []string                      `json:"unverifiedCtLogIds"`
 }
 
 type SignatureVerificationResult struct {
@@ -510,6 +515,11 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		return nil, fmt.Errorf("failed to verify timestamps: %w", err)
 	}
 
+	unverifiedTimestamps, err := getUnverifiedTimestamps(entity, verifiedTimestamps)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get unverified timestamps: %w", err)
+	}
+
 	verificationContent, err := entity.VerificationContent()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch verification content: %w", err)
@@ -517,6 +527,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 	var signedWithCertificate bool
 	var certSummary certificate.Summary
+	var unverifiedCTLogIDs []string
 
 	// If the bundle was signed with a long-lived key, and does not have a Fulcio certificate,
 	// then skip the certificate verification steps
@@ -568,6 +579,10 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify signed certificate timestamp: %w", err)
 			}
+			unverifiedCTLogIDs, err = getUnverifiedCTLogIDs(leafCert, v.trustedMaterial)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get unverified ct logs: %w", err)
+			}
 		}
 	}
 
@@ -609,6 +624,8 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		}
 	}
 
+	result.UnverifiedCTLogIDs = unverifiedCTLogIDs
+
 	// SignatureContent can be either an Envelope or a MessageSignature.
 	// If it's an Envelope, let's pop the Statement for our results:
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
@@ -621,6 +638,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	}
 
 	result.VerifiedTimestamps = verifiedTimestamps
+	result.UnverifiedTimestamps = unverifiedTimestamps
 
 	// Now that the signed entity's crypto material has been verified, and the
 	// result struct has been constructed, we can optionally enforce some
@@ -743,4 +761,44 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 	}
 
 	return verifiedTimestamps, nil
+}
+
+func getUnverifiedTimestamps(entity SignedEntity, timestampVerificationResult []TimestampVerificationResult) ([][]byte, error) {
+	timestampSignatures, err := entity.Timestamps()
+	if err != nil {
+		return nil, err
+	}
+
+	verifiedTimestamps := make(map[string]struct{}, len(timestampVerificationResult))
+	for i := 0; i < len(timestampVerificationResult); i++ {
+		verifiedTimestamps[timestampVerificationResult[i].Timestamp.String()] = struct{}{}
+	}
+
+	unverifiedTimestamps := make([][]byte, 0, len(timestampSignatures))
+	for _, timestamp := range timestampSignatures {
+		if _, ok := verifiedTimestamps[string(timestamp)]; !ok {
+			unverifiedTimestamps = append(unverifiedTimestamps, timestamp)
+		}
+	}
+
+	return unverifiedTimestamps, nil
+}
+
+func getUnverifiedCTLogIDs(leafCert *x509.Certificate, trustedMaterial root.TrustedMaterial) ([]string, error) {
+	trustedCTLogs := trustedMaterial.CTLogs()
+
+	scts, err := x509util.ParseSCTsFromCertificate(leafCert.Raw)
+	if err != nil {
+		return nil, err
+	}
+
+	unverifiedLogIDs := make([]string, 0, len(scts))
+
+	for _, sct := range scts {
+		encodedKeyID := hex.EncodeToString(sct.LogID.KeyID[:])
+		if _, ok := trustedCTLogs[encodedKeyID]; !ok {
+			unverifiedLogIDs = append(unverifiedLogIDs, encodedKeyID)
+		}
+	}
+	return unverifiedLogIDs, nil
 }
