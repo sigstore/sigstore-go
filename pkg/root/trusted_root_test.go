@@ -148,7 +148,7 @@ func TestTrustedMaterialCollectionRSA(t *testing.T) {
 	trustedRoot, err := NewTrustedRootFromProtobuf(trustedRootProto)
 	assert.NoError(t, err)
 
-	key, err := rsa.GenerateKey(rand.Reader, 256)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.NoError(t, err)
 
 	ecVerifier, err := signature.LoadRSAPSSVerifier(key.Public().(*rsa.PublicKey), crypto.SHA256, nil)
