@@ -145,7 +145,10 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 		}
 
 		switch tlog.GetPublicKey().GetKeyDetails() {
-		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256:
+		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
+			protocommon.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
+			protocommon.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512,
+			protocommon.PublicKeyDetails_PKIX_ECDSA_P256_HMAC_SHA_256:
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
@@ -180,9 +183,9 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 			if err != nil {
 				return nil, err
 			}
-			var edKey *ed25519.PublicKey
+			var edKey ed25519.PublicKey
 			var ok bool
-			if edKey, ok = key.(*ed25519.PublicKey); !ok {
+			if edKey, ok = key.(ed25519.PublicKey); !ok {
 				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
 			}
 			tlogEntry.PublicKey = edKey
