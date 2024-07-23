@@ -98,15 +98,6 @@ func (b *ProtobufBundle) validate() error {
 		}
 	}
 
-	// if bundle version >= v0.3, require verification material to not be X.509 certificate chain (only single certificate is allowed)
-	if semver.Compare(bundleVersion, "v0.3") >= 0 {
-		certs := b.Bundle.VerificationMaterial.GetX509CertificateChain()
-
-		if certs != nil {
-			return errors.New("verification material cannot be X.509 certificate chain (for bundle v0.3)")
-		}
-	}
-
 	// if bundle version is >= v0.4, return error as this version is not supported
 	if semver.Compare(bundleVersion, "v0.4") >= 0 {
 		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
@@ -205,14 +196,18 @@ func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, erro
 		if len(certs) == 0 {
 			return nil, ErrMissingVerificationMaterial
 		}
-		parsedCert, err := x509.ParseCertificate(certs[0].RawBytes)
-		if err != nil {
-			return nil, ErrValidationError(err)
+		parsedCerts := make([]*x509.Certificate, len(certs))
+		var err error
+		for i, c := range certs {
+			parsedCerts[i], err = x509.ParseCertificate(c.RawBytes)
+			if err != nil {
+				return nil, ErrValidationError(err)
+			}
 		}
-		cert := &Certificate{
-			Certificate: parsedCert,
+		certChain := &CertificateChain{
+			Certificates: parsedCerts,
 		}
-		return cert, nil
+		return certChain, nil
 	case *protobundle.VerificationMaterial_Certificate:
 		parsedCert, err := x509.ParseCertificate(content.Certificate.RawBytes)
 		if err != nil {

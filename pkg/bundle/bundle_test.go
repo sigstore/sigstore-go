@@ -366,7 +366,7 @@ func Test_validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "v0.3 without x.509 certificate chain",
