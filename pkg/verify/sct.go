@@ -15,7 +15,6 @@
 package verify
 
 import (
-	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 
@@ -29,9 +28,11 @@ import (
 // leaf certificate, will extract SCTs from the leaf certificate and verify the
 // timestamps using the TrustedMaterial's FulcioCertificateAuthorities() and
 // CTLogs()
-func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
+func VerifySignedCertificateTimestamp(verificationContent VerificationContent, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	ctlogs := trustedMaterial.CTLogs()
 	fulcioCerts := trustedMaterial.FulcioCertificateAuthorities()
+
+	leafCert := verificationContent.GetLeafCertificate()
 
 	scts, err := x509util.ParseSCTsFromCertificate(leafCert.Raw)
 	if err != nil {
@@ -55,6 +56,15 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 		for _, fulcioCa := range fulcioCerts {
 			fulcioChain := make([]*ctx509.Certificate, len(leafCTCert))
 			copy(fulcioChain, leafCTCert)
+
+			bundleIntermediates := verificationContent.GetIntermediates()
+			for _, cert := range bundleIntermediates {
+				convertedCert, err := ctx509.ParseCertificate(cert.Raw)
+				if err != nil {
+					continue
+				}
+				fulcioChain = append(fulcioChain, convertedCert)
+			}
 
 			var parentCert []byte
 

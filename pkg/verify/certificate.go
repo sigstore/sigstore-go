@@ -22,7 +22,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
-func VerifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certificate, trustedMaterial root.TrustedMaterial) error { // nolint: revive
+func VerifyLeafCertificate(observerTimestamp time.Time, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	for _, ca := range trustedMaterial.FulcioCertificateAuthorities() {
 		if !ca.ValidityPeriodStart.IsZero() && observerTimestamp.Before(ca.ValidityPeriodStart) {
 			continue
@@ -38,6 +38,10 @@ func VerifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certifica
 			intermediateCertPool.AddCert(cert)
 		}
 
+		for _, cert := range verificationContent.GetIntermediates() {
+			intermediateCertPool.AddCert(cert)
+		}
+
 		// From spec:
 		// > ## Certificate
 		// > For a signature with a given certificate to be considered valid, it must have a timestamp while every certificate in the chain up to the root is valid (the so-called “hybrid model” of certificate verification per Braun et al. (2013)).
@@ -50,6 +54,8 @@ func VerifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certifica
 				x509.ExtKeyUsageCodeSigning,
 			},
 		}
+
+		leafCert := verificationContent.GetLeafCertificate()
 
 		_, err := leafCert.Verify(opts)
 		if err == nil {

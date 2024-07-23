@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package verify
+package verify_test
 
 import (
 	"crypto"
@@ -31,7 +31,9 @@ import (
 	"github.com/google/certificate-transparency-go/trillian/ctfe"
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	ctx509util "github.com/google/certificate-transparency-go/x509util"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,21 +63,23 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	}
 	tests := []struct {
 		name            string
-		getCertFn       func() *x509.Certificate
+		getCertFn       func() verify.VerificationContent
 		threshold       int
 		trustedMaterial root.TrustedMaterial
 		wantErr         bool
 	}{
 		{
-			name:            "missing sct in cert",
-			getCertFn:       func() *x509.Certificate { return createBaseCert(t, privateKey, skid, big.NewInt(1)) },
+			name: "missing sct in cert",
+			getCertFn: func() verify.VerificationContent {
+				return createVerificationContent(t, privateKey, skid, big.NewInt(1))
+			},
 			threshold:       1,
 			trustedMaterial: &fakeTrustedMaterial{},
 			wantErr:         true,
 		},
 		{
 			name: "sct missing from ct logs",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{{
 					SCTVersion: ct.V1,
 					Timestamp:  12345,
@@ -90,7 +94,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "missing fulcio CAs",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{{
 					SCTVersion: ct.V1,
 					Timestamp:  12345,
@@ -107,7 +111,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "one valid sct",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{{
 					SCTVersion: ct.V1,
 					Timestamp:  12345,
@@ -130,7 +134,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "one invalid sct",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
 					{
 						SCTVersion: ct.V1,
@@ -156,7 +160,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "one valid sct out of multiple invalid scts",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
 					{
 						SCTVersion: ct.V1,
@@ -186,7 +190,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "threshold of 2 with only 1 valid sct",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
 					{
 						SCTVersion: ct.V1,
@@ -217,7 +221,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "no valid scts out of multiple",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
 					{
 						SCTVersion: ct.V1,
@@ -248,7 +252,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "fulcio CA has intermediates",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{{
 					SCTVersion: ct.V1,
 					Timestamp:  12345,
@@ -274,7 +278,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		},
 		{
 			name: "no valid fulcio CAs",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{{
 					SCTVersion: ct.V1,
 					Timestamp:  12345,
@@ -297,14 +301,16 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:            "threshold of 0",
-			getCertFn:       func() *x509.Certificate { return createBaseCert(t, privateKey, skid, big.NewInt(1)) },
+			name: "threshold of 0",
+			getCertFn: func() verify.VerificationContent {
+				return createVerificationContent(t, privateKey, skid, big.NewInt(1))
+			},
 			threshold:       0,
 			trustedMaterial: &fakeTrustedMaterial{},
 		},
 		{
 			name: "threshold of 2 with 2 valid scts",
-			getCertFn: func() *x509.Certificate {
+			getCertFn: func() verify.VerificationContent {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
 					{
 						SCTVersion: ct.V1,
@@ -335,7 +341,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err = VerifySignedCertificateTimestamp(test.getCertFn(), test.threshold, test.trustedMaterial)
+			err = verify.VerifySignedCertificateTimestamp(test.getCertFn(), test.threshold, test.trustedMaterial)
 			if test.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -361,7 +367,11 @@ func createBaseCert(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, seria
 	return parsedCert
 }
 
-func embedSCTs(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, preCert *x509.Certificate, sctInput []ct.SignedCertificateTimestamp) *x509.Certificate {
+func createVerificationContent(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, serialNumber *big.Int) verify.VerificationContent {
+	return &bundle.CertificateChain{[]*x509.Certificate{createBaseCert(t, privateKey, skid, serialNumber)}}
+}
+
+func embedSCTs(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, preCert *x509.Certificate, sctInput []ct.SignedCertificateTimestamp) verify.VerificationContent {
 	scts := make([]*ct.SignedCertificateTimestamp, 0)
 	for _, s := range sctInput {
 		logEntry := ct.LogEntry{
@@ -431,7 +441,7 @@ func embedSCTs(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, preCert *x
 	if err != nil {
 		t.Fatal(err)
 	}
-	return parsedCert
+	return &bundle.CertificateChain{[]*x509.Certificate{parsedCert}}
 }
 
 type fakeTrustedMaterial struct {

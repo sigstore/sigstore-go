@@ -15,9 +15,14 @@
 package verify_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"testing"
 	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
@@ -30,30 +35,64 @@ func TestVerifyValidityPeriod(t *testing.T) {
 	leaf, _, err := virtualSigstore.GenerateLeafCert("example@example.com", "issuer")
 	assert.NoError(t, err)
 
+	altIntermediate, intermediateKey, err := virtualSigstore.GenerateNewFulcioIntermediate("sigstore-subintermediate")
+	assert.NoError(t, err)
+
+	altPrivKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+	altLeaf, err := ca.GenerateLeafCert("example2@example.com", "issuer", time.Now().Add(time.Hour*24), altPrivKey, altIntermediate, intermediateKey)
+	assert.NoError(t, err)
+
 	tests := []struct {
-		name              string
-		observerTimestamp time.Time
-		wantErr           bool
+		name                string
+		observerTimestamp   time.Time
+		verificationContent verify.VerificationContent
+		wantErr             bool
 	}{
 		{
-			name:              "before validity period",
-			observerTimestamp: time.Now().Add(time.Hour * -24),
-			wantErr:           true,
+			name:                "before validity period",
+			observerTimestamp:   time.Now().Add(time.Hour * -24),
+			verificationContent: &bundle.CertificateChain{[]*x509.Certificate{leaf}},
+			wantErr:             true,
 		},
 		{
-			name:              "inside validity period",
+			name:                "inside validity period",
+			observerTimestamp:   time.Now(),
+			verificationContent: &bundle.CertificateChain{[]*x509.Certificate{leaf}},
+			wantErr:             false,
+		},
+		{
+			name:                "after validity period",
+			observerTimestamp:   time.Now().Add(time.Hour * 24),
+			verificationContent: &bundle.CertificateChain{[]*x509.Certificate{leaf}},
+			wantErr:             true,
+		},
+		{
+			name:              "with intermediates",
 			observerTimestamp: time.Now(),
-			wantErr:           false,
+			verificationContent: &bundle.CertificateChain{
+				[]*x509.Certificate{
+					altIntermediate,
+					altLeaf,
+				},
+			},
+			wantErr: false,
 		},
 		{
-			name:              "after validity period",
-			observerTimestamp: time.Now().Add(time.Hour * 24),
-			wantErr:           true,
+			name:              "with invalid intermediates",
+			observerTimestamp: time.Now(),
+			verificationContent: &bundle.CertificateChain{
+				[]*x509.Certificate{
+					altLeaf,
+					leaf,
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := verify.VerifyLeafCertificate(tt.observerTimestamp, leaf, virtualSigstore); (err != nil) != tt.wantErr {
+			if err := verify.VerifyLeafCertificate(tt.observerTimestamp, tt.verificationContent, virtualSigstore); (err != nil) != tt.wantErr {
 				t.Errorf("VerifyLeafCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

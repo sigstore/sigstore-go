@@ -23,8 +23,8 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
-type Certificate struct {
-	*x509.Certificate
+type CertificateChain struct {
+	Certificates []*x509.Certificate
 }
 
 type PublicKey struct {
@@ -35,25 +35,40 @@ func (pk PublicKey) Hint() string {
 	return pk.hint
 }
 
-func (c *Certificate) CompareKey(key any, _ root.TrustedMaterial) bool {
+func (c *CertificateChain) CompareKey(key any, _ root.TrustedMaterial) bool {
+	if len(c.Certificates) < 1 {
+		return false
+	}
 	x509Key, ok := key.(*x509.Certificate)
 	if !ok {
 		return false
 	}
-
-	return c.Certificate.Equal(x509Key)
+	return c.Certificates[0].Equal(x509Key)
 }
 
-func (c *Certificate) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
-	return !(c.Certificate.NotAfter.Before(t) || c.Certificate.NotBefore.After(t))
+func (c *CertificateChain) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
+	if len(c.Certificates) < 1 {
+		return false
+	}
+	return !(c.Certificates[0].NotAfter.Before(t) || c.Certificates[0].NotBefore.After(t))
 }
 
-func (c *Certificate) GetCertificate() *x509.Certificate {
-	return c.Certificate
+func (c *CertificateChain) GetLeafCertificate() *x509.Certificate {
+	if len(c.Certificates) < 1 {
+		return nil
+	}
+	return c.Certificates[0]
 }
 
-func (c *Certificate) HasPublicKey() (verify.PublicKeyProvider, bool) {
+func (c *CertificateChain) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return PublicKey{}, false
+}
+
+func (c *CertificateChain) GetIntermediates() []*x509.Certificate {
+	if len(c.Certificates) < 2 {
+		return nil
+	}
+	return c.Certificates[1:]
 }
 
 func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
@@ -79,10 +94,14 @@ func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
 	return verifier.ValidAtTime(t)
 }
 
-func (pk *PublicKey) GetCertificate() *x509.Certificate {
+func (pk *PublicKey) GetLeafCertificate() *x509.Certificate {
 	return nil
 }
 
 func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return *pk, true
+}
+
+func (pk *PublicKey) GetIntermediates() []*x509.Certificate {
+	return nil
 }
