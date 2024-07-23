@@ -41,6 +41,7 @@ var artifact *string
 var artifactDigest *string
 var artifactDigestAlgorithm *string
 var expectedOIDIssuer *string
+var expectedOIDIssuerRegex *string
 var expectedSAN *string
 var expectedSANRegex *string
 var requireTimestamp *bool
@@ -58,6 +59,7 @@ func init() {
 	artifactDigest = flag.String("artifact-digest", "", "Hex-encoded digest of artifact to verify")
 	artifactDigestAlgorithm = flag.String("artifact-digest-algorithm", "sha256", "Digest algorithm")
 	expectedOIDIssuer = flag.String("expectedIssuer", "", "The expected OIDC issuer for the signing certificate")
+	expectedOIDIssuerRegex = flag.String("expectedIssuerRegex", "", "The expected OIDC issuer for the signing certificate")
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
 	requireTimestamp = flag.Bool("requireTimestamp", true, "Require either an RFC3161 signed timestamp or log entry integrated timestamp")
@@ -120,7 +122,7 @@ func run() error {
 		verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 	}
 
-	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, "", *expectedSAN, *expectedSANRegex)
+	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedOIDIssuerRegex, *expectedSAN, *expectedSANRegex)
 	if err != nil {
 		return err
 	}

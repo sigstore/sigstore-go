@@ -28,39 +28,37 @@ type SubjectAlternativeNameMatcher struct {
 	Regexp                 regexp.Regexp `json:"regexp,omitempty"`
 }
 
+type IssuerMatcher struct {
+	Issuer string        `json:"issuer"`
+	Regexp regexp.Regexp `json:"regexp,omitempty"`
+}
+
 type CertificateIdentity struct {
 	SubjectAlternativeName SubjectAlternativeNameMatcher `json:"subjectAlternativeName"`
-	IssuerRegexp           *regexp.Regexp
+	Issuer                 IssuerMatcher                 `json:"issuer"`
 	certificate.Extensions
 }
 
 type CertificateIdentities []CertificateIdentity
 
-type ErrSANTypeMismatch struct {
+type ErrValueMismatch struct {
+	object   string
 	expected string
 	actual   string
 }
 
-func (e *ErrSANTypeMismatch) Error() string {
-	return fmt.Sprintf("expected SAN type %s, got %s", e.expected, e.actual)
+func (e *ErrValueMismatch) Error() string {
+	return fmt.Sprintf("expected %s value \"%s\", got \"%s\"", e.object, e.expected, e.actual)
 }
 
-type ErrSANValueMismatch struct {
-	expected string
-	actual   string
+type ErrValueRegexMismatch struct {
+	object string
+	regex  string
+	value  string
 }
 
-func (e *ErrSANValueMismatch) Error() string {
-	return fmt.Sprintf("expected SAN value \"%s\", got \"%s\"", e.expected, e.actual)
-}
-
-type ErrSANValueRegexMismatch struct {
-	regex string
-	value string
-}
-
-func (e *ErrSANValueRegexMismatch) Error() string {
-	return fmt.Sprintf("expected SAN value to match regex \"%s\", got \"%s\"", e.regex, e.value)
+func (e *ErrValueRegexMismatch) Error() string {
+	return fmt.Sprintf("expected %s value to match regex \"%s\", got \"%s\"", e.object, e.regex, e.value)
 }
 
 type ErrNoMatchingCertificateIdentity struct {
@@ -107,29 +105,65 @@ func (s *SubjectAlternativeNameMatcher) MarshalJSON() ([]byte, error) {
 func (s SubjectAlternativeNameMatcher) Verify(actualCert certificate.Summary) error {
 	if s.SubjectAlternativeName != "" &&
 		actualCert.SubjectAlternativeName != s.SubjectAlternativeName {
-		return &ErrSANValueMismatch{string(s.SubjectAlternativeName), string(actualCert.SubjectAlternativeName)}
+		return &ErrValueMismatch{"SAN", string(s.SubjectAlternativeName), string(actualCert.SubjectAlternativeName)}
 	}
 
 	if s.Regexp.String() != "" &&
 		!s.Regexp.MatchString(actualCert.SubjectAlternativeName) {
-		return &ErrSANValueRegexMismatch{string(s.Regexp.String()), string(actualCert.SubjectAlternativeName)}
+		return &ErrValueRegexMismatch{"SAN", string(s.Regexp.String()), string(actualCert.SubjectAlternativeName)}
 	}
 	return nil
 }
 
-func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, issuerRegexp *regexp.Regexp, extensions certificate.Extensions) (CertificateIdentity, error) {
+func NewIssuserMatcher(issuerValue, regexpStr string) (IssuerMatcher, error) {
+	r, err := regexp.Compile(regexpStr)
+	if err != nil {
+		return IssuerMatcher{}, err
+	}
+
+	return IssuerMatcher{Issuer: issuerValue, Regexp: *r}, nil
+}
+
+func (i *IssuerMatcher) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Issuer string `json:"issuer"`
+		Regexp string `json:"regexp,omitempty"`
+	}{
+		Issuer: i.Issuer,
+		Regexp: i.Regexp.String(),
+	})
+}
+
+func (i IssuerMatcher) Verify(actualCert certificate.Summary) error {
+	if i.Issuer != "" &&
+		actualCert.Extensions.Issuer != i.Issuer {
+		return &ErrValueMismatch{"issuer", string(i.Issuer), string(actualCert.Extensions.Issuer)}
+	}
+
+	if i.Regexp.String() != "" &&
+		!i.Regexp.MatchString(actualCert.Extensions.Issuer) {
+		return &ErrValueRegexMismatch{"issuer", string(i.Regexp.String()), string(actualCert.Extensions.Issuer)}
+	}
+	return nil
+}
+
+func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, issuerMatcher IssuerMatcher, extensions certificate.Extensions) (CertificateIdentity, error) {
 	if sanMatcher.SubjectAlternativeName == "" && sanMatcher.Regexp.String() == "" {
 		return CertificateIdentity{}, errors.New("when verifying a certificate identity, there must be subject alternative name criteria")
 	}
 
-	certID := CertificateIdentity{
-		SubjectAlternativeName: sanMatcher,
-		IssuerRegexp:           issuerRegexp,
-		Extensions:             extensions,
+	if issuerMatcher.Issuer == "" && issuerMatcher.Regexp.String() == "" {
+		return CertificateIdentity{}, errors.New("when verifying a certificate identity, must specify Issuer criteria")
 	}
 
-	if certID.Issuer == "" && issuerRegexp == nil {
-		return CertificateIdentity{}, errors.New("when verifying a certificate identity, must specify Issuer criteria")
+	if extensions.Issuer != "" {
+		return CertificateIdentity{}, errors.New("please specify issuer in IssuerMatcher, not Extensions")
+	}
+
+	certID := CertificateIdentity{
+		SubjectAlternativeName: sanMatcher,
+		Issuer:                 issuerMatcher,
+		Extensions:             extensions,
 	}
 
 	return certID, nil
@@ -139,22 +173,17 @@ func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, issuerRege
 // a CertificiateIdentity with a SAN and the Issuer OID extension. If you need
 // to check more OID extensions, use NewCertificateIdentity instead.
 func NewShortCertificateIdentity(issuer, issuerRegex, sanValue, sanRegex string) (CertificateIdentity, error) {
-	var r *regexp.Regexp
-	var err error
-
-	if issuerRegex != "" {
-		r, err = regexp.Compile(issuerRegex)
-		if err != nil {
-			return CertificateIdentity{}, err
-		}
-	}
-
 	sanMatcher, err := NewSANMatcher(sanValue, sanRegex)
 	if err != nil {
 		return CertificateIdentity{}, err
 	}
 
-	return NewCertificateIdentity(sanMatcher, r, certificate.Extensions{Issuer: issuer})
+	issuerMatcher, err := NewIssuserMatcher(issuer, issuerRegex)
+	if err != nil {
+		return CertificateIdentity{}, err
+	}
+
+	return NewCertificateIdentity(sanMatcher, issuerMatcher, certificate.Extensions{})
 }
 
 // Verify verifies the CertificateIdentities, and if ANY of them match the cert,
@@ -179,10 +208,10 @@ func (c CertificateIdentity) Verify(actualCert certificate.Summary) error {
 	if err = c.SubjectAlternativeName.Verify(actualCert); err != nil {
 		return err
 	}
-	if c.IssuerRegexp != nil {
-		if !c.IssuerRegexp.MatchString(actualCert.Extensions.Issuer) {
-			return fmt.Errorf("expected issuer value to match regex \"%s\", got \"%s\"", c.IssuerRegexp.String(), actualCert.Extensions.Issuer)
-		}
+
+	if err = c.Issuer.Verify(actualCert); err != nil {
+		return err
 	}
+
 	return certificate.CompareExtensions(c.Extensions, actualCert.Extensions)
 }

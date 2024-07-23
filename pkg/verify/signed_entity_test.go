@@ -216,7 +216,7 @@ func TestEntityWithOthernameSan(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
-	assert.Equal(t, res.VerifiedIdentity.Issuer, "http://oidc.local:8080")
+	assert.Equal(t, res.VerifiedIdentity.Issuer.Issuer, "http://oidc.local:8080")
 	assert.Equal(t, res.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName, "foo!oidc.local")
 
 	// an email address doesn't verify
@@ -342,7 +342,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 			verify.WithCertificateIdentity(goodCI)))
 	assert.Nil(t, err)
 
-	assert.Equal(t, res.VerifiedIdentity.Issuer, verify.ActionsIssuerValue)
+	assert.Equal(t, res.VerifiedIdentity.Issuer.Issuer, verify.ActionsIssuerValue)
 
 	// but if only pass in the bad CI, it will fail:
 	res, err = verifier.Verify(entity,
