@@ -115,7 +115,7 @@ func (s SubjectAlternativeNameMatcher) Verify(actualCert certificate.Summary) er
 	return nil
 }
 
-func NewIssuserMatcher(issuerValue, regexpStr string) (IssuerMatcher, error) {
+func NewIssuerMatcher(issuerValue, regexpStr string) (IssuerMatcher, error) {
 	r, err := regexp.Compile(regexpStr)
 	if err != nil {
 		return IssuerMatcher{}, err
@@ -178,7 +178,7 @@ func NewShortCertificateIdentity(issuer, issuerRegex, sanValue, sanRegex string)
 		return CertificateIdentity{}, err
 	}
 
-	issuerMatcher, err := NewIssuserMatcher(issuer, issuerRegex)
+	issuerMatcher, err := NewIssuerMatcher(issuer, issuerRegex)
 	if err != nil {
 		return CertificateIdentity{}, err
 	}
