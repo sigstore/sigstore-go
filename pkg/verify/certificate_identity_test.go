@@ -138,7 +138,7 @@ func certIDForTesting(sanValue, sanRegex, issuer, issuerRegex, runnerEnv string)
 		return CertificateIdentity{}, err
 	}
 
-	issuerMatcher, err := NewIssuserMatcher(issuer, issuerRegex)
+	issuerMatcher, err := NewIssuerMatcher(issuer, issuerRegex)
 	if err != nil {
 		return CertificateIdentity{}, err
 	}
