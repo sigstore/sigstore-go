@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
@@ -79,8 +80,17 @@ func CompareExtensions(expectedExt, actualExt Extensions) error {
 		if expectedFieldVal.IsValid() && !expectedFieldVal.IsZero() {
 			actualFieldVal := actExtValue.FieldByName(field.Name)
 			if actualFieldVal.IsValid() {
-				if expectedFieldVal.Interface() != actualFieldVal.Interface() {
-					return &ErrCompareExtensions{field.Name, fmt.Sprintf("%v", expectedFieldVal.Interface()), fmt.Sprintf("%v", actualFieldVal.Interface())}
+				expectedInterface := expectedFieldVal.Interface()
+				actualInterface := actualFieldVal.Interface()
+
+				if expectedFieldVal.Kind() == reflect.String && actualFieldVal.Kind() == reflect.String {
+					expectedStr := expectedFieldVal.String()
+					actualStr := actualFieldVal.String()
+					if !strings.EqualFold(expectedStr, actualStr) {
+						return &ErrCompareExtensions{field.Name, expectedStr, actualStr}
+					}
+				} else if expectedInterface != actualInterface {
+					return &ErrCompareExtensions{field.Name, fmt.Sprintf("%v", expectedInterface), fmt.Sprintf("%v", actualInterface)}
 				}
 			}
 		}
