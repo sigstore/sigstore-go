@@ -18,6 +18,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
@@ -148,8 +149,7 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 		switch tlog.GetPublicKey().GetKeyDetails() {
 		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
 			protocommon.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
-			protocommon.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512,
-			protocommon.PublicKeyDetails_PKIX_ECDSA_P256_HMAC_SHA_256: //nolint:staticcheck
+			protocommon.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512:
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
@@ -163,10 +163,7 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 		// This key format has public key in PKIX RSA format and PKCS1#1v1.5 or RSASSA-PSS signature
 		case protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256,
 			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256,
-			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256,
-			protocommon.PublicKeyDetails_PKIX_RSA_PSS_2048_SHA256,
-			protocommon.PublicKeyDetails_PKIX_RSA_PSS_3072_SHA256,
-			protocommon.PublicKeyDetails_PKIX_RSA_PSS_4096_SHA256:
+			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256:
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
@@ -177,7 +174,7 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
 			}
 			tlogEntry.PublicKey = rsaKey
-		case protocommon.PublicKeyDetails_PKIX_ED25519, protocommon.PublicKeyDetails_PKIX_ED25519_PH: //nolint:staticcheck
+		case protocommon.PublicKeyDetails_PKIX_ED25519: //nolint:staticcheck
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
@@ -199,6 +196,7 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
 
+		tlogEntry.SignatureHashFunc = getSignatureHashAlgo(tlogEntry.PublicKey)
 		transparencyLogs[encodedKeyID] = tlogEntry
 
 		if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
@@ -325,6 +323,30 @@ func GetTrustedRoot(c *tuf.Client) (*TrustedRoot, error) {
 		return nil, err
 	}
 	return NewTrustedRootFromJSON(jsonBytes)
+}
+
+func getSignatureHashAlgo(pubKey crypto.PublicKey) crypto.Hash {
+	var h crypto.Hash
+	switch pk := pubKey.(type) {
+	case *rsa.PublicKey:
+		h = crypto.SHA256
+	case *ecdsa.PublicKey:
+		switch pk.Curve {
+		case elliptic.P256():
+			h = crypto.SHA256
+		case elliptic.P384():
+			h = crypto.SHA384
+		case elliptic.P521():
+			h = crypto.SHA512
+		default:
+			h = crypto.SHA256
+		}
+	case ed25519.PublicKey:
+		h = crypto.SHA512
+	default:
+		h = crypto.SHA256
+	}
+	return h
 }
 
 // LiveTrustedRoot is a wrapper around TrustedRoot that periodically

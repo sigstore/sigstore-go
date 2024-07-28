@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const pkixRsaPssSHA256 = `-----BEGIN PUBLIC KEY-----
+const pkixRsa = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3wqI/TysUiKTgY1bz+wd
 JfEOil4MEsRASKGzJddZ6x9hb+rn2UVoJmuxN62XI0TMoMn4mukgfCgY6jgTB58V
 +/LaeSA8Wz1p4gOxhk1mcgbF4HyxR+xlRgYfH4iSbXy+Ez/8ZjM2OO68fKr4JZEA
@@ -113,6 +113,10 @@ func TestTrustedMaterialCollectionED25519(t *testing.T) {
 	trustedRoot, err := NewTrustedRootFromProtobuf(trustedRootProto)
 	assert.NoError(t, err)
 
+	for _, tlog := range trustedRoot.rekorLogs {
+		assert.Equal(t, tlog.SignatureHashFunc, crypto.SHA512)
+	}
+
 	key, _, err := ed25519.GenerateKey(rand.Reader)
 	assert.NoError(t, err)
 
@@ -134,14 +138,14 @@ func TestTrustedMaterialCollectionRSA(t *testing.T) {
 	trustedRootProto, err := NewTrustedRootProtobuf(trustedrootJSON)
 	assert.NoError(t, err)
 	for _, ctlog := range trustedRootProto.Ctlogs {
-		ctlog.PublicKey.KeyDetails = protocommon.PublicKeyDetails_PKIX_RSA_PSS_2048_SHA256
-		derBytes, _ := pem.Decode([]byte(pkixRsaPssSHA256))
+		ctlog.PublicKey.KeyDetails = protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256
+		derBytes, _ := pem.Decode([]byte(pkixRsa))
 		ctlog.PublicKey.RawBytes = derBytes.Bytes
 	}
 
 	for _, tlog := range trustedRootProto.Tlogs {
-		tlog.PublicKey.KeyDetails = protocommon.PublicKeyDetails_PKIX_RSA_PSS_2048_SHA256
-		derBytes, _ := pem.Decode([]byte(pkixRsaPssSHA256))
+		tlog.PublicKey.KeyDetails = protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256
+		derBytes, _ := pem.Decode([]byte(pkixRsa))
 		tlog.PublicKey.RawBytes = derBytes.Bytes
 	}
 
@@ -151,7 +155,7 @@ func TestTrustedMaterialCollectionRSA(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.NoError(t, err)
 
-	ecVerifier, err := signature.LoadRSAPSSVerifier(key.Public().(*rsa.PublicKey), crypto.SHA256, nil)
+	ecVerifier, err := signature.LoadRSAPKCS1v15Verifier(key.Public().(*rsa.PublicKey), crypto.SHA256)
 	assert.NoError(t, err)
 
 	verifier := &nonExpiringVerifier{ecVerifier}
