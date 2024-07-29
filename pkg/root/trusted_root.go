@@ -17,6 +17,9 @@ package root
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
@@ -136,8 +139,17 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 			return nil, fmt.Errorf("unsupported hash function for the tlog")
 		}
 
+		tlogEntry := &TransparencyLog{
+			BaseURL:           tlog.GetBaseUrl(),
+			ID:                tlog.GetLogId().GetKeyId(),
+			HashFunc:          hashFunc,
+			SignatureHashFunc: crypto.SHA256,
+		}
+
 		switch tlog.GetPublicKey().GetKeyDetails() {
-		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256:
+		case protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
+			protocommon.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
+			protocommon.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512:
 			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
@@ -145,31 +157,47 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 			var ecKey *ecdsa.PublicKey
 			var ok bool
 			if ecKey, ok = key.(*ecdsa.PublicKey); !ok {
-				return nil, fmt.Errorf("tlog public key is not ECDSA P256")
+				return nil, fmt.Errorf("tlog public key is not ECDSA: %s", tlog.GetPublicKey().GetKeyDetails())
 			}
-			transparencyLogs[encodedKeyID] = &TransparencyLog{
-				BaseURL:           tlog.GetBaseUrl(),
-				ID:                tlog.GetLogId().GetKeyId(),
-				HashFunc:          hashFunc,
-				PublicKey:         ecKey,
-				SignatureHashFunc: crypto.SHA256,
+			tlogEntry.PublicKey = ecKey
+		// This key format has public key in PKIX RSA format and PKCS1#1v1.5 or RSASSA-PSS signature
+		case protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256,
+			protocommon.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256:
+			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
+			if err != nil {
+				return nil, err
 			}
+			var rsaKey *rsa.PublicKey
+			var ok bool
+			if rsaKey, ok = key.(*rsa.PublicKey); !ok {
+				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
+			}
+			tlogEntry.PublicKey = rsaKey
+		case protocommon.PublicKeyDetails_PKIX_ED25519: //nolint:staticcheck
+			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
+			if err != nil {
+				return nil, err
+			}
+			var edKey ed25519.PublicKey
+			var ok bool
+			if edKey, ok = key.(ed25519.PublicKey); !ok {
+				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
+			}
+			tlogEntry.PublicKey = edKey
 		// This key format is deprecated, but currently in use for Sigstore staging instance
 		case protocommon.PublicKeyDetails_PKCS1_RSA_PKCS1V5: //nolint:staticcheck
 			key, err := x509.ParsePKCS1PublicKey(tlog.GetPublicKey().GetRawBytes())
 			if err != nil {
 				return nil, err
 			}
-			transparencyLogs[encodedKeyID] = &TransparencyLog{
-				BaseURL:           tlog.GetBaseUrl(),
-				ID:                tlog.GetLogId().GetKeyId(),
-				HashFunc:          hashFunc,
-				PublicKey:         key,
-				SignatureHashFunc: crypto.SHA256,
-			}
+			tlogEntry.PublicKey = key
 		default:
 			return nil, fmt.Errorf("unsupported tlog public key type: %s", tlog.GetPublicKey().GetKeyDetails())
 		}
+
+		tlogEntry.SignatureHashFunc = getSignatureHashAlgo(tlogEntry.PublicKey)
+		transparencyLogs[encodedKeyID] = tlogEntry
 
 		if validFor := tlog.GetPublicKey().GetValidFor(); validFor != nil {
 			if validFor.GetStart() != nil {
@@ -295,6 +323,30 @@ func GetTrustedRoot(c *tuf.Client) (*TrustedRoot, error) {
 		return nil, err
 	}
 	return NewTrustedRootFromJSON(jsonBytes)
+}
+
+func getSignatureHashAlgo(pubKey crypto.PublicKey) crypto.Hash {
+	var h crypto.Hash
+	switch pk := pubKey.(type) {
+	case *rsa.PublicKey:
+		h = crypto.SHA256
+	case *ecdsa.PublicKey:
+		switch pk.Curve {
+		case elliptic.P256():
+			h = crypto.SHA256
+		case elliptic.P384():
+			h = crypto.SHA384
+		case elliptic.P521():
+			h = crypto.SHA512
+		default:
+			h = crypto.SHA256
+		}
+	case ed25519.PublicKey:
+		h = crypto.SHA512
+	default:
+		h = crypto.SHA256
+	}
+	return h
 }
 
 // LiveTrustedRoot is a wrapper around TrustedRoot that periodically
