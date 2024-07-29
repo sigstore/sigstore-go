@@ -70,10 +70,6 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
 }
 
 func (b *ProtobufBundle) validate() error {
-	err := validateBundle(b.Bundle)
-	if err != nil {
-		return fmt.Errorf("invalid bundle: %w", err)
-	}
 	bundleVersion, err := getBundleVersion(b.Bundle.MediaType)
 	if err != nil {
 		return fmt.Errorf("error getting bundle version: %w", err)
@@ -116,6 +112,10 @@ func (b *ProtobufBundle) validate() error {
 		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
 	}
 
+	err = validateBundle(b.Bundle)
+	if err != nil {
+		return fmt.Errorf("invalid bundle: %w", err)
+	}
 	return nil
 }
 
