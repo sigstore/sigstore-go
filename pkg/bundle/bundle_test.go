@@ -25,6 +25,7 @@ import (
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	rekorv1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
 	"github.com/stretchr/testify/require"
@@ -228,6 +229,7 @@ func Test_validate(t *testing.T) {
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
 				},
 			},
+			wantErr: true,
 		},
 		{
 			name: "v0.1 with no inclusion promise",
@@ -277,7 +279,11 @@ func Test_validate(t *testing.T) {
 								},
 							},
 						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &v1.PublicKeyIdentifier{},
+						},
 					},
+					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
 		},
@@ -301,7 +307,11 @@ func Test_validate(t *testing.T) {
 								CanonicalizedBody: canonicalTlogBody,
 							},
 						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &v1.PublicKeyIdentifier{},
+						},
 					},
+					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
 			wantErr: true,
@@ -331,7 +341,11 @@ func Test_validate(t *testing.T) {
 								},
 							},
 						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &v1.PublicKeyIdentifier{},
+						},
 					},
+					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
 		},
@@ -364,6 +378,7 @@ func Test_validate(t *testing.T) {
 							X509CertificateChain: &protocommon.X509CertificateChain{},
 						},
 					},
+					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
 			wantErr: true,
@@ -397,6 +412,7 @@ func Test_validate(t *testing.T) {
 							Certificate: &protocommon.X509Certificate{},
 						},
 					},
+					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
 		},
@@ -746,6 +762,79 @@ func TestTimestamps(t *testing.T) {
 			}
 			require.NoError(t, gotErr)
 			require.Equal(t, tt.wantTimestamps, got)
+		})
+	}
+}
+
+func Test_BundleValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		bundle  *ProtobufBundle
+		errMsg  string
+		wantErr bool
+	}{
+		{
+			name: "Empty verification material",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: nil,
+					},
+					Content: &protobundle.Bundle_MessageSignature{},
+				},
+			},
+			errMsg:  "invalid bundle: missing verification material content",
+			wantErr: true,
+		},
+		{
+			name: "No bundle content",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					Content:   nil,
+				},
+			},
+			errMsg:  "invalid bundle: missing bundle content",
+			wantErr: true,
+		},
+		{
+			name: "Nil verification material",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType:            "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					Content:              &protobundle.Bundle_MessageSignature{},
+					VerificationMaterial: nil,
+				},
+			},
+			errMsg:  "invalid bundle: missing verification material",
+			wantErr: true,
+		},
+		{
+			name: "Valid protobuf bundle",
+			bundle: &ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
+					Content:   &protobundle.Bundle_DsseEnvelope{},
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &v1.PublicKeyIdentifier{},
+						},
+						TimestampVerificationData: &protobundle.TimestampVerificationData{},
+					},
+				},
+			},
+			errMsg:  "",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("name:%s", tt.name), func(t *testing.T) {
+			err := tt.bundle.validate()
+			if (err != nil) != tt.wantErr || (err != nil && tt.errMsg != err.Error()) {
+				t.Errorf("Protobuf.Bundle() error = %v, wantErr %v", err, tt.errMsg)
+				return
+			}
 		})
 	}
 }
