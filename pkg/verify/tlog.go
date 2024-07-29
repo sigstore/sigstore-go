@@ -140,8 +140,6 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 
 			if len(resp.Payload) == 0 {
 				return nil, fmt.Errorf("unable to locate log entry %d", logIndex)
-			} else if len(resp.Payload) > 1 {
-				return nil, errors.New("too many log entries returned")
 			}
 
 			logEntry := resp.Payload
