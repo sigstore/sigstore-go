@@ -81,6 +81,15 @@ func (tr *TrustedRoot) CTLogs() map[string]*TransparencyLog {
 	return tr.ctLogs
 }
 
+func (tr *TrustedRoot) MarshalJSON() ([]byte, error) {
+	err := tr.constructProtoTrustRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing protobuf TrustRoot representation: %w", err)
+	}
+
+	return protojson.Marshal(tr.trustedRoot)
+}
+
 func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot) (trustedRoot *TrustedRoot, err error) {
 	if protobufTrustedRoot.GetMediaType() != TrustedRootMediaType01 {
 		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", protobufTrustedRoot.GetMediaType())
