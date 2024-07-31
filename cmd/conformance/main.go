@@ -308,7 +308,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		bun, err := bundle.NewProtobufBundle(&pb)
+		bun, err := bundle.NewBundle(&pb)
 		if err != nil {
 			log.Fatal(err)
 		}

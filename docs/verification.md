@@ -32,7 +32,7 @@ The verifier allows you to use the Sigstore Public Good TUF root or your own cus
 
 This library includes a few abstractions to support different use cases, testing, and extensibility:
 
-- `SignedEntity` - an interface type respresenting a signed message or attestation, with a signature and metadata, implemented by `ProtobufBundle`, a type which wraps the `Bundle` type from `protobuf-specs`.
+- `SignedEntity` - an interface type respresenting a signed message or attestation, with a signature and metadata, implemented by `Bundle`, a type which wraps the `Bundle` type from `protobuf-specs`.
 - `TrustedMaterial` - an interface type representing a trusted set of keys or certificates for verifying certificates, timestamps, and artifact transparency logs, implemented by `TrustedRoot`
 
 ## Verifier

@@ -129,7 +129,7 @@ func TestMinVersion(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			b := &ProtobufBundle{Bundle: &protobundle.Bundle{
+			b := &Bundle{Bundle: &protobundle.Bundle{
 				MediaType: tc.mediaType,
 			}}
 			ret := b.MinVersion(tc.expectedVersion)
@@ -192,12 +192,12 @@ func Test_validate(t *testing.T) {
 	require.NoError(t, err)
 	tests := []struct {
 		name    string
-		pb      ProtobufBundle
+		pb      Bundle
 		wantErr bool
 	}{
 		{
 			name: "invalid media type",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "",
 				},
@@ -206,7 +206,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "version too low",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle.v0.0.1+json",
 				},
@@ -215,7 +215,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "version too high",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.4",
 				},
@@ -224,7 +224,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "no verification material",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
 				},
@@ -233,7 +233,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "v0.1 with no inclusion promise",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -258,7 +258,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "v0.1 with inclusion promise",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -289,7 +289,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "v0.2 with no inclusion proof",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.2",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -318,7 +318,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "v0.2 with inclusion proof",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.2",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -351,7 +351,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "v0.3 with x.509 certificate chain",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -385,7 +385,7 @@ func Test_validate(t *testing.T) {
 		},
 		{
 			name: "v0.3 without x.509 certificate chain",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -446,21 +446,21 @@ func TestVerificationContent(t *testing.T) {
 	require.NoError(t, err)
 	tests := []struct {
 		name            string
-		pb              ProtobufBundle
+		pb              Bundle
 		wantCertificate bool
 		wantPublicKey   bool
 		wantErr         bool
 	}{
 		{
 			name: "no verification material",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{},
 			},
 			wantErr: true,
 		},
 		{
 			name: "certificate chain with zero certs",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_X509CertificateChain{
@@ -473,7 +473,7 @@ func TestVerificationContent(t *testing.T) {
 		},
 		{
 			name: "certificate chain with self-signed cert",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_X509CertificateChain{
@@ -492,7 +492,7 @@ func TestVerificationContent(t *testing.T) {
 		},
 		{
 			name: "certificate chain",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_X509CertificateChain{
@@ -514,7 +514,7 @@ func TestVerificationContent(t *testing.T) {
 		},
 		{
 			name: "certificate chain with invalid cert",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_X509CertificateChain{
@@ -533,7 +533,7 @@ func TestVerificationContent(t *testing.T) {
 		},
 		{
 			name: "certificate",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_Certificate{
@@ -548,7 +548,7 @@ func TestVerificationContent(t *testing.T) {
 		},
 		{
 			name: "invalid certificate",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_Certificate{
@@ -563,7 +563,7 @@ func TestVerificationContent(t *testing.T) {
 		},
 		{
 			name: "public key",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_PublicKey{
@@ -601,13 +601,13 @@ func TestSignatureContent(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name          string
-		pb            ProtobufBundle
+		pb            Bundle
 		wantEnvelope  bool
 		wantSignature bool
 	}{
 		{
 			name: "dsse envelope",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_DsseEnvelope{},
 				},
@@ -616,7 +616,7 @@ func TestSignatureContent(t *testing.T) {
 		},
 		{
 			name: "message signature",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_MessageSignature{
 						MessageSignature: &protocommon.MessageSignature{
@@ -649,12 +649,12 @@ func TestEnvelope(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		pb      ProtobufBundle
+		pb      Bundle
 		wantErr bool
 	}{
 		{
 			name: "dsse envelope",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_DsseEnvelope{},
 				},
@@ -662,7 +662,7 @@ func TestEnvelope(t *testing.T) {
 		},
 		{
 			name: "message signature",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_MessageSignature{
 						MessageSignature: &protocommon.MessageSignature{
@@ -691,18 +691,18 @@ func TestTimestamps(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
-		pb             ProtobufBundle
+		pb             Bundle
 		wantTimestamps [][]byte
 		wantErr        bool
 	}{
 		{
 			name:    "missing verification material",
-			pb:      ProtobufBundle{Bundle: &protobundle.Bundle{}},
+			pb:      Bundle{Bundle: &protobundle.Bundle{}},
 			wantErr: true,
 		},
 		{
 			name: "empty timestamp data",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{},
 				},
@@ -711,7 +711,7 @@ func TestTimestamps(t *testing.T) {
 		},
 		{
 			name: "one timestamp",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						TimestampVerificationData: &protobundle.TimestampVerificationData{
@@ -730,7 +730,7 @@ func TestTimestamps(t *testing.T) {
 		},
 		{
 			name: "multiple timestamps",
-			pb: ProtobufBundle{
+			pb: Bundle{
 				Bundle: &protobundle.Bundle{
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						TimestampVerificationData: &protobundle.TimestampVerificationData{
@@ -769,13 +769,13 @@ func TestTimestamps(t *testing.T) {
 func Test_BundleValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		bundle  *ProtobufBundle
+		bundle  *Bundle
 		errMsg  string
 		wantErr bool
 	}{
 		{
 			name: "Empty verification material",
-			bundle: &ProtobufBundle{
+			bundle: &Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					VerificationMaterial: &protobundle.VerificationMaterial{
@@ -789,7 +789,7 @@ func Test_BundleValidation(t *testing.T) {
 		},
 		{
 			name: "No bundle content",
-			bundle: &ProtobufBundle{
+			bundle: &Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					Content:   nil,
@@ -800,7 +800,7 @@ func Test_BundleValidation(t *testing.T) {
 		},
 		{
 			name: "Nil verification material",
-			bundle: &ProtobufBundle{
+			bundle: &Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType:            "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					Content:              &protobundle.Bundle_MessageSignature{},
@@ -812,7 +812,7 @@ func Test_BundleValidation(t *testing.T) {
 		},
 		{
 			name: "Valid protobuf bundle",
-			bundle: &ProtobufBundle{
+			bundle: &Bundle{
 				Bundle: &protobundle.Bundle{
 					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.3",
 					Content:   &protobundle.Bundle_DsseEnvelope{},

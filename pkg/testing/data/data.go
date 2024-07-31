@@ -49,15 +49,15 @@ var SigstoreJS200ProvenanceBundleRaw []byte
 //go:embed othernameBundle.json
 var OthernameBundleRaw []byte
 
-// TestBundle creates *bundle.ProtobufBundle from a raw byte stream
+// TestBundle creates *bundle.Bundle from a raw byte stream
 // containing a JSON encoded protobuf bundle.
-func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
+func TestBundle(t *testing.T, raw []byte) *bundle.Bundle {
 	var b protobundle.Bundle
 	err := protojson.Unmarshal(raw, &b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	bun, err := bundle.NewProtobufBundle(&b)
+	bun, err := bundle.NewBundle(&b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,24 +65,24 @@ func TestBundle(t *testing.T, raw []byte) *bundle.ProtobufBundle {
 }
 
 // SigstoreBundle returns a test *sigstore.Bundle.
-func SigstoreBundle(t *testing.T) *bundle.ProtobufBundle {
+func SigstoreBundle(t *testing.T) *bundle.Bundle {
 	return TestBundle(t, SigstoreBundleRaw)
 }
 
 // SigstoreBundle2Sig returns a test *sigstore.Bundle with two signatures.
-func SigstoreBundle2Sig(t *testing.T) *bundle.ProtobufBundle {
+func SigstoreBundle2Sig(t *testing.T) *bundle.Bundle {
 	return TestBundle(t, SigstoreBundle2SigRaw)
 }
 
 // SigstoreJS200ProvenanceBundle returns a test *sigstore.Bundle that
 // contains a complete sigstore-js build provenance.
-func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.ProtobufBundle {
+func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.Bundle {
 	return TestBundle(t, SigstoreJS200ProvenanceBundleRaw)
 }
 
 // OthernameBundle returns a test *sigstore.Bundle that contains verification
 // content for an artifact signed with an Othername identity.
-func OthernameBundle(t *testing.T) *bundle.ProtobufBundle {
+func OthernameBundle(t *testing.T) *bundle.Bundle {
 	return TestBundle(t, OthernameBundleRaw)
 }
 

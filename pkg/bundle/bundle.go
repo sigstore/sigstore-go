@@ -48,14 +48,14 @@ func ErrValidationError(err error) error {
 	return fmt.Errorf("%w: %w", ErrValidation, err)
 }
 
-type ProtobufBundle struct {
+type Bundle struct {
 	*protobundle.Bundle
 	hasInclusionPromise bool
 	hasInclusionProof   bool
 }
 
-func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
-	bundle := &ProtobufBundle{
+func NewBundle(pbundle *protobundle.Bundle) (*Bundle, error) {
+	bundle := &Bundle{
 		Bundle:              pbundle,
 		hasInclusionPromise: false,
 		hasInclusionProof:   false,
@@ -69,7 +69,7 @@ func NewProtobufBundle(pbundle *protobundle.Bundle) (*ProtobufBundle, error) {
 	return bundle, nil
 }
 
-func (b *ProtobufBundle) validate() error {
+func (b *Bundle) validate() error {
 	bundleVersion, err := getBundleVersion(b.Bundle.MediaType)
 	if err != nil {
 		return fmt.Errorf("error getting bundle version: %w", err)
@@ -194,8 +194,8 @@ func validateBundle(b *protobundle.Bundle) error {
 	return nil
 }
 
-func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
-	var bundle ProtobufBundle
+func LoadJSONFromPath(path string) (*Bundle, error) {
+	var bundle Bundle
 	bundle.Bundle = new(protobundle.Bundle)
 
 	contents, err := os.ReadFile(path)
@@ -211,11 +211,11 @@ func LoadJSONFromPath(path string) (*ProtobufBundle, error) {
 	return &bundle, nil
 }
 
-func (b *ProtobufBundle) MarshalJSON() ([]byte, error) {
+func (b *Bundle) MarshalJSON() ([]byte, error) {
 	return protojson.Marshal(b.Bundle)
 }
 
-func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
+func (b *Bundle) UnmarshalJSON(data []byte) error {
 	b.Bundle = new(protobundle.Bundle)
 	err := protojson.Unmarshal(data, b.Bundle)
 	if err != nil {
@@ -230,7 +230,7 @@ func (b *ProtobufBundle) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, error) {
+func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 	if b.VerificationMaterial == nil {
 		return nil, ErrMissingVerificationMaterial
 	}
@@ -269,15 +269,15 @@ func (b *ProtobufBundle) VerificationContent() (verify.VerificationContent, erro
 	}
 }
 
-func (b *ProtobufBundle) HasInclusionPromise() bool {
+func (b *Bundle) HasInclusionPromise() bool {
 	return b.hasInclusionPromise
 }
 
-func (b *ProtobufBundle) HasInclusionProof() bool {
+func (b *Bundle) HasInclusionProof() bool {
 	return b.hasInclusionProof
 }
 
-func (b *ProtobufBundle) TlogEntries() ([]*tlog.Entry, error) {
+func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 	if b.VerificationMaterial == nil {
 		return nil, nil
 	}
@@ -301,7 +301,7 @@ func (b *ProtobufBundle) TlogEntries() ([]*tlog.Entry, error) {
 	return tlogEntries, nil
 }
 
-func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
+func (b *Bundle) SignatureContent() (verify.SignatureContent, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		envelope, err := parseEnvelope(content.DsseEnvelope)
@@ -319,7 +319,7 @@ func (b *ProtobufBundle) SignatureContent() (verify.SignatureContent, error) {
 	return nil, ErrMissingVerificationMaterial
 }
 
-func (b *ProtobufBundle) Envelope() (*Envelope, error) {
+func (b *Bundle) Envelope() (*Envelope, error) {
 	switch content := b.Bundle.Content.(type) { //nolint:gocritic
 	case *protobundle.Bundle_DsseEnvelope:
 		envelope, err := parseEnvelope(content.DsseEnvelope)
@@ -331,7 +331,7 @@ func (b *ProtobufBundle) Envelope() (*Envelope, error) {
 	return nil, ErrMissingVerificationMaterial
 }
 
-func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
+func (b *Bundle) Timestamps() ([][]byte, error) {
 	if b.VerificationMaterial == nil {
 		return nil, ErrMissingVerificationMaterial
 	}
@@ -350,7 +350,7 @@ func (b *ProtobufBundle) Timestamps() ([][]byte, error) {
 }
 
 // MinVersion returns true if the bundle version is greater than or equal to the expected version.
-func (b *ProtobufBundle) MinVersion(expectVersion string) bool {
+func (b *Bundle) MinVersion(expectVersion string) bool {
 	version, err := getBundleVersion(b.Bundle.MediaType)
 	if err != nil {
 		return false

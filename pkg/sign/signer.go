@@ -144,7 +144,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			return nil, err
 		}
 
-		protobundle, err := verifyBundle.NewProtobufBundle(bundle)
+		protobundle, err := verifyBundle.NewBundle(bundle)
 		if err != nil {
 			return nil, err
 		}

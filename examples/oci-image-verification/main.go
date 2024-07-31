@@ -98,7 +98,7 @@ func main() {
 }
 
 func run() error {
-	var b *bundle.ProtobufBundle
+	var b *bundle.Bundle
 	var err error
 
 	if *ociImage != "" {
@@ -246,8 +246,8 @@ func trustedPublicKeyMaterial(pk crypto.PublicKey) *root.TrustedPublicKeyMateria
 	})
 }
 
-// bundleFromOCIImage returns a ProtobufBundle based on OCI image reference.
-func bundleFromOCIImage(imageRef string) (*bundle.ProtobufBundle, *string, error) {
+// bundleFromOCIImage returns a Bundle based on OCI image reference.
+func bundleFromOCIImage(imageRef string) (*bundle.Bundle, *string, error) {
 	// 1. Get the simple signing layer
 	simpleSigning, err := simpleSigningLayerFromOCIImage(imageRef)
 	if err != nil {
@@ -273,7 +273,7 @@ func bundleFromOCIImage(imageRef string) (*bundle.ProtobufBundle, *string, error
 		VerificationMaterial: verificationMaterial,
 		Content:              msgSignature,
 	}
-	bun, err := bundle.NewProtobufBundle(&pb)
+	bun, err := bundle.NewBundle(&pb)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating bundle: %w", err)
 	}
