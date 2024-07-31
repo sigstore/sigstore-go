@@ -51,6 +51,7 @@ type CertificateAuthority struct {
 	Leaf                *x509.Certificate
 	ValidityPeriodStart time.Time
 	ValidityPeriodEnd   time.Time
+	URI                 string
 }
 
 type TransparencyLog struct {
@@ -249,7 +250,9 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 		return nil, fmt.Errorf("CertificateAuthority cert chain is empty")
 	}
 
-	certificateAuthority = &CertificateAuthority{}
+	certificateAuthority = &CertificateAuthority{
+		URI: certAuthority.Uri,
+	}
 	for i, cert := range certChain.GetCertificates() {
 		parsedCert, err := x509.ParseCertificate(cert.RawBytes)
 		if err != nil {

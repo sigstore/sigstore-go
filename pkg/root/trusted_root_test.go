@@ -21,6 +21,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"encoding/pem"
 	"os"
 	"testing"
@@ -164,4 +165,17 @@ func TestTrustedMaterialCollectionRSA(t *testing.T) {
 	verifier2, err := trustedMaterialCollection.PublicKeyVerifier("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, verifier, verifier2)
+}
+
+func TestFromJSONToJSON(t *testing.T) {
+	trustedrootJSON, err := os.ReadFile("../../examples/trusted-root-public-good.json")
+	assert.NoError(t, err)
+
+	trustedRoot, err := NewTrustedRootFromJSON(trustedrootJSON)
+	assert.NoError(t, err)
+
+	jsonBytes, err := json.Marshal(trustedRoot)
+	assert.NoError(t, err)
+
+	assert.JSONEq(t, string(trustedrootJSON), string(jsonBytes))
 }

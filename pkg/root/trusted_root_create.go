@@ -26,6 +26,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -87,17 +88,17 @@ func NewTrustedRootFromTargets(mediaType string, targets []RawTrustedRootTarget)
 		case TSATarget:
 			tsaCertChains = append(tsaCertChains, target.GetBytes())
 		case RekorTarget:
-			tlInstance, keyId, err := pubkeyToTransparencyLogInstance(target.GetBytes(), now)
+			tlInstance, keyID, err := pubkeyToTransparencyLogInstance(target.GetBytes(), now)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse rekor key: %w", err)
 			}
-			tr.rekorLogs[keyId] = tlInstance
+			tr.rekorLogs[keyID] = tlInstance
 		case CTFETarget:
-			tlInstance, keyId, err := pubkeyToTransparencyLogInstance(target.GetBytes(), now)
+			tlInstance, keyID, err := pubkeyToTransparencyLogInstance(target.GetBytes(), now)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse ctlog key: %w", err)
 			}
-			tr.ctLogs[keyId] = tlInstance
+			tr.ctLogs[keyID] = tlInstance
 		}
 	}
 
@@ -121,7 +122,7 @@ func NewTrustedRootFromTargets(mediaType string, targets []RawTrustedRootTarget)
 }
 
 func pubkeyToTransparencyLogInstance(keyBytes []byte, tm time.Time) (*TransparencyLog, string, error) {
-	logId := sha256.Sum256(keyBytes)
+	logID := sha256.Sum256(keyBytes)
 	der, _ := pem.Decode(keyBytes)
 	key, keyDetails, err := getKeyWithDetails(der.Bytes)
 	if err != nil {
@@ -130,12 +131,12 @@ func pubkeyToTransparencyLogInstance(keyBytes []byte, tm time.Time) (*Transparen
 
 	return &TransparencyLog{
 		BaseURL:             "",
-		ID:                  logId[:],
+		ID:                  logID[:],
 		ValidityPeriodStart: tm,
 		HashFunc:            crypto.SHA256, // we can't get this from the keyBytes, assume SHA256
 		PublicKey:           key,
 		SignatureHashFunc:   keyDetails,
-	}, hex.EncodeToString(logId[:]), nil
+	}, hex.EncodeToString(logID[:]), nil
 }
 
 func getKeyWithDetails(key []byte) (crypto.PublicKey, crypto.Hash, error) {
@@ -213,9 +214,8 @@ func certsToAuthority(certChainPem []byte) (*CertificateAuthority, error) {
 		}
 	}
 
-	// TODO: should this rather be the innermost cert?
-	ca.ValidityPeriodStart = ca.Root.NotBefore
-	ca.ValidityPeriodEnd = ca.Root.NotAfter
+	ca.ValidityPeriodStart = certChain[0].NotBefore
+	ca.ValidityPeriodEnd = certChain[0].NotAfter
 
 	return &ca, nil
 }
@@ -224,20 +224,46 @@ func (tr *TrustedRoot) constructProtoTrustRoot() error {
 	tr.trustedRoot = &prototrustroot.TrustedRoot{}
 	tr.trustedRoot.MediaType = TrustedRootMediaType01
 
-	for logId, transparencyLog := range tr.rekorLogs {
+	for logID, transparencyLog := range tr.rekorLogs {
 		tlProto, err := transparencyLogToProtobufTL(*transparencyLog)
 		if err != nil {
-			return fmt.Errorf("failed converting rekor log %s to protobuf: %w", logId, err)
+			return fmt.Errorf("failed converting rekor log %s to protobuf: %w", logID, err)
 		}
 		tr.trustedRoot.Tlogs = append(tr.trustedRoot.Tlogs, tlProto)
+		// ensure stable sorting of the slice
+		sort.Slice(tr.trustedRoot.Tlogs, func(i, j int) bool {
+			iTime := time.Unix(0, 0)
+			jTime := time.Unix(0, 0)
+
+			if tr.trustedRoot.Tlogs[i].PublicKey.ValidFor.Start != nil {
+				iTime = tr.trustedRoot.Tlogs[i].PublicKey.ValidFor.Start.AsTime()
+			}
+			if tr.trustedRoot.Tlogs[j].PublicKey.ValidFor.Start != nil {
+				iTime = tr.trustedRoot.Tlogs[j].PublicKey.ValidFor.Start.AsTime()
+			}
+			return iTime.Before(jTime)
+		})
 	}
 
-	for logId, ctLog := range tr.ctLogs {
+	for logID, ctLog := range tr.ctLogs {
 		ctProto, err := transparencyLogToProtobufTL(*ctLog)
 		if err != nil {
-			return fmt.Errorf("failed converting ctlog %s to protobuf: %w", logId, err)
+			return fmt.Errorf("failed converting ctlog %s to protobuf: %w", logID, err)
 		}
 		tr.trustedRoot.Ctlogs = append(tr.trustedRoot.Ctlogs, ctProto)
+		// ensure stable sorting of the slice
+		sort.Slice(tr.trustedRoot.Ctlogs, func(i, j int) bool {
+			iTime := time.Unix(0, 0)
+			jTime := time.Unix(0, 0)
+
+			if tr.trustedRoot.Ctlogs[i].PublicKey.ValidFor.Start != nil {
+				iTime = tr.trustedRoot.Ctlogs[i].PublicKey.ValidFor.Start.AsTime()
+			}
+			if tr.trustedRoot.Ctlogs[j].PublicKey.ValidFor.Start != nil {
+				iTime = tr.trustedRoot.Ctlogs[j].PublicKey.ValidFor.Start.AsTime()
+			}
+			return iTime.Before(jTime)
+		})
 	}
 
 	for _, ca := range tr.fulcioCertAuthorities {
@@ -277,18 +303,21 @@ func certificateAuthorityToProtobufCA(ca CertificateAuthority) (*prototrustroot.
 	allCerts = append(allCerts, &protocommon.X509Certificate{RawBytes: ca.Root.Raw})
 
 	caProto := prototrustroot.CertificateAuthority{
-		Uri: "",
+		Uri: ca.URI,
 		Subject: &protocommon.DistinguishedName{
 			Organization: org,
 			CommonName:   ca.Root.Subject.CommonName,
 		},
 		ValidFor: &protocommon.TimeRange{
 			Start: timestamppb.New(ca.ValidityPeriodStart),
-			End:   timestamppb.New(ca.ValidityPeriodEnd),
 		},
 		CertChain: &protocommon.X509CertificateChain{
 			Certificates: allCerts,
 		},
+	}
+
+	if !ca.ValidityPeriodEnd.IsZero() {
+		caProto.ValidFor.End = timestamppb.New(ca.ValidityPeriodEnd)
 	}
 
 	return &caProto, nil
@@ -299,7 +328,7 @@ func transparencyLogToProtobufTL(tl TransparencyLog) (*prototrustroot.Transparen
 	if err != nil {
 		return nil, fmt.Errorf("failed converting hash algorithm to protobuf: %w", err)
 	}
-	publicKey, err := publicKeyToProtobufPublicKey(tl.PublicKey, tl.ValidityPeriodStart)
+	publicKey, err := publicKeyToProtobufPublicKey(tl.PublicKey, tl.ValidityPeriodStart, tl.ValidityPeriodEnd)
 	if err != nil {
 		return nil, fmt.Errorf("failed converting public key to protobuf: %w", err)
 	}
@@ -332,11 +361,15 @@ func hashAlgorithmToProtobufHashAlgorithm(hashAlgorithm crypto.Hash) (protocommo
 	}
 }
 
-func publicKeyToProtobufPublicKey(publicKey crypto.PublicKey, tm time.Time) (*protocommon.PublicKey, error) {
+func publicKeyToProtobufPublicKey(publicKey crypto.PublicKey, start time.Time, end time.Time) (*protocommon.PublicKey, error) {
 	pkd := protocommon.PublicKey{
 		ValidFor: &protocommon.TimeRange{
-			Start: timestamppb.New(tm),
+			Start: timestamppb.New(start),
 		},
+	}
+
+	if !end.IsZero() {
+		pkd.ValidFor.End = timestamppb.New(end)
 	}
 
 	rawBytes, err := x509.MarshalPKIXPublicKey(publicKey)
