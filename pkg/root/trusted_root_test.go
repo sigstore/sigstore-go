@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -177,5 +178,10 @@ func TestFromJSONToJSON(t *testing.T) {
 	jsonBytes, err := json.Marshal(trustedRoot)
 	assert.NoError(t, err)
 
-	assert.JSONEq(t, string(trustedrootJSON), string(jsonBytes))
+	// Protobuf JSON serialization intentionally strips second fraction from time, if
+	// the fraction is 0. We do the same to the expected result:
+	// https://github.com/golang/protobuf/blob/b7697bb698b1c56643249ef6179c7cae1478881d/jsonpb/encode.go#L207
+	trJSONTrimmedTime := strings.ReplaceAll(string(trustedrootJSON), ".000Z\"", "Z\"")
+
+	assert.JSONEq(t, trJSONTrimmedTime, string(jsonBytes))
 }
