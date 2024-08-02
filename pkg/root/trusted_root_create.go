@@ -124,6 +124,9 @@ func NewTrustedRootFromTargets(mediaType string, targets []RawTrustedRootTarget)
 func pubkeyToTransparencyLogInstance(keyBytes []byte, tm time.Time) (*TransparencyLog, string, error) {
 	logID := sha256.Sum256(keyBytes)
 	der, _ := pem.Decode(keyBytes)
+	if der == nil {
+		return nil, "", errors.New("failed to read PEM data for key")
+	}
 	key, keyDetails, err := getKeyWithDetails(der.Bytes)
 	if err != nil {
 		return nil, "", err
