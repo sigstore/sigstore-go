@@ -149,7 +149,15 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			return nil, err
 		}
 
-		artifactOpts := verify.WithArtifact(bytes.NewReader(content.PreAuthEncoding()))
+		// Generally, you should provide an artifact when verifying.
+		//
+		// However, we just signed the DSSE object trusting the user has
+		// referenced the artifact(s) they intended.
+		artifactOpts := verify.WithoutArtifactUnsafe()
+		if bundle.GetMessageSignature() != nil {
+			artifactOpts = verify.WithArtifact(bytes.NewReader(content.PreAuthEncoding()))
+		}
+
 		policy := verify.NewPolicy(artifactOpts, verify.WithoutIdentitiesUnsafe())
 		_, err = sev.Verify(protobundle, policy)
 		if err != nil {
