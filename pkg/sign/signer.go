@@ -15,7 +15,6 @@
 package sign
 
 import (
-	"bytes"
 	"context"
 	"encoding/pem"
 	"errors"
@@ -149,7 +148,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			return nil, err
 		}
 
-		artifactOpts := verify.WithArtifact(bytes.NewReader(content.PreAuthEncoding()))
+		artifactOpts := verify.WithoutArtifactUnsafe()
 		policy := verify.NewPolicy(artifactOpts, verify.WithoutIdentitiesUnsafe())
 		_, err = sev.Verify(protobundle, policy)
 		if err != nil {
