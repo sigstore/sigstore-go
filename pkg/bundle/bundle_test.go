@@ -25,7 +25,6 @@ import (
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
-	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	rekorv1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
 	"github.com/stretchr/testify/require"
@@ -280,7 +279,79 @@ func Test_validate(t *testing.T) {
 							},
 						},
 						Content: &protobundle.VerificationMaterial_PublicKey{
-							PublicKey: &v1.PublicKeyIdentifier{},
+							PublicKey: &protocommon.PublicKeyIdentifier{},
+						},
+					},
+					Content: &protobundle.Bundle_MessageSignature{},
+				},
+			},
+		},
+		{
+			name: "v0.1 with inclusion promise & proof without checkpoint",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						TlogEntries: []*rekorv1.TransparencyLogEntry{
+							{
+								LogIndex: 42,
+								LogId: &protocommon.LogId{
+									KeyId: []byte("deadbeef"),
+								},
+								KindVersion: &rekorv1.KindVersion{
+									Kind:    "hashedrekord",
+									Version: "0.0.1",
+								},
+								IntegratedTime:    1,
+								CanonicalizedBody: canonicalTlogBody,
+								InclusionProof: &rekorv1.InclusionProof{
+									LogIndex: 42,
+									RootHash: []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
+								},
+								InclusionPromise: &rekorv1.InclusionPromise{
+									SignedEntryTimestamp: []byte("1"),
+								},
+							},
+						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &protocommon.PublicKeyIdentifier{},
+						},
+					},
+					Content: &protobundle.Bundle_MessageSignature{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "v0.1 with inclusion proof & promise",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						TlogEntries: []*rekorv1.TransparencyLogEntry{
+							{
+								LogIndex: 42,
+								LogId: &protocommon.LogId{
+									KeyId: []byte("deadbeef"),
+								},
+								KindVersion: &rekorv1.KindVersion{
+									Kind:    "hashedrekord",
+									Version: "0.0.1",
+								},
+								IntegratedTime:    1,
+								CanonicalizedBody: canonicalTlogBody,
+								InclusionProof: &rekorv1.InclusionProof{
+									LogIndex:   42,
+									RootHash:   []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
+									Checkpoint: &rekorv1.Checkpoint{Envelope: "checkpoint"},
+								},
+								InclusionPromise: &rekorv1.InclusionPromise{
+									SignedEntryTimestamp: []byte("1"),
+								},
+							},
+						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &protocommon.PublicKeyIdentifier{},
 						},
 					},
 					Content: &protobundle.Bundle_MessageSignature{},
@@ -308,7 +379,74 @@ func Test_validate(t *testing.T) {
 							},
 						},
 						Content: &protobundle.VerificationMaterial_PublicKey{
-							PublicKey: &v1.PublicKeyIdentifier{},
+							PublicKey: &protocommon.PublicKeyIdentifier{},
+						},
+					},
+					Content: &protobundle.Bundle_MessageSignature{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "v0.2 with inclusion proof without checkpoint",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.2",
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						TlogEntries: []*rekorv1.TransparencyLogEntry{
+							{
+								LogIndex: 42,
+								LogId: &protocommon.LogId{
+									KeyId: []byte("deadbeef"),
+								},
+								KindVersion: &rekorv1.KindVersion{
+									Kind:    "hashedrekord",
+									Version: "0.0.1",
+								},
+								IntegratedTime:    1,
+								CanonicalizedBody: canonicalTlogBody,
+								InclusionProof: &rekorv1.InclusionProof{
+									LogIndex: 42,
+									RootHash: []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
+								},
+							},
+						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &protocommon.PublicKeyIdentifier{},
+						},
+					},
+					Content: &protobundle.Bundle_MessageSignature{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "v0.2 with inclusion proof with empty checkpoint",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.2",
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						TlogEntries: []*rekorv1.TransparencyLogEntry{
+							{
+								LogIndex: 42,
+								LogId: &protocommon.LogId{
+									KeyId: []byte("deadbeef"),
+								},
+								KindVersion: &rekorv1.KindVersion{
+									Kind:    "hashedrekord",
+									Version: "0.0.1",
+								},
+								IntegratedTime:    1,
+								CanonicalizedBody: canonicalTlogBody,
+								InclusionProof: &rekorv1.InclusionProof{
+									LogIndex:   42,
+									RootHash:   []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
+									Checkpoint: &rekorv1.Checkpoint{},
+								},
+							},
+						},
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: &protocommon.PublicKeyIdentifier{},
 						},
 					},
 					Content: &protobundle.Bundle_MessageSignature{},
@@ -337,12 +475,12 @@ func Test_validate(t *testing.T) {
 								InclusionProof: &rekorv1.InclusionProof{
 									LogIndex:   42,
 									RootHash:   []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
-									Checkpoint: &rekorv1.Checkpoint{},
+									Checkpoint: &rekorv1.Checkpoint{Envelope: "checkpoint"},
 								},
 							},
 						},
 						Content: &protobundle.VerificationMaterial_PublicKey{
-							PublicKey: &v1.PublicKeyIdentifier{},
+							PublicKey: &protocommon.PublicKeyIdentifier{},
 						},
 					},
 					Content: &protobundle.Bundle_MessageSignature{},
@@ -370,7 +508,7 @@ func Test_validate(t *testing.T) {
 								InclusionProof: &rekorv1.InclusionProof{
 									LogIndex:   42,
 									RootHash:   []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
-									Checkpoint: &rekorv1.Checkpoint{},
+									Checkpoint: &rekorv1.Checkpoint{Envelope: "checkpoint"},
 								},
 							},
 						},
@@ -404,7 +542,7 @@ func Test_validate(t *testing.T) {
 								InclusionProof: &rekorv1.InclusionProof{
 									LogIndex:   42,
 									RootHash:   []byte("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"),
-									Checkpoint: &rekorv1.Checkpoint{},
+									Checkpoint: &rekorv1.Checkpoint{Envelope: "checkpoint"},
 								},
 							},
 						},
@@ -818,7 +956,7 @@ func Test_BundleValidation(t *testing.T) {
 					Content:   &protobundle.Bundle_DsseEnvelope{},
 					VerificationMaterial: &protobundle.VerificationMaterial{
 						Content: &protobundle.VerificationMaterial_PublicKey{
-							PublicKey: &v1.PublicKeyIdentifier{},
+							PublicKey: &protocommon.PublicKeyIdentifier{},
 						},
 						TimestampVerificationData: &protobundle.TimestampVerificationData{},
 					},
