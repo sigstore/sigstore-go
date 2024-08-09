@@ -35,6 +35,10 @@ func (pk PublicKey) Hint() string {
 	return pk.hint
 }
 
+type CertificateChain struct {
+	Certificates []*x509.Certificate
+}
+
 func (c *Certificate) CompareKey(key any, _ root.TrustedMaterial) bool {
 	x509Key, ok := key.(*x509.Certificate)
 	if !ok {
@@ -54,6 +58,10 @@ func (c *Certificate) GetCertificate() *x509.Certificate {
 
 func (c *Certificate) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return PublicKey{}, false
+}
+
+func (c *Certificate) GetCertificateChain() []*x509.Certificate {
+	return nil
 }
 
 func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
@@ -85,4 +93,40 @@ func (pk *PublicKey) GetCertificate() *x509.Certificate {
 
 func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
 	return *pk, true
+}
+
+func (pk *PublicKey) GetCertificateChain() []*x509.Certificate {
+	return nil
+}
+
+func (cc *CertificateChain) CompareKey(key any, tm root.TrustedMaterial) bool {
+	if len(cc.Certificates) < 1 {
+		return false
+	}
+	return (&Certificate{cc.Certificates[0]}).CompareKey(key, tm)
+}
+
+func (cc *CertificateChain) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
+	if len(cc.Certificates) < 1 {
+		return false
+	}
+	return (&Certificate{cc.Certificates[0]}).ValidAtTime(t, tm)
+}
+
+func (cc *CertificateChain) GetCertificate() *x509.Certificate {
+	if len(cc.Certificates) < 1 {
+		return nil
+	}
+	return cc.Certificates[0]
+}
+
+func (cc *CertificateChain) HasPublicKey() (verify.PublicKeyProvider, bool) {
+	return PublicKey{}, false
+}
+
+func (cc *CertificateChain) GetCertificateChain() []*x509.Certificate {
+	if len(cc.Certificates) < 2 {
+		return nil
+	}
+	return cc.Certificates[1:]
 }
