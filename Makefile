@@ -24,7 +24,6 @@ build:
 build-examples:
 	go build -C ./examples/oci-image-verification -o oci-image-verification .
 	go build -C ./examples/sigstore-go-signing -o sigstore-go-signing .
-	go build -C ./examples/construct-trusted-root -o construct-trusted-root .
 
 .PHONY: test
 test:

@@ -314,6 +314,27 @@ func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error
 	return pbTrustedRoot, nil
 }
 
+// NewTrustedRoot initializes a TrustedRoot object from a mediaType string, list of Fulcio
+// certificate authorities, list of timestamp authorities and maps of ctlogs and rekor
+// transparency log instances.
+func NewTrustedRoot(mediaType string,
+	certificateAuthorities []CertificateAuthority,
+	certificateTransparencyLogs map[string]*TransparencyLog,
+	timestampAuthorities []CertificateAuthority,
+	transparencyLogs map[string]*TransparencyLog) (*TrustedRoot, error) {
+	// document that we assume 1 cert chain per target and with certs already ordered from leaf to root
+	if mediaType != TrustedRootMediaType01 {
+		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", TrustedRootMediaType01)
+	}
+	tr := &TrustedRoot{
+		fulcioCertAuthorities:   certificateAuthorities,
+		ctLogs:                  certificateTransparencyLogs,
+		timestampingAuthorities: timestampAuthorities,
+		rekorLogs:               transparencyLogs,
+	}
+	return tr, nil
+}
+
 // FetchTrustedRoot fetches the Sigstore trusted root from TUF and returns it.
 func FetchTrustedRoot() (*TrustedRoot, error) {
 	return FetchTrustedRootWithOptions(tuf.DefaultOptions())
