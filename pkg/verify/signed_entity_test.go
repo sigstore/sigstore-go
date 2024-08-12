@@ -94,6 +94,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	assert.NotNil(t, res.Signature.Certificate)
 	assert.Equal(t, "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main", res.Signature.Certificate.SubjectAlternativeName)
 	assert.NotEmpty(t, res.VerifiedTimestamps)
+	assert.Equal(t, "https://rekor.sigstore.dev", res.VerifiedTimestamps[0].URI)
 
 	// verifies with integrated timestamp threshold too
 	v, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
