@@ -32,7 +32,7 @@ func TestTlogVerifier(t *testing.T) {
 	assert.NoError(t, err)
 
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
-	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	var ts []time.Time
@@ -56,7 +56,7 @@ func TestTlogVerifier(t *testing.T) {
 	//
 	// This time was chosen assuming the Fulcio signing certificate expires
 	// after 5 minutes, but while the TSA intermediate is still valid (2 hours).
-	entity, err = virtualSigstore.AttestAtTime("foo@fighters.com", "issuer", statement, time.Now().Add(30*time.Minute))
+	entity, err = virtualSigstore.AttestAtTime("foo@example.com", "issuer", statement, time.Now().Add(30*time.Minute))
 	assert.NoError(t, err)
 
 	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
@@ -87,12 +87,12 @@ func TestIgnoredTLogEntries(t *testing.T) {
 
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
-	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	untrustedSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
-	untrustedEntity, err := untrustedSigstore.Attest("foo@fighters.com", "issuer", statement)
+	untrustedEntity, err := untrustedSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	// success: entry that cannot be verified is ignored
@@ -134,7 +134,7 @@ func TestInvalidTLogEntries(t *testing.T) {
 
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
-	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	// failure: threshold of 1 is not met with invalid entry
@@ -158,7 +158,7 @@ func TestNoTLogEntries(t *testing.T) {
 
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
-	entity, err := virtualSigstore.Attest("foo@fighters.com", "issuer", statement)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	// failure: threshold of 1 is not met with no entries
@@ -187,7 +187,7 @@ func TestDuplicateTlogEntries(t *testing.T) {
 	assert.NoError(t, err)
 
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
-	entity, err := virtualSigstore.Attest("foofighters@example.com", "issuer", statement)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	_, err = verify.VerifyArtifactTransparencyLog(&dupTlogEntity{entity}, virtualSigstore, 1, true, false)
