@@ -1,6 +1,7 @@
 module github.com/sigstore/sigstore-go
 
 go 1.22.5
+
 require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7
@@ -17,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.0
 	golang.org/x/crypto v0.25.0
-	golang.org/x/mod v0.19.0
+	golang.org/x/mod v0.20.0
 	google.golang.org/protobuf v1.34.2
 )
 
