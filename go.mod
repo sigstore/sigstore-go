@@ -1,8 +1,6 @@
 module github.com/sigstore/sigstore-go
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.22.5
 
 require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
@@ -15,7 +13,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/protobuf-specs v0.3.2
 	github.com/sigstore/rekor v1.3.6
-	github.com/sigstore/sigstore v1.8.7
+	github.com/sigstore/sigstore v1.8.8
 	github.com/sigstore/timestamp-authority v1.2.2
 	github.com/stretchr/testify v1.9.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.0
@@ -43,7 +41,7 @@ require (
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
-	github.com/google/go-containerregistry v0.20.0 // indirect
+	github.com/google/go-containerregistry v0.20.1 // indirect
 	github.com/google/trillian v1.6.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
