@@ -1,15 +1,12 @@
 module github.com/sigstore/sigstore-go/examples/oci-image-verification
 
 go 1.22.0
-
-toolchain go1.22.5
-
 replace github.com/sigstore/sigstore-go => ../../
 
 require (
 	github.com/google/go-containerregistry v0.20.2
 	github.com/sigstore/protobuf-specs v0.3.2
-	github.com/sigstore/sigstore v1.8.7
+	github.com/sigstore/sigstore v1.8.8
 	github.com/sigstore/sigstore-go v0.1.0
 )
 
