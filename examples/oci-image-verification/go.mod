@@ -1,6 +1,6 @@
 module github.com/sigstore/sigstore-go/examples/oci-image-verification
 
-go 1.22.0
+go 1.22.5
 replace github.com/sigstore/sigstore-go => ../../
 
 require (
