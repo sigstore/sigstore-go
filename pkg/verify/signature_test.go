@@ -33,7 +33,7 @@ func TestSignatureVerifier(t *testing.T) {
 	assert.NoError(t, err)
 
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
-	entity, err := virtualSigstore.Attest("foofighters@example.com", "issuer", statement)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	sigContent, err := entity.SignatureContent()
@@ -46,7 +46,7 @@ func TestSignatureVerifier(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should fail to verify with a different signature
-	entity2, err := virtualSigstore.Attest("foofighters@example.com", "issuer", statement)
+	entity2, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
 	sigContent2, err := entity2.SignatureContent()
@@ -95,7 +95,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	assert.NoError(t, err)
 
 	artifact := "Hi, I am an artifact!"
-	entity, err := virtualSigstore.Sign("foofighters@example.com", "issuer", []byte(artifact))
+	entity, err := virtualSigstore.Sign("foo@example.com", "issuer", []byte(artifact))
 	assert.NoError(t, err)
 
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
@@ -104,7 +104,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
-	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName, "foofighters@example.com")
+	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName, "foo@example.com")
 	assert.Equal(t, result.VerifiedTimestamps[0].Type, "Tlog")
 
 	// should fail to verify with a different artifact
