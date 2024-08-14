@@ -69,6 +69,14 @@ func NewBundle(pbundle *protobundle.Bundle) (*Bundle, error) {
 	return bundle, nil
 }
 
+// Deprecated: use Bundle instead
+type ProtobufBundle = Bundle
+
+// Deprecated: use NewBundle instead
+func NewProtobufBundle(b *protobundle.Bundle) (*ProtobufBundle, error) {
+	return NewBundle(b)
+}
+
 func (b *Bundle) validate() error {
 	bundleVersion, err := getBundleVersion(b.Bundle.MediaType)
 	if err != nil {
