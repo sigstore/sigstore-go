@@ -713,18 +713,8 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 	}
 
 	if v.config.weDoNotExpectAnyObserverTimestamps {
-		// if we have a cert, let's pop the leafcert's NotBefore
-		verificationContent, err := entity.VerificationContent()
-		if err != nil {
-			return nil, err
-		}
-
-		if leafCert := verificationContent.Certificate(); leafCert != nil {
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "LeafCert.NotBefore", URI: "", Timestamp: leafCert.NotBefore})
-		} else {
-			// no cert? use current time
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "CurrentTime", URI: "", Timestamp: time.Now()})
-		}
+		// use current time to verify certificate if no signed timestamps are provided
+		verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "CurrentTime", URI: "", Timestamp: time.Now()})
 	}
 
 	if len(verifiedTimestamps) == 0 {
