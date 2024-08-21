@@ -35,67 +35,81 @@ func (tr *TrustedRoot) constructProtoTrustRoot() error {
 	tr.trustedRoot.MediaType = TrustedRootMediaType01
 
 	for logID, transparencyLog := range tr.rekorLogs {
-		tlProto, err := transparencyLogToProtobufTL(*transparencyLog)
+		tlProto, err := transparencyLogToProtobufTL(transparencyLog)
 		if err != nil {
 			return fmt.Errorf("failed converting rekor log %s to protobuf: %w", logID, err)
 		}
 		tr.trustedRoot.Tlogs = append(tr.trustedRoot.Tlogs, tlProto)
-		// ensure stable sorting of the slice
-		sort.Slice(tr.trustedRoot.Tlogs, func(i, j int) bool {
-			iTime := time.Unix(0, 0)
-			jTime := time.Unix(0, 0)
-
-			if tr.trustedRoot.Tlogs[i].PublicKey.ValidFor.Start != nil {
-				iTime = tr.trustedRoot.Tlogs[i].PublicKey.ValidFor.Start.AsTime()
-			}
-			if tr.trustedRoot.Tlogs[j].PublicKey.ValidFor.Start != nil {
-				iTime = tr.trustedRoot.Tlogs[j].PublicKey.ValidFor.Start.AsTime()
-			}
-			return iTime.Before(jTime)
-		})
 	}
+	// ensure stable sorting of the slice
+	sortTlogSlice(tr.trustedRoot.Tlogs)
 
 	for logID, ctLog := range tr.ctLogs {
-		ctProto, err := transparencyLogToProtobufTL(*ctLog)
+		ctProto, err := transparencyLogToProtobufTL(ctLog)
 		if err != nil {
 			return fmt.Errorf("failed converting ctlog %s to protobuf: %w", logID, err)
 		}
 		tr.trustedRoot.Ctlogs = append(tr.trustedRoot.Ctlogs, ctProto)
-		// ensure stable sorting of the slice
-		sort.Slice(tr.trustedRoot.Ctlogs, func(i, j int) bool {
-			iTime := time.Unix(0, 0)
-			jTime := time.Unix(0, 0)
-
-			if tr.trustedRoot.Ctlogs[i].PublicKey.ValidFor.Start != nil {
-				iTime = tr.trustedRoot.Ctlogs[i].PublicKey.ValidFor.Start.AsTime()
-			}
-			if tr.trustedRoot.Ctlogs[j].PublicKey.ValidFor.Start != nil {
-				iTime = tr.trustedRoot.Ctlogs[j].PublicKey.ValidFor.Start.AsTime()
-			}
-			return iTime.Before(jTime)
-		})
 	}
+	// ensure stable sorting of the slice
+	sortTlogSlice(tr.trustedRoot.Ctlogs)
 
 	for _, ca := range tr.fulcioCertAuthorities {
-		caProto, err := certificateAuthorityToProtobufCA(ca)
+		caProto, err := certificateAuthorityToProtobufCA(&ca)
 		if err != nil {
 			return fmt.Errorf("failed converting fulcio cert chain to protobuf: %w", err)
 		}
 		tr.trustedRoot.CertificateAuthorities = append(tr.trustedRoot.CertificateAuthorities, caProto)
 	}
+	// ensure stable sorting of the slice
+	sortCASlice(tr.trustedRoot.CertificateAuthorities)
 
 	for _, ca := range tr.timestampingAuthorities {
-		caProto, err := certificateAuthorityToProtobufCA(ca)
+		caProto, err := certificateAuthorityToProtobufCA(&ca)
 		if err != nil {
 			return fmt.Errorf("failed converting TSA cert chain to protobuf: %w", err)
 		}
 		tr.trustedRoot.TimestampAuthorities = append(tr.trustedRoot.TimestampAuthorities, caProto)
 	}
+	// ensure stable sorting of the slice
+	sortCASlice(tr.trustedRoot.TimestampAuthorities)
 
 	return nil
 }
 
-func certificateAuthorityToProtobufCA(ca CertificateAuthority) (*prototrustroot.CertificateAuthority, error) {
+func sortCASlice(slc []*prototrustroot.CertificateAuthority) {
+	sort.Slice(slc, func(i, j int) bool {
+		iTime := time.Unix(0, 0)
+		jTime := time.Unix(0, 0)
+
+		if slc[i].ValidFor.Start != nil {
+			iTime = slc[i].ValidFor.Start.AsTime()
+		}
+		if slc[j].ValidFor.Start != nil {
+			jTime = slc[j].ValidFor.Start.AsTime()
+		}
+
+		return iTime.Before(jTime)
+	})
+}
+
+func sortTlogSlice(slc []*prototrustroot.TransparencyLogInstance) {
+	sort.Slice(slc, func(i, j int) bool {
+		iTime := time.Unix(0, 0)
+		jTime := time.Unix(0, 0)
+
+		if slc[i].PublicKey.ValidFor.Start != nil {
+			iTime = slc[i].PublicKey.ValidFor.Start.AsTime()
+		}
+		if slc[j].PublicKey.ValidFor.Start != nil {
+			jTime = slc[j].PublicKey.ValidFor.Start.AsTime()
+		}
+
+		return iTime.Before(jTime)
+	})
+}
+
+func certificateAuthorityToProtobufCA(ca *CertificateAuthority) (*prototrustroot.CertificateAuthority, error) {
 	org := ""
 	if len(ca.Root.Subject.Organization) > 0 {
 		org = ca.Root.Subject.Organization[0]
@@ -133,7 +147,7 @@ func certificateAuthorityToProtobufCA(ca CertificateAuthority) (*prototrustroot.
 	return &caProto, nil
 }
 
-func transparencyLogToProtobufTL(tl TransparencyLog) (*prototrustroot.TransparencyLogInstance, error) {
+func transparencyLogToProtobufTL(tl *TransparencyLog) (*prototrustroot.TransparencyLogInstance, error) {
 	hashAlgo, err := hashAlgorithmToProtobufHashAlgorithm(tl.HashFunc)
 	if err != nil {
 		return nil, fmt.Errorf("failed converting hash algorithm to protobuf: %w", err)
