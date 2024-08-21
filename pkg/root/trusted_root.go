@@ -51,6 +51,7 @@ type CertificateAuthority struct {
 	Leaf                *x509.Certificate
 	ValidityPeriodStart time.Time
 	ValidityPeriodEnd   time.Time
+	URI                 string
 }
 
 type TransparencyLog struct {
@@ -79,6 +80,15 @@ func (tr *TrustedRoot) RekorLogs() map[string]*TransparencyLog {
 
 func (tr *TrustedRoot) CTLogs() map[string]*TransparencyLog {
 	return tr.ctLogs
+}
+
+func (tr *TrustedRoot) MarshalJSON() ([]byte, error) {
+	err := tr.constructProtoTrustRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed constructing protobuf TrustRoot representation: %w", err)
+	}
+
+	return protojson.Marshal(tr.trustedRoot)
 }
 
 func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot) (trustedRoot *TrustedRoot, err error) {
@@ -240,7 +250,9 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 		return nil, fmt.Errorf("CertificateAuthority cert chain is empty")
 	}
 
-	certificateAuthority = &CertificateAuthority{}
+	certificateAuthority = &CertificateAuthority{
+		URI: certAuthority.Uri,
+	}
 	for i, cert := range certChain.GetCertificates() {
 		parsedCert, err := x509.ParseCertificate(cert.RawBytes)
 		if err != nil {
@@ -300,6 +312,27 @@ func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error
 		return nil, err
 	}
 	return pbTrustedRoot, nil
+}
+
+// NewTrustedRoot initializes a TrustedRoot object from a mediaType string, list of Fulcio
+// certificate authorities, list of timestamp authorities and maps of ctlogs and rekor
+// transparency log instances.
+func NewTrustedRoot(mediaType string,
+	certificateAuthorities []CertificateAuthority,
+	certificateTransparencyLogs map[string]*TransparencyLog,
+	timestampAuthorities []CertificateAuthority,
+	transparencyLogs map[string]*TransparencyLog) (*TrustedRoot, error) {
+	// document that we assume 1 cert chain per target and with certs already ordered from leaf to root
+	if mediaType != TrustedRootMediaType01 {
+		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", TrustedRootMediaType01)
+	}
+	tr := &TrustedRoot{
+		fulcioCertAuthorities:   certificateAuthorities,
+		ctLogs:                  certificateTransparencyLogs,
+		timestampingAuthorities: timestampAuthorities,
+		rekorLogs:               transparencyLogs,
+	}
+	return tr, nil
 }
 
 // FetchTrustedRoot fetches the Sigstore trusted root from TUF and returns it.
