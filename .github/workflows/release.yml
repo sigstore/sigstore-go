@@ -1,0 +1,75 @@
+# Copyright 2024 The Sigstore Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "Release sigstore-go"
+
+on:
+  workflow_dispatch: {} # TODO: change to release
+  push: {} # TODO: Change to release
+
+permissions:
+  id-token: write
+  contents: read
+  attestations: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Install Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+      - name: Run tests
+        run: 'make test'
+      - name: Build binaries
+        run: 'make build'
+
+      - name: Rename artifact
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          echo "ARTIFACT_FILENAME=sigstore-go-${{ matrix.os }}.exe" >> $GITHUB_ENV
+          mv sigstore-go.exe sigstore-go-${{ matrix.os }}.exe
+      - name: Rename artifact
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          echo "ARTIFACT_FILENAME=sigstore-go-${{ matrix.os }}" >> $GITHUB_ENV
+          mv sigstore-go sigstore-go-${{ matrix.os }}
+ 
+      - name: Generate artifact attestation
+        if: ${{ matrix.os != 'windows-latest' }}
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: '${{ env.ARTIFACT_FILENAME }}'
+      - name: Upload mac or linux artifact
+        if: ${{ matrix.os != 'windows-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: '${{ env.ARTIFACT_FILENAME }}'
+          path: '${{ env.ARTIFACT_FILENAME }}'
+      - name: Upload mac or linux artifact
+        if: ${{ matrix.os == 'windows-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'sigstore-go-windows-latest.exe'
+          path: 'sigstore-go-windows-latest.exe'
