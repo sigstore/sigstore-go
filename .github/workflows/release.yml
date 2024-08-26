@@ -15,61 +15,191 @@
 name: "Release sigstore-go"
 
 on:
-  workflow_dispatch: {} # TODO: change to release
-  push: {} # TODO: Change to release
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  REPO: 'https://github.com/${{ github.event.repository.full_name }}'
+  REPO_OWNER: '${{ github.event.repository.owner.name }}'
+  REPO_NAME: '${{ github.event.repository.name }}'
+  RELEASE_TAG: '${{ github.ref_name }}'
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
   attestations: write
 
+# This workflow cuts a release. The workflow then downloads
+# the source archives from different GitHub URLs against the
+# source code sigstore-go released.
+# A source archive is a compressed archive that GitHub creates
+# by way of "git archive" and makes available for anyone to
+# download.
+# The workflow first checks out the release tag and then
+# verifies these source archives against the checked out
+# source. As such, the checked out source is our source
+# of truth, and to pass verification, the downloaded source
+# archives must match our source of truth.
+#
+# When this workflow completes, sigstore-go will issue a release,
+# and consumers can get donwload the source code by and any
+# of the following methods:
+# 1. curl -L \
+#     -H "Accept: application/vnd.github+json" \
+#     -H "Authorization: Bearer <YOUR-TOKEN>" \
+#     -H "X-GitHub-Api-Version: 2022-11-28" \
+#     https://api.github.com/repos/sigstore/sigstore-go/zipball/REF (or "tarball")
+# 2. Manually downloading the source archive from a release page.
+# 3. wget https://github.com/sigstore/sigstore-go/archive/tags/REF.zip (or .tar.gz)
+#
+# Consumers can then verify the source archive by way of:
+# gh attestation verify SOURCE_ARCHIVE.zip/tar.gz --repo=sigstore/sigstore-go
 jobs:
   build:
     strategy:
       fail-fast: false
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: [ubuntu-latest]
     steps:
+      # Check out the repo _before_ issuing the release
+      # so we have the ground truth.
       - name: Checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Install Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-      - name: Run tests
-        run: 'make test'
-      - name: Build binaries
-        run: 'make build'
+          ref: ${{ github.ref_name }}
+      - name: Issue release
+        uses: softprops/action-gh-release@v2
 
-      - name: Rename artifact
-        if: ${{ matrix.os == 'windows-latest' }}
+      # Download the source archives from the
+      # "zipball_url" and "tarball_url" values
+      # from https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#list-releases
+      - name: Download source archives from API
+        uses: robinraju/release-downloader@v1
+        with:
+          latest: true
+          zipBall: true
+          tarBall: true
+          out-file-path: '${{ github.workspace }}/../source-archives' # download-path
+          tag: ${{ github.ref_name }}
+
+      # Download the source archives from:
+      # https://api.github.com/repos/OWNER/REPO/zipball/REF
+      - name: Download source archives from archive/tags and archive/refs/tags
+        working-directory: ${{ github.workspace }}
+        env:
+          DEST_DIR: '${{ github.workspace }}/../source-archives'
         run: |
-          echo "ARTIFACT_FILENAME=sigstore-go-${{ matrix.os }}.exe" >> $GITHUB_ENV
-          mv sigstore-go.exe sigstore-go-${{ matrix.os }}.exe
-      - name: Rename artifact
-        if: ${{ matrix.os != 'windows-latest' }}
+          export DEST_DIR="${{ github.workspace }}/../source-archives"
+          wget "${REPO}"/archive/tags/"${RELEASE_TAG}".zip -O "${DEST_DIR}"/"${REPO_NAME}"-tags-"${RELEASE_TAG}".zip
+          wget "${REPO}"/archive/tags/"${RELEASE_TAG}".tar.gz -O "${DEST_DIR}"/"${REPO_NAME}"-tags-"${RELEASE_TAG}".tar.gz
+          wget "${REPO}"/archive/refs/tags/"${RELEASE_TAG}".zip -O "${DEST_DIR}"/"${REPO_NAME}"-refs-tags-"${RELEASE_TAG}".zip
+          wget "${REPO}"/archive/refs/tags/"${RELEASE_TAG}".tar.gz -O "${DEST_DIR}"/"${REPO_NAME}"-refs-tags-"${RELEASE_TAG}".tar.gz
+      - name: Verify all downloaded source archives
+        working-directory: ${{ github.workspace }}
+        env:
+          RELEASE_VERSION: '${{ github.ref_name }}'
         run: |
-          echo "ARTIFACT_FILENAME=sigstore-go-${{ matrix.os }}" >> $GITHUB_ENV
-          mv sigstore-go sigstore-go-${{ matrix.os }}
- 
-      - name: Generate artifact attestation
-        if: ${{ matrix.os != 'windows-latest' }}
+          export shortened_sha=$(echo "${GITHUB_SHA}" | head -c 7)
+          export directory="${REPO_NAME}" # The directory to verify source archives against
+          export TAG_WITHOUT_V=${RELEASE_VERSION#"v"} # eg. v0.0.1 becomes 0.0.1
+          cd ..
+          # Check that the source of truth exists
+          if [ ! -d "$directory" ]; then
+            exit 1
+          fi
+
+          # Verifies a file from a downloaded source archive
+          # against the corresponding file in our source of truth.
+          # Eg, we compare /downloaded-source-archive/file1 against
+          # /source-of-truth/file1. 
+          verify_file() {
+            filename=$1
+            trusted_dir=$2
+            untrusted_dir=$3
+            path="${trusted_dir}/${filename#*/}"
+            cs_file1=$(sha256sum "${path}" | head -c 64)
+
+            path2="${untrusted_dir}/${filename#*/}"
+            cs_file2=$(sha256sum "${path2}" | head -c 64)
+            echo verifying "${path}" and "${path2}"
+            if [ "$cs_file1" != "$cs_file2" ]; then exit 1; fi
+          }
+          export -f verify_file
+
+          # Compares all files in two directories. When we use this
+          # later, one of the directories is our source of truth,
+          # and the other is the source archive we have downloaded.
+          # When we download a source archive, the .git directory
+          # is not included, but it exists in our source of truth,
+          # so we do not compare files in that directory.
+          dirs_are_equal() {
+            export trusted_dir=$1
+            export untrusted_dir=$2 
+            find $trusted_dir -type f -not -path "*.git/*" -exec bash -c 'verify_file {} $trusted_dir $untrusted_dir' \;
+            number_of_files1=$(find "${trusted_dir}" -type f -not -path "*.git/*" | wc -l)
+            number_of_files2=$(find "${untrusted_dir}" -type f -not -path "*.git/*" | wc -l)
+            if [ "$number_of_files1" != "$number_of_files2" ]; then echo "WRONG" && exit 1; else echo "SAME AMOUNT OF FILES"; fi
+            echo $number_of_files1 $number_of_files2
+          }
+
+          # Extracts a compressed source archive file
+          # and compares its contents against our
+          # source of truth.
+          verify_compressed_dir() {
+            extracted_dir_name=$1
+            archive_name=$2
+            compressed_type=$3
+
+            export dir_name="${extracted_dir_name}"
+            if [ -d "${dir_name}" ]; then
+              echo "${dir_name} already exists but shouldn't."
+              exit 1
+            fi
+            if [ "$compressed_type" = "zip" ]; then
+              unzip source-archives/"${archive_name}"
+            else
+              tar -xvzf source-archives/"${archive_name}"
+            fi
+            dirs_are_equal "${directory}" "${dir_name}"
+            rm -r "${dir_name}"
+          }          
+
+          # We have downloaded 6 source archives earlier in the
+          # workflow. Now we verify these against our source of truth.
+          ls source-archives
+          verify_compressed_dir \
+                  "${REPO_OWNER}-${REPO_NAME}-${shortened_sha}" \
+                  "${REPO_NAME}-${RELEASE_TAG}.zip" \
+                  "zip"
+          verify_compressed_dir \
+                  "${REPO_OWNER}-${REPO_NAME}-${shortened_sha}" \
+                  "${REPO_NAME}-${RELEASE_TAG}.tar.gz" \
+                  "tar.gz"
+          verify_compressed_dir \
+                  "${REPO_NAME}-tags-${RELEASE_TAG}" \
+                  "${REPO_NAME}-tags-${RELEASE_TAG}.zip" \
+                  "zip"
+          verify_compressed_dir \
+                  "${REPO_NAME}-tags-${RELEASE_TAG}" \
+                  "${REPO_NAME}-tags-${RELEASE_TAG}.tar.gz" \
+                  "tar.gz"
+          verify_compressed_dir \
+                  "${REPO_NAME}-${TAG_WITHOUT_V}" \
+                  "${REPO_NAME}-refs-tags-${RELEASE_TAG}.zip" \
+                  "zip"
+          verify_compressed_dir \
+                  "${REPO_NAME}-${TAG_WITHOUT_V}" \
+                  "${REPO_NAME}-refs-tags-${RELEASE_TAG}.tar.gz" \
+                  "tar.gz"
+      # We can't use "../" in the "subject-path" for the
+      # "attest-build-provenance" step, so we move it
+      # into scope.
+      - name: Move source archive files
+        run: |
+          mv ${{ github.workspace }}/../source-archives ./
+      - name: Attest all
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: '${{ env.ARTIFACT_FILENAME }}'
-      - name: Upload mac or linux artifact
-        if: ${{ matrix.os != 'windows-latest' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: '${{ env.ARTIFACT_FILENAME }}'
-          path: '${{ env.ARTIFACT_FILENAME }}'
-      - name: Upload mac or linux artifact
-        if: ${{ matrix.os == 'windows-latest' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: 'sigstore-go-windows-latest.exe'
-          path: 'sigstore-go-windows-latest.exe'
+          subject-path: 'source-archives/*'
