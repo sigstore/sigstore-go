@@ -7,7 +7,7 @@ replace github.com/sigstore/sigstore-go => ../../
 require (
 	github.com/google/go-containerregistry v0.20.2
 	github.com/sigstore/protobuf-specs v0.3.2
-	github.com/sigstore/sigstore v1.8.8
+	github.com/sigstore/sigstore v1.8.9
 	github.com/sigstore/sigstore-go v0.1.0
 )
 
@@ -87,7 +87,7 @@ require (
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
 	golang.org/x/mod v0.20.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/term v0.23.0 // indirect

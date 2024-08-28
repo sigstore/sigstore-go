@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/util"
+	"github.com/sigstore/sigstore/pkg/oauthflow"
 )
 
 type CertificateProviderOptions struct {
@@ -54,10 +55,6 @@ type FulcioOptions struct {
 	Retries uint
 	// Optional Transport (for dependency injection)
 	Transport http.RoundTripper
-}
-
-type jsonWebToken struct {
-	Sub string `json:"sub"`
 }
 
 type fulcioCertRequest struct {
@@ -122,14 +119,13 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 		return nil, err
 	}
 
-	var jwt jsonWebToken
-	err = json.Unmarshal([]byte(jwtString), &jwt)
+	subject, err := oauthflow.SubjectFromUnverifiedToken(jwtString)
 	if err != nil {
 		return nil, err
 	}
 
 	// Sign JWT subject for proof of possession
-	subjectSignature, _, err := keypair.SignData([]byte(jwt.Sub))
+	subjectSignature, _, err := keypair.SignData([]byte(subject))
 	if err != nil {
 		return nil, err
 	}
