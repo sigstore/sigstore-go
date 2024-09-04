@@ -38,7 +38,7 @@ var ErrUnsupportedMediaType = fmt.Errorf("%w: unsupported media type", ErrValida
 var ErrMissingVerificationMaterial = fmt.Errorf("%w: missing verification material", ErrValidation)
 var ErrUnimplemented = errors.New("unimplemented")
 var ErrInvalidAttestation = fmt.Errorf("%w: invalid attestation", ErrValidation)
-var ErrMissingEnvelope = fmt.Errorf("%w: missing envelope", ErrInvalidAttestation)
+var ErrMissingEnvelope = fmt.Errorf("%w: missing valid envelope", ErrInvalidAttestation)
 var ErrDecodingJSON = fmt.Errorf("%w: decoding json", ErrInvalidAttestation)
 var ErrDecodingB64 = fmt.Errorf("%w: decoding base64", ErrInvalidAttestation)
 
@@ -196,7 +196,7 @@ func validateBundle(b *protobundle.Bundle) error {
 	switch b.VerificationMaterial.Content.(type) {
 	case *protobundle.VerificationMaterial_PublicKey, *protobundle.VerificationMaterial_Certificate, *protobundle.VerificationMaterial_X509CertificateChain:
 	default:
-		return fmt.Errorf("invalid verififcation material content: verification material must be one of public key, x509 certificate and x509 certificate chain")
+		return fmt.Errorf("invalid verification material content: verification material must be one of public key, x509 certificate and x509 certificate chain")
 	}
 
 	return nil
@@ -245,8 +245,11 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 
 	switch content := b.VerificationMaterial.GetContent().(type) {
 	case *protobundle.VerificationMaterial_X509CertificateChain:
+		if content.X509CertificateChain == nil {
+			return nil, ErrMissingVerificationMaterial
+		}
 		certs := content.X509CertificateChain.GetCertificates()
-		if len(certs) == 0 {
+		if len(certs) == 0 || certs[0].RawBytes == nil {
 			return nil, ErrMissingVerificationMaterial
 		}
 		parsedCert, err := x509.ParseCertificate(certs[0].RawBytes)
@@ -258,6 +261,9 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_Certificate:
+		if content.Certificate == nil || content.Certificate.RawBytes == nil {
+			return nil, ErrMissingVerificationMaterial
+		}
 		parsedCert, err := x509.ParseCertificate(content.Certificate.RawBytes)
 		if err != nil {
 			return nil, ErrValidationError(err)
@@ -267,6 +273,9 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_PublicKey:
+		if content.PublicKey == nil {
+			return nil, ErrMissingVerificationMaterial
+		}
 		pk := &PublicKey{
 			hint: content.PublicKey.Hint,
 		}
@@ -318,6 +327,9 @@ func (b *Bundle) SignatureContent() (verify.SignatureContent, error) {
 		}
 		return envelope, nil
 	case *protobundle.Bundle_MessageSignature:
+		if content.MessageSignature == nil || content.MessageSignature.MessageDigest == nil {
+			return nil, ErrMissingVerificationMaterial
+		}
 		return NewMessageSignature(
 			content.MessageSignature.MessageDigest.Digest,
 			protocommon.HashAlgorithm_name[int32(content.MessageSignature.MessageDigest.Algorithm)],
@@ -372,11 +384,21 @@ func (b *Bundle) MinVersion(expectVersion string) bool {
 }
 
 func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {
+	if input == nil {
+		return nil, ErrMissingEnvelope
+	}
 	output := &dsse.Envelope{}
-	output.Payload = base64.StdEncoding.EncodeToString([]byte(input.GetPayload()))
+	payload := input.GetPayload()
+	if payload == nil {
+		return nil, ErrMissingEnvelope
+	}
+	output.Payload = base64.StdEncoding.EncodeToString([]byte(payload))
 	output.PayloadType = string(input.GetPayloadType())
 	output.Signatures = make([]dsse.Signature, len(input.GetSignatures()))
 	for i, sig := range input.GetSignatures() {
+		if sig == nil {
+			return nil, ErrMissingEnvelope
+		}
 		output.Signatures[i].KeyID = sig.GetKeyid()
 		output.Signatures[i].Sig = base64.StdEncoding.EncodeToString(sig.GetSig())
 	}
