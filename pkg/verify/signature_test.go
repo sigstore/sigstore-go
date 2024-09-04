@@ -18,9 +18,12 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 
+	"github.com/in-toto/in-toto-golang/in_toto"
+	"github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/common"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +97,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	artifact := "Hi, I am an artifact!"
+	artifact := "Hi, I am an artifact!" //nolint:goconst
 	entity, err := virtualSigstore.Sign("foo@example.com", "issuer", []byte(artifact))
 	assert.NoError(t, err)
 
@@ -112,4 +115,62 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	result, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact2)), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 	assert.Nil(t, result)
+}
+
+func TestTooManySubjects(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	tooManySubjectsStatement := in_toto.Statement{}
+	for i := 0; i < 1025; i++ {
+		tooManySubjectsStatement.Subject = append(tooManySubjectsStatement.Subject, in_toto.Subject{
+			Name: fmt.Sprintf("subject-%d", i),
+			Digest: map[string]string{
+				"sha256": "", // actual content of digest does not matter for this test
+			},
+		})
+	}
+
+	tooManySubjectsStatementBytes, err := json.Marshal(tooManySubjectsStatement)
+	assert.NoError(t, err)
+
+	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
+	assert.NoError(t, err)
+
+	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
+
+	artifact := "Hi, I am an artifact!" //nolint:goconst
+	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	assert.ErrorContains(t, err, "too many subjects")
+}
+
+func TestTooManyDigests(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	tooManyDigestsStatement := in_toto.Statement{}
+	tooManyDigestsStatement.Subject = []in_toto.Subject{
+		{
+			Name:   fmt.Sprintf("subject"),
+			Digest: make(common.DigestSet),
+		},
+	}
+	tooManyDigestsStatement.Subject[0].Digest["sha512"] = "" // verifier requires that at least one known hash algorithm is present in the digest map
+	for i := 0; i < 32; i++ {
+		tooManyDigestsStatement.Subject[0].Digest[fmt.Sprintf("digest-%d", i)] = ""
+	}
+
+	tooManySubjectsStatementBytes, err := json.Marshal(tooManyDigestsStatement)
+	assert.NoError(t, err)
+
+	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
+	assert.NoError(t, err)
+
+	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	assert.NoError(t, err)
+
+	artifact := "Hi, I am an artifact!" //nolint:goconst
+	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	assert.ErrorContains(t, err, "too many digests")
 }

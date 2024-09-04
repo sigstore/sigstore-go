@@ -113,7 +113,7 @@ func TestDuplicateTimestamps(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = verify.VerifyTimestampAuthorityWithThreshold(&dupTimestampEntity{entity}, virtualSigstore, 1)
-	assert.Error(t, err) // duplicate timestamps should fail to verify
+	assert.ErrorContains(t, err, "duplicate timestamps found")
 }
 
 type badTSASignatureEntity struct {
@@ -222,4 +222,32 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 			}
 		})
 	}
+}
+
+type tooManyTimestampsEntity struct {
+	*ca.TestEntity
+}
+
+func (e *tooManyTimestampsEntity) Timestamps() ([][]byte, error) {
+	timestamps, err := e.TestEntity.Timestamps()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < 32; i++ {
+		timestamps = append(timestamps, timestamps[0])
+	}
+
+	return timestamps, nil
+}
+
+func TestTooManyTimestamps(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(&tooManyTimestampsEntity{entity}, virtualSigstore, 1)
+	assert.ErrorContains(t, err, "too many signed timestamps")
 }

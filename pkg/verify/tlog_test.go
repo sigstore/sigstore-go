@@ -191,5 +191,33 @@ func TestDuplicateTlogEntries(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = verify.VerifyArtifactTransparencyLog(&dupTlogEntity{entity}, virtualSigstore, 1, true, false)
-	assert.Error(t, err) // duplicate tlog entries should fail to verify
+	assert.ErrorContains(t, err, "duplicate tlog entries found") // duplicate tlog entries should fail to verify
+}
+
+type tooManyTlogEntriesEntity struct {
+	*ca.TestEntity
+}
+
+func (e *tooManyTlogEntriesEntity) TlogEntries() ([]*tlog.Entry, error) {
+	entries, err := e.TestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < 32; i++ {
+		entries = append(entries, entries[0])
+	}
+
+	return entries, nil
+}
+
+func TestMaxAllowedTlogEntries(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyArtifactTransparencyLog(&tooManyTlogEntriesEntity{entity}, virtualSigstore, 1, true, false)
+	assert.ErrorContains(t, err, "too many tlog entries") // too many tlog entries should fail to verify
 }
