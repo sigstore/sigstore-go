@@ -25,6 +25,7 @@ import (
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	rekorv1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
 	"github.com/stretchr/testify/require"
@@ -670,6 +671,53 @@ func TestVerificationContent(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "certificate chain with nil bytes",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: &protocommon.X509CertificateChain{
+								Certificates: []*protocommon.X509Certificate{
+									{
+										RawBytes: nil,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "certificate chain with nil cert",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: &protocommon.X509CertificateChain{
+								Certificates: nil,
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "certificate chain with nil chain",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_X509CertificateChain{
+							X509CertificateChain: nil,
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "certificate",
 			pb: Bundle{
 				Bundle: &protobundle.Bundle{
@@ -700,6 +748,36 @@ func TestVerificationContent(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "certificate with nil bytes",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_Certificate{
+							Certificate: &protocommon.X509Certificate{
+								RawBytes: nil,
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty certificate",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_Certificate{
+							Certificate: &protocommon.X509Certificate{
+								RawBytes: nil,
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "public key",
 			pb: Bundle{
 				Bundle: &protobundle.Bundle{
@@ -711,6 +789,19 @@ func TestVerificationContent(t *testing.T) {
 				},
 			},
 			wantPublicKey: true,
+		},
+		{
+			name: "nil public key",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					VerificationMaterial: &protobundle.VerificationMaterial{
+						Content: &protobundle.VerificationMaterial_PublicKey{
+							PublicKey: nil,
+						},
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -742,15 +833,49 @@ func TestSignatureContent(t *testing.T) {
 		pb            Bundle
 		wantEnvelope  bool
 		wantSignature bool
+		wantErr       bool
 	}{
 		{
 			name: "dsse envelope",
 			pb: Bundle{
 				Bundle: &protobundle.Bundle{
-					Content: &protobundle.Bundle_DsseEnvelope{},
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &protodsse.Envelope{
+							Payload:    []byte{},
+							Signatures: []*protodsse.Signature{{Sig: []byte{}, Keyid: ""}},
+						},
+					},
 				},
 			},
 			wantEnvelope: true,
+		},
+		{
+			name: "dsse envelope with nil signature",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &protodsse.Envelope{
+							Payload:    []byte{},
+							Signatures: []*protodsse.Signature{nil},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "dsse envelope with nil payload",
+			pb: Bundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &protodsse.Envelope{
+							Payload:    nil,
+							Signatures: []*protodsse.Signature{{Sig: []byte{}, Keyid: ""}},
+						},
+					},
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name: "message signature",
@@ -770,6 +895,10 @@ func TestSignatureContent(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, gotErr := tt.pb.SignatureContent()
+			if tt.wantErr {
+				require.Error(t, gotErr)
+				return
+			}
 			require.NoError(t, gotErr)
 			if tt.wantEnvelope {
 				require.NotNil(t, got.EnvelopeContent())
@@ -794,7 +923,12 @@ func TestEnvelope(t *testing.T) {
 			name: "dsse envelope",
 			pb: Bundle{
 				Bundle: &protobundle.Bundle{
-					Content: &protobundle.Bundle_DsseEnvelope{},
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &protodsse.Envelope{
+							Payload:    []byte{},
+							Signatures: []*protodsse.Signature{{Sig: []byte{}, Keyid: ""}},
+						},
+					},
 				},
 			},
 		},
