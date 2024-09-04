@@ -34,6 +34,8 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
+const maxAllowedTlogEntries = 32
+
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
 // in the transparency log and that the log entry is valid.
 //
@@ -45,6 +47,11 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
+	}
+
+	// limit the number of tlog entries to prevent DoS
+	if len(entries) > maxAllowedTlogEntries {
+		return nil, fmt.Errorf("too many tlog entries: %d > %d", len(entries), maxAllowedTlogEntries)
 	}
 
 	// disallow duplicate entries, as a malicious actor could use duplicates to bypass the threshold
