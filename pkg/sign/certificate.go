@@ -210,11 +210,12 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 	}
 
 	var cert []byte
-	if len(fulcioResp.SignedCertificateEmbeddedSct.Chain.Certificates) > 0 {
+	switch {
+	case len(fulcioResp.SignedCertificateEmbeddedSct.Chain.Certificates) > 0:
 		cert = []byte(fulcioResp.SignedCertificateEmbeddedSct.Chain.Certificates[0])
-	} else if len(fulcioResp.SignedCertificateDetachedSct.Chain.Certificates) > 0 {
+	case len(fulcioResp.SignedCertificateDetachedSct.Chain.Certificates) > 0:
 		cert = []byte(fulcioResp.SignedCertificateDetachedSct.Chain.Certificates[0])
-	} else {
+	default:
 		return nil, errors.New("Fulcio returned no certificates")
 	}
 
