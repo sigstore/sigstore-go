@@ -72,10 +72,15 @@ type publicKey struct {
 }
 
 type fulcioResponse struct {
-	SctCertWithChain signedCertificateEmbeddedSct `json:"signedCertificateEmbeddedSct"`
+	SignedCertificateEmbeddedSct signedCertificateEmbeddedSct `json:"signedCertificateEmbeddedSct"`
+	SignedCertificateDetachedSct signedCertificateDetachedSct `json:"signedCertificateDetachedSct"`
 }
 
 type signedCertificateEmbeddedSct struct {
+	Chain chain `json:"chain"`
+}
+
+type signedCertificateDetachedSct struct {
 	Chain chain `json:"chain"`
 }
 
@@ -204,12 +209,16 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 		return nil, err
 	}
 
-	certs := fulcioResp.SctCertWithChain.Chain.Certificates
-	if len(certs) == 0 {
+	var cert []byte
+	if len(fulcioResp.SignedCertificateEmbeddedSct.Chain.Certificates) > 0 {
+		cert = []byte(fulcioResp.SignedCertificateEmbeddedSct.Chain.Certificates[0])
+	} else if len(fulcioResp.SignedCertificateDetachedSct.Chain.Certificates) > 0 {
+		cert = []byte(fulcioResp.SignedCertificateDetachedSct.Chain.Certificates[0])
+	} else {
 		return nil, errors.New("Fulcio returned no certificates")
 	}
 
-	certBlock, _ := pem.Decode([]byte(certs[0]))
+	certBlock, _ := pem.Decode(cert)
 	if certBlock == nil {
 		return nil, errors.New("unable to parse Fulcio certificate")
 	}
