@@ -35,7 +35,9 @@ import (
 
 var ErrValidation = errors.New("validation error")
 var ErrUnsupportedMediaType = fmt.Errorf("%w: unsupported media type", ErrValidation)
+var ErrEmptyBundle = fmt.Errorf("%w: empty protobuf bundle", ErrValidation)
 var ErrMissingVerificationMaterial = fmt.Errorf("%w: missing verification material", ErrValidation)
+var ErrMissingBundleContent = fmt.Errorf("%w: missing bundle content", ErrValidation)
 var ErrUnimplemented = errors.New("unimplemented")
 var ErrInvalidAttestation = fmt.Errorf("%w: invalid attestation", ErrValidation)
 var ErrMissingEnvelope = fmt.Errorf("%w: missing valid envelope", ErrInvalidAttestation)
@@ -172,11 +174,11 @@ func getBundleVersion(mediaType string) (string, error) {
 
 func validateBundle(b *protobundle.Bundle) error {
 	if b == nil {
-		return fmt.Errorf("empty protobuf bundle")
+		return ErrEmptyBundle
 	}
 
 	if b.Content == nil {
-		return fmt.Errorf("missing bundle content")
+		return ErrMissingBundleContent
 	}
 
 	switch b.Content.(type) {

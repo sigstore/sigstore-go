@@ -1067,7 +1067,7 @@ func Test_BundleValidation(t *testing.T) {
 					Content:   nil,
 				},
 			},
-			errMsg:  "invalid bundle: missing bundle content",
+			errMsg:  "invalid bundle: validation error: missing bundle content",
 			wantErr: true,
 		},
 		{
