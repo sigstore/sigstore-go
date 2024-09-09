@@ -185,12 +185,8 @@ func validateBundle(b *protobundle.Bundle) error {
 		return fmt.Errorf("invalid bundle content: bundle content must be either a message signature or dsse envelope")
 	}
 
-	if b.VerificationMaterial == nil {
-		return fmt.Errorf("missing verification material")
-	}
-
-	if b.VerificationMaterial.Content == nil {
-		return fmt.Errorf("missing verification material content")
+	if b.VerificationMaterial == nil || b.VerificationMaterial.Content == nil {
+		return ErrMissingVerificationMaterial
 	}
 
 	switch b.VerificationMaterial.Content.(type) {
