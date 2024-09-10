@@ -19,7 +19,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.0
 	golang.org/x/crypto v0.27.0
-	golang.org/x/mod v0.20.0
+	golang.org/x/mod v0.21.0
 	google.golang.org/protobuf v1.34.2
 )
 
