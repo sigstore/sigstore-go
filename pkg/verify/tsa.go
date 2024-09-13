@@ -28,9 +28,14 @@ import (
 
 const maxAllowedTimestamps = 32
 
+type Timestamp struct {
+	Time time.Time
+	URI  string
+}
+
 // VerifyTimestampAuthority verifies that the given entity has been timestamped
 // by a trusted timestamp authority and that the timestamp is valid.
-func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]time.Time, error) { //nolint:revive
+func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]Timestamp, error) { //nolint:revive
 	signedTimestamps, err := entity.Timestamps()
 	if err != nil {
 		return nil, err
@@ -62,7 +67,7 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 		return nil, err
 	}
 
-	verifiedTimestamps := []time.Time{}
+	verifiedTimestamps := []Timestamp{}
 	for _, timestamp := range signedTimestamps {
 		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial, verificationContent)
 
@@ -82,7 +87,7 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 //
 // The threshold parameter is the number of unique timestamps that must be
 // verified.
-func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]time.Time, error) { //nolint:revive
+func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]Timestamp, error) { //nolint:revive
 	verifiedTimestamps, err := VerifyTimestampAuthority(entity, trustedMaterial)
 	if err != nil {
 		return nil, err
@@ -93,7 +98,7 @@ func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial 
 	return verifiedTimestamps, nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent VerificationContent) (time.Time, error) {
+func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent VerificationContent) (Timestamp, error) {
 	certAuthorities := trustedMaterial.TimestampingAuthorities()
 
 	// Iterate through TSA certificate authorities to find one that verifies
@@ -124,8 +129,8 @@ func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, tr
 		}
 
 		// All above verification successful, so return nil
-		return timestamp.Time, nil
+		return Timestamp{Time: timestamp.Time, URI: ca.URI}, nil
 	}
 
-	return time.Time{}, errors.New("unable to verify signed timestamps")
+	return Timestamp{}, errors.New("unable to verify signed timestamps")
 }

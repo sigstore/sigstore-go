@@ -60,7 +60,7 @@ func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	var ts []time.Time
+	var ts []verify.Timestamp
 
 	// expect one verified timestamp
 	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore)

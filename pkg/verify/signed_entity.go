@@ -667,7 +667,7 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 		}
 
 		for _, vts := range verifiedTlogTimestamps {
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "Tlog", URI: "TODO", Timestamp: vts})
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "Tlog", URI: vts.URI, Timestamp: vts.Time})
 		}
 	}
 
@@ -692,7 +692,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 			return nil, err
 		}
 		for _, vts := range verifiedSignedTimestamps {
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: "TODO", Timestamp: vts})
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: vts.URI, Timestamp: vts.Time})
 		}
 	}
 
@@ -719,7 +719,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 		// append all timestamps
 		verifiedTimestamps = append(verifiedTimestamps, logTimestamps...)
 		for _, vts := range verifiedSignedTimestamps {
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: "TODO", Timestamp: vts})
+			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "TimestampAuthority", URI: vts.URI, Timestamp: vts.Time})
 		}
 	}
 
