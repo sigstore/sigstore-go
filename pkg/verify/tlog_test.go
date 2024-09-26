@@ -20,8 +20,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
@@ -220,4 +223,31 @@ func TestMaxAllowedTlogEntries(t *testing.T) {
 
 	_, err = verify.VerifyArtifactTransparencyLog(&tooManyTlogEntriesEntity{entity}, virtualSigstore, 1, true, false)
 	assert.ErrorContains(t, err, "too many tlog entries") // too many tlog entries should fail to verify
+}
+
+func TestOnlineTlogVerification(t *testing.T) {
+	b, err := bundle.LoadJSONFromPath("../../examples/bundle-provenance.json")
+	assert.NoError(t, err)
+
+	trustedMaterials, err := getTrustedMaterial()
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyArtifactTransparencyLog(b, trustedMaterials, 1, true, true)
+	assert.NoError(t, err)
+}
+
+func getTrustedMaterial() (root.TrustedMaterial, error) {
+	client, err := tuf.New(tuf.DefaultOptions())
+	if err != nil {
+		return nil, err
+	}
+	trustedRootJSON, err := client.GetTarget("trusted_root.json")
+	if err != nil {
+		return nil, err
+	}
+	trustedRoot, err := root.NewTrustedRootFromJSON(trustedRootJSON)
+	if err != nil {
+		return nil, err
+	}
+	return trustedRoot, nil
 }
