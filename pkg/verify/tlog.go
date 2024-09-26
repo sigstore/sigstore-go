@@ -35,6 +35,30 @@ import (
 
 const maxAllowedTlogEntries = 32
 
+type GetRekorClientFunc func(string) (*rekorGeneratedClient.Rekor, error)
+type verifytlogOptions struct {
+	getRekorClient GetRekorClientFunc
+}
+
+func makeOptions(opts ...VerifyTlogOption) verifytlogOptions {
+	opt := verifytlogOptions{}
+	for _, o := range opts {
+		o(&opt)
+	}
+	return opt
+}
+
+// VerifyTlogOption is a functional option for transparency log verification.
+type VerifyTlogOption func(*verifytlogOptions)
+
+// WithGetRekorClientFunc sets the function that will be used to fetch rekor client from base URL.
+// If not provided, rekorClient.GetRekorClient is used.
+func WithGetRekorClientFunc(f GetRekorClientFunc) VerifyTlogOption {
+	return func(opts *verifytlogOptions) {
+		opts.getRekorClient = f
+	}
+}
+
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
 // in the transparency log and that the log entry is valid.
 //
@@ -42,7 +66,8 @@ const maxAllowedTlogEntries = 32
 // that must be verified.
 //
 // If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]Timestamp, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool, opts ...VerifyTlogOption) ([]Timestamp, error) { //nolint:revive
+	options := makeOptions(opts...)
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -118,10 +143,20 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
 			}
 		} else {
-			client, err := getRekorClient(tlogVerifier.BaseURL)
-			if err != nil {
-				return nil, err
+			var client *rekorGeneratedClient.Rekor
+			var err error
+			if options.getRekorClient != nil {
+				client, err = options.getRekorClient(tlogVerifier.BaseURL)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				client, err = getRekorClient(tlogVerifier.BaseURL)
+				if err != nil {
+					return nil, err
+				}
 			}
+
 			verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 			if err != nil {
 				return nil, err

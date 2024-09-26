@@ -36,6 +36,7 @@ import (
 	"github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer"
 	"github.com/digitorus/timestamp"
 	"github.com/go-openapi/runtime"
+	"github.com/go-openapi/swag"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
@@ -43,6 +44,7 @@ import (
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
 	"github.com/sigstore/rekor/pkg/types/intoto"
 	"github.com/sigstore/rekor/pkg/types/rekord"
+	"github.com/sigstore/rekor/pkg/util"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
@@ -193,7 +195,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	entry, err := ca.GenerateTlogEntry(leafCert, envelope, sig, integratedTime.Unix())
+	entry, err := ca.GenerateTlogEntry(leafCert, envelope, signer, sig, integratedTime.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +247,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 	}, nil
 }
 
-func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
+func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, signer *signature.ECDSASignerVerifier, sig []byte, integratedTime int64) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
 		return nil, err
@@ -284,7 +286,22 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil)
+	// TODO: what will be the root hash?
+	rootHash := ""
+	scBytes, err := util.CreateAndSignCheckpoint(context.TODO(), "rekor.localhost", int64(123), uint64(42), []byte(rootHash), signer)
+	if err != nil {
+		return nil, err
+	}
+	inclusionProof := &models.InclusionProof{
+		TreeSize: swag.Int64(int64(2)),
+		RootHash: swag.String(rootHash),
+		LogIndex: swag.Int64(1),
+		Hashes: []string{
+			"", // TODO: ???
+		},
+		Checkpoint: swag.String(string(scBytes)),
+	}
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)
 }
 
 func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certificate, artifact []byte, sig []byte, integratedTime int64) (*tlog.Entry, error) {
@@ -451,6 +468,7 @@ func (ca *VirtualSigstore) RekorLogs() map[string]*root.TransparencyLog {
 		ValidityPeriodEnd:   time.Now().Add(time.Hour),
 		HashFunc:            crypto.SHA256,
 		PublicKey:           ca.rekorKey.Public(),
+		SignatureHashFunc:   crypto.SHA256,
 	}
 	return verifiers
 }

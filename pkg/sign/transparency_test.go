@@ -70,7 +70,7 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 		return nil, err
 	}
 
-	entry, err := virtualSigstore.GenerateTlogEntry(leafCert, envelope, signature, time.Now().Unix())
+	entry, err := virtualSigstore.GenerateTlogEntry(leafCert, envelope, signer, signature, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}

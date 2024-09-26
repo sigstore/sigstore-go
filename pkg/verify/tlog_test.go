@@ -16,10 +16,15 @@ package verify_test
 
 import (
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-openapi/runtime"
+	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
+	"github.com/sigstore/rekor/pkg/generated/client/entries"
+	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
@@ -233,6 +238,65 @@ func TestOnlineTlogVerification(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = verify.VerifyArtifactTransparencyLog(b, trustedMaterials, 1, true, true)
+	assert.NoError(t, err)
+}
+
+type mockEntriesClient struct {
+	Entries []*models.LogEntry
+}
+
+func (m *mockEntriesClient) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockEntriesClient) GetLogEntryByIndex(params *entries.GetLogEntryByIndexParams, _ ...entries.ClientOption) (*entries.GetLogEntryByIndexOK, error) {
+	resp := &entries.GetLogEntryByIndexOK{}
+	if len(m.Entries) != 0 {
+		for _, e := range m.Entries {
+			for _, i := range *e {
+				if *i.LogIndex == params.LogIndex {
+					resp.Payload = *e
+				}
+			}
+		}
+
+		if resp.Payload == nil {
+			resp.Payload = *m.Entries[0]
+		}
+	}
+	return resp, nil
+}
+
+func (m *mockEntriesClient) GetLogEntryByUUID(_ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockEntriesClient) SearchLogQuery(params *entries.SearchLogQueryParams, _ ...entries.ClientOption) (*entries.SearchLogQueryOK, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockEntriesClient) SetTransport(_ runtime.ClientTransport) {}
+
+func TestTlogVerification(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
+	assert.NoError(t, err)
+	tlogEntries, err := entity.TlogEntries()
+	assert.NoError(t, err)
+
+	tlogEntry := tlogEntries[0]
+	var logEntry models.LogEntry = make(models.LogEntry)
+	logEntry["foo"] = tlogEntry.LogEntry()
+	mockRekor := &rekorGeneratedClient.Rekor{
+		Entries: &mockEntriesClient{
+			Entries: []*models.LogEntry{&logEntry},
+		},
+	}
+
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, true, verify.WithGetRekorClientFunc(func(_ string) (*rekorGeneratedClient.Rekor, error) { return mockRekor, nil }))
 	assert.NoError(t, err)
 }
 
