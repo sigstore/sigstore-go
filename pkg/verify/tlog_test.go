@@ -25,11 +25,8 @@ import (
 	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/entries"
 	"github.com/sigstore/rekor/pkg/generated/models"
-	"github.com/sigstore/sigstore-go/pkg/bundle"
-	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
-	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
@@ -230,17 +227,6 @@ func TestMaxAllowedTlogEntries(t *testing.T) {
 	assert.ErrorContains(t, err, "too many tlog entries") // too many tlog entries should fail to verify
 }
 
-func TestOnlineTlogVerification(t *testing.T) {
-	b, err := bundle.LoadJSONFromPath("../../examples/bundle-provenance.json")
-	assert.NoError(t, err)
-
-	trustedMaterials, err := getTrustedMaterial()
-	assert.NoError(t, err)
-
-	_, err = verify.VerifyArtifactTransparencyLog(b, trustedMaterials, 1, true, true)
-	assert.NoError(t, err)
-}
-
 type mockEntriesClient struct {
 	Entries []*models.LogEntry
 }
@@ -271,7 +257,7 @@ func (m *mockEntriesClient) GetLogEntryByUUID(_ *entries.GetLogEntryByUUIDParams
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockEntriesClient) SearchLogQuery(params *entries.SearchLogQueryParams, _ ...entries.ClientOption) (*entries.SearchLogQueryOK, error) {
+func (m *mockEntriesClient) SearchLogQuery(_ *entries.SearchLogQueryParams, _ ...entries.ClientOption) (*entries.SearchLogQueryOK, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -298,20 +284,4 @@ func TestTlogVerification(t *testing.T) {
 
 	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, true, verify.WithGetRekorClientFunc(func(_ string) (*rekorGeneratedClient.Rekor, error) { return mockRekor, nil }))
 	assert.NoError(t, err)
-}
-
-func getTrustedMaterial() (root.TrustedMaterial, error) {
-	client, err := tuf.New(tuf.DefaultOptions())
-	if err != nil {
-		return nil, err
-	}
-	trustedRootJSON, err := client.GetTarget("trusted_root.json")
-	if err != nil {
-		return nil, err
-	}
-	trustedRoot, err := root.NewTrustedRootFromJSON(trustedRootJSON)
-	if err != nil {
-		return nil, err
-	}
-	return trustedRoot, nil
 }

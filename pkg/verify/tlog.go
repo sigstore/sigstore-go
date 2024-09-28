@@ -40,7 +40,7 @@ type verifytlogOptions struct {
 	getRekorClient GetRekorClientFunc
 }
 
-func makeOptions(opts ...VerifyTlogOption) verifytlogOptions {
+func makeOptions(opts ...TlogOption) verifytlogOptions {
 	opt := verifytlogOptions{}
 	for _, o := range opts {
 		o(&opt)
@@ -48,12 +48,12 @@ func makeOptions(opts ...VerifyTlogOption) verifytlogOptions {
 	return opt
 }
 
-// VerifyTlogOption is a functional option for transparency log verification.
-type VerifyTlogOption func(*verifytlogOptions)
+// TlogOption is a functional option for transparency log verification.
+type TlogOption func(*verifytlogOptions)
 
 // WithGetRekorClientFunc sets the function that will be used to fetch rekor client from base URL.
 // If not provided, rekorClient.GetRekorClient is used.
-func WithGetRekorClientFunc(f GetRekorClientFunc) VerifyTlogOption {
+func WithGetRekorClientFunc(f GetRekorClientFunc) TlogOption {
 	return func(opts *verifytlogOptions) {
 		opts.getRekorClient = f
 	}
@@ -66,7 +66,7 @@ func WithGetRekorClientFunc(f GetRekorClientFunc) VerifyTlogOption {
 // that must be verified.
 //
 // If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool, opts ...VerifyTlogOption) ([]Timestamp, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool, opts ...TlogOption) ([]Timestamp, error) { //nolint:revive
 	options := makeOptions(opts...)
 	entries, err := entity.TlogEntries()
 	if err != nil {
