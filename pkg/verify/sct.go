@@ -17,6 +17,7 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/google/certificate-transparency-go/ctutil"
@@ -29,16 +30,18 @@ import (
 // leaf certificate, will extract SCTs from the leaf certificate and verify the
 // timestamps using the TrustedMaterial's FulcioCertificateAuthorities() and
 // CTLogs()
-func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
+func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
+	if len(chains) == 0 && len(chains[0]) == 0 && chains[0][0] == nil {
+		return errors.New("no chains provided")
+	}
 	ctlogs := trustedMaterial.CTLogs()
-	fulcioCerts := trustedMaterial.FulcioCertificateAuthorities()
 
-	scts, err := x509util.ParseSCTsFromCertificate(leafCert.Raw)
+	scts, err := x509util.ParseSCTsFromCertificate(chains[0][0].Raw)
 	if err != nil {
 		return err
 	}
 
-	leafCTCert, err := ctx509.ParseCertificates(leafCert.Raw)
+	leafCTCert, err := ctx509.ParseCertificates(chains[0][0].Raw)
 	if err != nil {
 		return err
 	}
@@ -52,17 +55,14 @@ func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int,
 			continue
 		}
 
-		for _, fulcioCa := range fulcioCerts {
+		for _, chain := range chains {
 			fulcioChain := make([]*ctx509.Certificate, len(leafCTCert))
 			copy(fulcioChain, leafCTCert)
 
-			var parentCert []byte
-
-			if len(fulcioCa.Intermediates) == 0 {
-				parentCert = fulcioCa.Root.Raw
-			} else {
-				parentCert = fulcioCa.Intermediates[0].Raw
+			if len(chain) < 2 {
+				continue
 			}
+			parentCert := chain[1].Raw
 
 			fulcioIssuer, err := ctx509.ParseCertificates(parentCert)
 			if err != nil {

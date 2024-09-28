@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -35,7 +36,7 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	var ts []verify.Timestamp
+	var ts []root.Timestamp
 	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
 	assert.NoError(t, err)
 	// 1 verified timestamp

@@ -62,6 +62,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	tests := []struct {
 		name            string
 		getCertFn       func() *x509.Certificate
+		chain           []*x509.Certificate // only intermediate and root
 		threshold       int
 		trustedMaterial root.TrustedMaterial
 		wantErr         bool
@@ -69,6 +70,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		{
 			name:            "missing sct in cert",
 			getCertFn:       func() *x509.Certificate { return createBaseCert(t, privateKey, skid, big.NewInt(1)) },
+			chain:           []*x509.Certificate{},
 			threshold:       1,
 			trustedMaterial: &fakeTrustedMaterial{},
 			wantErr:         true,
@@ -82,6 +84,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					LogID:      ct.LogID{KeyID: logID},
 				}})
 			},
+			chain:     []*x509.Certificate{},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{},
@@ -97,6 +100,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					LogID:      ct.LogID{KeyID: logID},
 				}})
 			},
+			chain:     []*x509.Certificate{},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -114,6 +118,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					LogID:      ct.LogID{KeyID: logID},
 				}})
 			},
+			chain:     []*x509.Certificate{caCert},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -122,7 +127,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 					},
 				},
@@ -139,6 +144,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				})
 			},
+			chain:     []*x509.Certificate{caCert},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -147,7 +153,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 					},
 				},
@@ -170,6 +176,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				})
 			},
+			chain:     []*x509.Certificate{caCert},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -178,7 +185,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 					},
 				},
@@ -200,6 +207,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				})
 			},
+			chain:     []*x509.Certificate{caCert},
 			threshold: 2,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -208,7 +216,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 					},
 				},
@@ -231,6 +239,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				})
 			},
+			chain:     []*x509.Certificate{caCert},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -239,7 +248,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 					},
 				},
@@ -255,6 +264,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					LogID:      ct.LogID{KeyID: logID},
 				}})
 			},
+			chain:     []*x509.Certificate{caCert, caCert},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -263,7 +273,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 						Intermediates: []*x509.Certificate{
 							caCert,
@@ -281,6 +291,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					LogID:      ct.LogID{KeyID: logID},
 				}})
 			},
+			chain:     []*x509.Certificate{anotherCACert},
 			threshold: 1,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -289,7 +300,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: anotherCACert,
 					},
 				},
@@ -299,6 +310,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		{
 			name:            "threshold of 0",
 			getCertFn:       func() *x509.Certificate { return createBaseCert(t, privateKey, skid, big.NewInt(1)) },
+			chain:           []*x509.Certificate{},
 			threshold:       0,
 			trustedMaterial: &fakeTrustedMaterial{},
 		},
@@ -318,6 +330,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				})
 			},
+			chain:     []*x509.Certificate{caCert},
 			threshold: 2,
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
@@ -326,7 +339,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 					},
 				},
 				cas: []root.CertificateAuthority{
-					{
+					&root.FulcioCertificateAuthority{
 						Root: caCert,
 					},
 				},
@@ -335,7 +348,9 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err = VerifySignedCertificateTimestamp(test.getCertFn(), test.threshold, test.trustedMaterial)
+			chain := []*x509.Certificate{test.getCertFn()}
+			chain = append(chain, test.chain...)
+			err = VerifySignedCertificateTimestamp([][]*x509.Certificate{chain}, test.threshold, test.trustedMaterial)
 			if test.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -447,7 +462,7 @@ func (t *fakeTrustedMaterial) FulcioCertificateAuthorities() []root.CertificateA
 	return t.cas
 }
 
-func (t *fakeTrustedMaterial) TimestampingAuthorities() []root.CertificateAuthority {
+func (t *fakeTrustedMaterial) TimestampingAuthorities() []root.TimestampingAuthority {
 	panic("not implemented")
 }
 func (t *fakeTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog { panic("not implemented") }
