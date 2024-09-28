@@ -195,7 +195,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	entry, err := ca.GenerateTlogEntry(leafCert, envelope, signer, sig, integratedTime.Unix())
+	entry, err := ca.GenerateTlogEntry(leafCert, envelope, sig, integratedTime.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 	}, nil
 }
 
-func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, signer *signature.ECDSASignerVerifier, sig []byte, integratedTime int64) (*tlog.Entry, error) {
+func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	logIndex := int64(1000)
+	logIndex := int64(0)
 
 	b := createRekorBundle(rekorLogID, integratedTime, logIndex, rekorBody)
 	set, err := ca.rekorSignPayload(*b)
@@ -286,19 +286,21 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	// TODO: what will be the root hash?
-	rootHash := ""
-	scBytes, err := util.CreateAndSignCheckpoint(context.TODO(), "rekor.localhost", int64(123), uint64(42), []byte(rootHash), signer)
+	signer, err := signature.LoadECDSASignerVerifier(ca.rekorKey, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	rootHash := sha256.Sum256(append([]byte("\000"), rekorBodyRaw...))
+	encodedRootHash := hex.EncodeToString(rootHash[:])
+	scBytes, err := util.CreateAndSignCheckpoint(context.TODO(), "rekor.localhost", int64(123), uint64(42), rootHash[:], signer)
 	if err != nil {
 		return nil, err
 	}
 	inclusionProof := &models.InclusionProof{
-		TreeSize: swag.Int64(int64(2)),
-		RootHash: swag.String(rootHash),
-		LogIndex: swag.Int64(1),
-		Hashes: []string{
-			"", // TODO: ???
-		},
+		TreeSize:   swag.Int64(int64(1)),
+		RootHash:   &encodedRootHash,
+		LogIndex:   swag.Int64(0),
+		Hashes:     nil,
 		Checkpoint: swag.String(string(scBytes)),
 	}
 	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)

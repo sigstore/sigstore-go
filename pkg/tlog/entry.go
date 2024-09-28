@@ -89,7 +89,8 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 
 	if inclusionProof != nil {
 		entry.logEntryAnon.Verification = &models.LogEntryAnonVerification{
-			InclusionProof: inclusionProof,
+			InclusionProof:       inclusionProof,
+			SignedEntryTimestamp: signedEntryTimestamp,
 		}
 	}
 
