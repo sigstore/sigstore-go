@@ -249,9 +249,8 @@ func (entry *Entry) HasInclusionPromise() bool {
 func (entry *Entry) HasInclusionProof() bool {
 	return entry.logEntryAnon.Verification != nil
 }
-
-func (entry *Entry) LogEntry() models.LogEntryAnon {
-	return entry.logEntryAnon
+func (entry *Entry) Verification() *models.LogEntryAnonVerification {
+	return entry.logEntryAnon.Verification
 }
 
 func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {

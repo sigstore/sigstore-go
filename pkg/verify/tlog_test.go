@@ -16,12 +16,14 @@ package verify_test
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-openapi/runtime"
+	"github.com/go-openapi/swag"
 	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/entries"
 	"github.com/sigstore/rekor/pkg/generated/models"
@@ -275,7 +277,13 @@ func TestTlogVerification(t *testing.T) {
 
 	tlogEntry := tlogEntries[0]
 	var logEntry models.LogEntry = make(models.LogEntry)
-	logEntry["foo"] = tlogEntry.LogEntry()
+	logEntry["foo"] = models.LogEntryAnon{
+		Body:           tlogEntry.Body(),
+		IntegratedTime: swag.Int64(tlogEntry.IntegratedTime().Unix()),
+		LogIndex:       swag.Int64(tlogEntry.LogIndex()),
+		LogID:          swag.String(hex.EncodeToString([]byte(tlogEntry.LogKeyID()))),
+		Verification:   tlogEntry.Verification(),
+	}
 	mockRekor := &rekorGeneratedClient.Rekor{
 		Entries: &mockEntriesClient{
 			Entries: []*models.LogEntry{&logEntry},
