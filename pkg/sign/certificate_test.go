@@ -56,7 +56,7 @@ func getFulcioResponse() (*http.Response, error) {
 	}))
 
 	responseStruct := fulcioResponse{
-		SctCertWithChain: signedCertificateEmbeddedSct{
+		SignedCertificateEmbeddedSct: signedCertificateEmbeddedSct{
 			Chain: chain{
 				Certificates: []string{certPEM},
 			},
