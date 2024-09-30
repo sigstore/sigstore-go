@@ -34,8 +34,12 @@ Documentation is found in the [`docs`](./docs) subdirectory.
 
 ## Requirements
 
-- Unix-compatible OS
-- [Go 1.21](https://go.dev/doc/install)
+Tested with:
+
+- Unix-compatible OS and Windows
+- [Go 1.22](https://go.dev/doc/install)
+
+Note that we do not provide built versions of this library, but you can see what architectures your version of `go` supports with `go tool dist list`.
 
 ## Installation
 
