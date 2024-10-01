@@ -38,4 +38,4 @@ jobs:
           args: --timeout=5m --verbose
           # sometimes the pkg cache gets corrupted, skipping cache avoids this
           # https://github.com/golangci/golangci-lint-action/issues/23
-          skip-pkg-cache: true
+          skip-cache: true
