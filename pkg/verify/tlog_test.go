@@ -265,7 +265,7 @@ func (m *mockEntriesClient) SearchLogQuery(_ *entries.SearchLogQueryParams, _ ..
 
 func (m *mockEntriesClient) SetTransport(_ runtime.ClientTransport) {}
 
-func TestTlogVerification(t *testing.T) {
+func TestOnlineVerification(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
