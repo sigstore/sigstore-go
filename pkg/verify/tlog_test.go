@@ -63,7 +63,7 @@ func TestTlogVerifier(t *testing.T) {
 	//
 	// This time was chosen assuming the Fulcio signing certificate expires
 	// after 5 minutes, but while the TSA intermediate is still valid (2 hours).
-	entity, err = virtualSigstore.AttestAtTime("foo@example.com", "issuer", statement, time.Now().Add(30*time.Minute))
+	entity, err = virtualSigstore.AttestAtTime("foo@example.com", "issuer", statement, time.Now().Add(30*time.Minute), false)
 	assert.NoError(t, err)
 
 	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
@@ -270,7 +270,7 @@ func TestOnlineVerification(t *testing.T) {
 	assert.NoError(t, err)
 
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
-	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
+	entity, err := virtualSigstore.AttestWithInclusionProof("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 	tlogEntries, err := entity.TlogEntries()
 	assert.NoError(t, err)

@@ -158,10 +158,16 @@ func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Cert
 func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) (*TestEntity, error) {
 	// The timing here is important. We need to attest at a time when the leaf
 	// certificate is valid, so we match what GenerateLeafCert() does, above
-	return ca.AttestAtTime(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute))
+	return ca.AttestAtTime(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute), false)
 }
 
-func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []byte, integratedTime time.Time) (*TestEntity, error) {
+func (ca *VirtualSigstore) AttestWithInclusionProof(identity, issuer string, envelopeBody []byte) (*TestEntity, error) {
+	// The timing here is important. We need to attest at a time when the leaf
+	// certificate is valid, so we match what GenerateLeafCert() does, above
+	return ca.AttestAtTime(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute), true)
+}
+
+func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []byte, integratedTime time.Time, generateInclusionProof bool) (*TestEntity, error) {
 	leafCert, leafPrivKey, err := ca.GenerateLeafCert(identity, issuer)
 	if err != nil {
 		return nil, err
@@ -195,7 +201,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	entry, err := ca.GenerateTlogEntry(leafCert, envelope, sig, integratedTime.Unix())
+	entry, err := ca.GenerateTlogEntry(leafCert, envelope, sig, integratedTime.Unix(), generateInclusionProof)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +253,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 	}, nil
 }
 
-func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64) (*tlog.Entry, error) {
+func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelope *dsse.Envelope, sig []byte, integratedTime int64, generateInclusionProof bool) (*tlog.Entry, error) {
 	leafCertPem, err := cryptoutils.MarshalCertificateToPEM(leafCert)
 	if err != nil {
 		return nil, err
@@ -296,12 +302,15 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 	if err != nil {
 		return nil, err
 	}
-	inclusionProof := &models.InclusionProof{
-		TreeSize:   swag.Int64(int64(1)),
-		RootHash:   &encodedRootHash,
-		LogIndex:   swag.Int64(0),
-		Hashes:     nil,
-		Checkpoint: swag.String(string(scBytes)),
+	var inclusionProof *models.InclusionProof
+	if generateInclusionProof {
+		inclusionProof = &models.InclusionProof{
+			TreeSize:   swag.Int64(int64(1)),
+			RootHash:   &encodedRootHash,
+			LogIndex:   swag.Int64(0),
+			Hashes:     nil,
+			Checkpoint: swag.String(string(scBytes)),
+		}
 	}
 	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)
 }
