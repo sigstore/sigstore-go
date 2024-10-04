@@ -89,8 +89,7 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 
 	if inclusionProof != nil {
 		entry.logEntryAnon.Verification = &models.LogEntryAnonVerification{
-			InclusionProof:       inclusionProof,
-			SignedEntryTimestamp: signedEntryTimestamp,
+			InclusionProof: inclusionProof,
 		}
 	}
 
@@ -248,9 +247,6 @@ func (entry *Entry) HasInclusionPromise() bool {
 
 func (entry *Entry) HasInclusionProof() bool {
 	return entry.logEntryAnon.Verification != nil
-}
-func (entry *Entry) Verification() *models.LogEntryAnonVerification {
-	return entry.logEntryAnon.Verification
 }
 
 func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {

@@ -123,7 +123,11 @@ func getLogID(pub crypto.PublicKey) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
-func (ca *VirtualSigstore) rekorSignPayload(payload tlog.RekorPayload) ([]byte, error) {
+func (ca *VirtualSigstore) RekorLogID() (string, error) {
+	return getLogID(ca.rekorKey.Public())
+}
+
+func (ca *VirtualSigstore) RekorSignPayload(payload tlog.RekorPayload) ([]byte, error) {
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -159,12 +163,6 @@ func (ca *VirtualSigstore) Attest(identity, issuer string, envelopeBody []byte) 
 	// The timing here is important. We need to attest at a time when the leaf
 	// certificate is valid, so we match what GenerateLeafCert() does, above
 	return ca.AttestAtTime(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute), false)
-}
-
-func (ca *VirtualSigstore) AttestWithInclusionProof(identity, issuer string, envelopeBody []byte) (*TestEntity, error) {
-	// The timing here is important. We need to attest at a time when the leaf
-	// certificate is valid, so we match what GenerateLeafCert() does, above
-	return ca.AttestAtTime(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute), true)
 }
 
 func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []byte, integratedTime time.Time, generateInclusionProof bool) (*TestEntity, error) {
@@ -282,7 +280,7 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 	logIndex := int64(0)
 
 	b := createRekorBundle(rekorLogID, integratedTime, logIndex, rekorBody)
-	set, err := ca.rekorSignPayload(*b)
+	set, err := ca.RekorSignPayload(*b)
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +290,17 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
+	var inclusionProof *models.InclusionProof
+	if generateInclusionProof {
+		inclusionProof, err = ca.GetInclusionProof(rekorBodyRaw)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)
+}
+
+func (ca *VirtualSigstore) GetInclusionProof(rekorBodyRaw []byte) (*models.InclusionProof, error) {
 	signer, err := signature.LoadECDSASignerVerifier(ca.rekorKey, crypto.SHA256)
 	if err != nil {
 		return nil, err
@@ -302,17 +311,14 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 	if err != nil {
 		return nil, err
 	}
-	var inclusionProof *models.InclusionProof
-	if generateInclusionProof {
-		inclusionProof = &models.InclusionProof{
-			TreeSize:   swag.Int64(int64(1)),
-			RootHash:   &encodedRootHash,
-			LogIndex:   swag.Int64(0),
-			Hashes:     nil,
-			Checkpoint: swag.String(string(scBytes)),
-		}
-	}
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)
+
+	return &models.InclusionProof{
+		TreeSize:   swag.Int64(int64(1)),
+		RootHash:   &encodedRootHash,
+		LogIndex:   swag.Int64(0),
+		Hashes:     nil,
+		Checkpoint: swag.String(string(scBytes)),
+	}, nil
 }
 
 func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certificate, artifact []byte, sig []byte, integratedTime int64) (*tlog.Entry, error) {
@@ -339,7 +345,7 @@ func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certific
 	logIndex := int64(1000)
 
 	b := createRekorBundle(rekorLogID, integratedTime, logIndex, rekorBody)
-	set, err := ca.rekorSignPayload(*b)
+	set, err := ca.RekorSignPayload(*b)
 	if err != nil {
 		return nil, err
 	}
