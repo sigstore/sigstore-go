@@ -144,9 +144,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				return nil, fmt.Errorf("unable to locate log entry %d", logIndex)
 			}
 
-			logEntry := resp.Payload
-
-			for _, v := range logEntry {
+			for _, v := range resp.Payload {
 				v := v
 				err = rekorVerify.VerifyLogEntry(context.TODO(), &v, *verifier)
 				if err != nil {
