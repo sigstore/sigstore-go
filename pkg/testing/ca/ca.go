@@ -524,6 +524,11 @@ func (e *TestEntity) HasInclusionPromise() bool {
 }
 
 func (e *TestEntity) HasInclusionProof() bool {
+	for _, tlog := range e.tlogEntries {
+		if tlog.HasInclusionProof() {
+			return true
+		}
+	}
 	return false
 }
 
