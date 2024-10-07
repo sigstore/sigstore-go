@@ -520,7 +520,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 	// If the bundle was signed with a long-lived key, and does not have a Fulcio certificate,
 	// then skip the certificate verification steps
-	if leafCert := verificationContent.GetCertificate(); leafCert != nil {
+	if leafCert := verificationContent.GetLeafCertificate(); leafCert != nil {
 		if policy.WeExpectSigningKey() {
 			return nil, errors.New("expected key signature, not certificate")
 		}
@@ -554,7 +554,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 		for _, verifiedTs := range verifiedTimestamps {
 			// verify the leaf certificate against the root
-			err = VerifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial)
+			err = VerifyLeafCertificate(verifiedTs.Timestamp, verificationContent, v.trustedMaterial)
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify leaf certificate: %w", err)
 			}
@@ -564,7 +564,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
 		if v.config.weExpectSCTs {
-			err = VerifySignedCertificateTimestamp(leafCert, v.config.ctlogEntriesThreshold, v.trustedMaterial)
+			err = VerifySignedCertificateTimestamp(verificationContent, v.config.ctlogEntriesThreshold, v.trustedMaterial)
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify signed certificate timestamp: %w", err)
 			}
@@ -730,7 +730,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 			return nil, err
 		}
 
-		if leafCert := verificationContent.GetCertificate(); leafCert != nil {
+		if leafCert := verificationContent.GetLeafCertificate(); leafCert != nil {
 			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "LeafCert.NotBefore", URI: "", Timestamp: leafCert.NotBefore})
 		} else {
 			// no cert? use current time

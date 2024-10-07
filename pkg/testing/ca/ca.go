@@ -332,6 +332,34 @@ func (ca *VirtualSigstore) PublicKeyVerifier(keyID string) (root.TimeConstrained
 	return v, nil
 }
 
+func (ca *VirtualSigstore) GenerateNewFulcioIntermediate(name string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
+	subTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   name,
+			Organization: []string{"sigstore.dev"},
+		},
+		NotBefore:             time.Now().Add(-2 * time.Minute),
+		NotAfter:              time.Now().Add(2 * time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cert, err := createCertificate(subTemplate, ca.fulcioCA.Intermediates[0], &priv.PublicKey, ca.fulcioIntermediateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, priv, nil
+}
+
 func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte) (string, error) {
 	// Generate the Rekor Entry
 	entryImpl, err := createEntry(context.Background(), kind, version, artifact, cert, sig)
@@ -481,7 +509,7 @@ type TestEntity struct {
 }
 
 func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
-	return &bundle.Certificate{Certificate: e.certChain[0]}, nil
+	return &bundle.CertificateChain{[]*x509.Certificate{e.certChain[0]}}, nil
 }
 
 func (e *TestEntity) HasInclusionPromise() bool {
