@@ -35,6 +35,8 @@ import (
 
 const maxAllowedTlogEntries = 32
 
+var RekorClientGetter = getRekorClient
+
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
 // in the transparency log and that the log entry is valid.
 //
@@ -118,10 +120,11 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
 			}
 		} else {
-			client, err := getRekorClient(tlogVerifier.BaseURL)
+			client, err := RekorClientGetter(tlogVerifier.BaseURL)
 			if err != nil {
 				return nil, err
 			}
+
 			verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 			if err != nil {
 				return nil, err
@@ -141,9 +144,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				return nil, fmt.Errorf("unable to locate log entry %d", logIndex)
 			}
 
-			logEntry := resp.Payload
-
-			for _, v := range logEntry {
+			for _, v := range resp.Payload {
 				v := v
 				err = rekorVerify.VerifyLogEntry(context.TODO(), &v, *verifier)
 				if err != nil {
