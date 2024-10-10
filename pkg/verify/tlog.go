@@ -105,7 +105,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 					verifiedTimestamps = append(verifiedTimestamps, Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 				}
 			}
-			if entity.HasInclusionProof() {
+			if entry.HasInclusionProof() {
 				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 				if err != nil {
 					return nil, err
