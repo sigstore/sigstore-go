@@ -34,14 +34,17 @@ func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold in
 	if len(chains) == 0 && len(chains[0]) == 0 && chains[0][0] == nil {
 		return errors.New("no chains provided")
 	}
+	// The first certificate in the chain is always the leaf certificate
+	leaf := chains[0][0]
+
 	ctlogs := trustedMaterial.CTLogs()
 
-	scts, err := x509util.ParseSCTsFromCertificate(chains[0][0].Raw)
+	scts, err := x509util.ParseSCTsFromCertificate(leaf.Raw)
 	if err != nil {
 		return err
 	}
 
-	leafCTCert, err := ctx509.ParseCertificates(chains[0][0].Raw)
+	leafCTCert, err := ctx509.ParseCertificates(leaf.Raw)
 	if err != nil {
 		return err
 	}
