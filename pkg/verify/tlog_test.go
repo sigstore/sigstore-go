@@ -35,7 +35,7 @@ func TestTlogVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	var ts []time.Time
+	var ts []verify.Timestamp
 	ts, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
 	assert.NoError(t, err)
 	// 1 verified timestamp

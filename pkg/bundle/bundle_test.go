@@ -1056,7 +1056,7 @@ func Test_BundleValidation(t *testing.T) {
 					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
-			errMsg:  "invalid bundle: missing verification material content",
+			errMsg:  "invalid bundle: validation error: missing verification material",
 			wantErr: true,
 		},
 		{
@@ -1067,7 +1067,7 @@ func Test_BundleValidation(t *testing.T) {
 					Content:   nil,
 				},
 			},
-			errMsg:  "invalid bundle: missing bundle content",
+			errMsg:  "invalid bundle: validation error: missing bundle content",
 			wantErr: true,
 		},
 		{
@@ -1079,7 +1079,7 @@ func Test_BundleValidation(t *testing.T) {
 					VerificationMaterial: nil,
 				},
 			},
-			errMsg:  "invalid bundle: missing verification material",
+			errMsg:  "invalid bundle: validation error: missing verification material",
 			wantErr: true,
 		},
 		{

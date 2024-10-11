@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"time"
 
 	rekorClient "github.com/sigstore/rekor/pkg/client"
 	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
@@ -43,7 +42,7 @@ const maxAllowedTlogEntries = 32
 // that must be verified.
 //
 // If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]time.Time, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]Timestamp, error) { //nolint:revive
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -75,7 +74,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		return nil, err
 	}
 
-	verifiedTimestamps := []time.Time{}
+	verifiedTimestamps := []Timestamp{}
 	logEntriesVerified := 0
 
 	for _, entry := range entries {
@@ -84,29 +83,29 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 			return nil, err
 		}
 
+		rekorLogs := trustedMaterial.RekorLogs()
+		keyID := entry.LogKeyID()
+		hex64Key := hex.EncodeToString([]byte(keyID))
+		tlogVerifier, ok := trustedMaterial.RekorLogs()[hex64Key]
+		if !ok {
+			// skip entries the trust root cannot verify
+			continue
+		}
 		if !online {
 			if !entry.HasInclusionPromise() && !entry.HasInclusionProof() {
 				return nil, fmt.Errorf("entry must contain an inclusion proof and/or promise")
 			}
 			if entry.HasInclusionPromise() {
-				err = tlog.VerifySET(entry, trustedMaterial.RekorLogs())
+				err = tlog.VerifySET(entry, rekorLogs)
 				if err != nil {
 					// skip entries the trust root cannot verify
 					continue
 				}
 				if trustIntegratedTime {
-					verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
+					verifiedTimestamps = append(verifiedTimestamps, Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 				}
 			}
-			if entity.HasInclusionProof() {
-				keyID := entry.LogKeyID()
-				hex64Key := hex.EncodeToString([]byte(keyID))
-				tlogVerifier, ok := trustedMaterial.RekorLogs()[hex64Key]
-				if !ok {
-					// skip entries the trust root cannot verify
-					continue
-				}
-
+			if entry.HasInclusionProof() {
 				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
 				if err != nil {
 					return nil, err
@@ -119,14 +118,6 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
 			}
 		} else {
-			keyID := entry.LogKeyID()
-			hex64Key := hex.EncodeToString([]byte(keyID))
-			tlogVerifier, ok := trustedMaterial.RekorLogs()[hex64Key]
-			if !ok {
-				// skip entries the trust root cannot verify
-				continue
-			}
-
 			client, err := getRekorClient(tlogVerifier.BaseURL)
 			if err != nil {
 				return nil, err
@@ -160,7 +151,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				}
 			}
 			if trustIntegratedTime {
-				verifiedTimestamps = append(verifiedTimestamps, entry.IntegratedTime())
+				verifiedTimestamps = append(verifiedTimestamps, Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 			}
 		}
 		// Ensure entry signature matches signature from bundle
