@@ -269,9 +269,6 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 
 	certificateAuthority.URI = certAuthority.Uri
 
-	// TODO: Should we inspect/enforce ca.Subject?
-	// TODO: Handle validity period (ca.ValidFor)
-
 	return certificateAuthority, nil
 }
 
@@ -330,9 +327,6 @@ func ParseTimestampingAuthority(certAuthority *prototrustroot.CertificateAuthori
 	}
 
 	timestampingAuthority.URI = certAuthority.Uri
-
-	// TODO: Should we inspect/enforce ca.Subject?
-	// TODO: Handle validity period (ca.ValidFor)
 
 	return timestampingAuthority, nil
 }
