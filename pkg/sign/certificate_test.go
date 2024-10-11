@@ -39,7 +39,7 @@ func setupVirtualSigstore() {
 	}
 }
 
-func getFulcioResponse() (*http.Response, error) {
+func getFulcioResponse(detachedSct bool) (*http.Response, error) {
 	virtualSigstoreOnce.Do(setupVirtualSigstore)
 	if virtualSigstoreErr != nil {
 		return nil, virtualSigstoreErr
@@ -55,14 +55,24 @@ func getFulcioResponse() (*http.Response, error) {
 		Bytes: leafCert.Raw,
 	}))
 
-	responseStruct := fulcioResponse{
-		SignedCertificateEmbeddedSct: signedCertificateEmbeddedSct{
-			Chain: chain{
-				Certificates: []string{certPEM},
+	var responseStruct fulcioResponse
+	if detachedSct {
+		responseStruct = fulcioResponse{
+			SignedCertificateDetachedSct: signedCertificateDetachedSct{
+				Chain: chain{
+					Certificates: []string{certPEM},
+				},
 			},
-		},
+		}
+	} else {
+		responseStruct = fulcioResponse{
+			SignedCertificateEmbeddedSct: signedCertificateEmbeddedSct{
+				Chain: chain{
+					Certificates: []string{certPEM},
+				},
+			},
+		}
 	}
-
 	fulcioJSON, err := json.Marshal(responseStruct)
 	if err != nil {
 		return nil, err
@@ -76,14 +86,17 @@ func getFulcioResponse() (*http.Response, error) {
 	return response, nil
 }
 
-type mockFulcio struct{}
+type mockFulcio struct {
+	detachedSct bool
+}
 
 func (m *mockFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
-	return getFulcioResponse()
+	return getFulcioResponse(m.detachedSct)
 }
 
 type failFirstFulcio struct {
-	Count int
+	Count       int
+	detachedSct bool
 }
 
 func (f *failFirstFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
@@ -96,7 +109,7 @@ func (f *failFirstFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
 		return response, nil
 	}
 
-	return getFulcioResponse()
+	return getFulcioResponse(f.detachedSct)
 }
 
 func Test_GetCertificate(t *testing.T) {
@@ -135,4 +148,12 @@ func Test_GetCertificate(t *testing.T) {
 	cert, err = retryFulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.Nil(t, cert)
 	assert.NotNil(t, err)
+
+	// Test detached SCT
+	detachedOpts := &FulcioOptions{Retries: 1, Transport: &mockFulcio{detachedSct: true}}
+	detachedFulcio := NewFulcio(detachedOpts)
+
+	cert, err = detachedFulcio.GetCertificate(ctx, keypair, certOpts)
+	assert.NotNil(t, cert)
+	assert.NoError(t, err)
 }
