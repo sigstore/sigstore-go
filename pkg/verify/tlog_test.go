@@ -324,7 +324,30 @@ func TestOnlineVerification(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestOnlineVerificationWithoutInclusionProof(t *testing.T) {
+func TestNoInclusionProofOnline(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+	integratedTime := time.Now().Add(5 * time.Minute)
+	entity, err := virtualSigstore.AttestAtTime("foo@example.com", "issuer", statement, integratedTime, false)
+	assert.NoError(t, err)
+
+	entriesClient, err := newMockRekorEntriesClient(*virtualSigstore, statement, integratedTime)
+	assert.NoError(t, err)
+	mockRekor := &rekorGeneratedClient.Rekor{
+		Entries: entriesClient,
+	}
+
+	oldRekorClientGetter := verify.RekorClientGetter
+	verify.RekorClientGetter = func(_ string) (*rekorGeneratedClient.Rekor, error) { return mockRekor, nil }
+	defer func() { verify.RekorClientGetter = oldRekorClientGetter }()
+
+	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, true)
+	assert.NoError(t, err)
+}
+
+func TestNoInclusionProofAndRekorVerification(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
