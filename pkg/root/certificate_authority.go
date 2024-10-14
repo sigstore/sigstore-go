@@ -32,6 +32,8 @@ type FulcioCertificateAuthority struct {
 	URI                 string
 }
 
+var _ CertificateAuthority = &FulcioCertificateAuthority{}
+
 func (ca *FulcioCertificateAuthority) Verify(cert *x509.Certificate, observerTimestamp time.Time) ([][]*x509.Certificate, error) {
 	if !ca.ValidityPeriodStart.IsZero() && observerTimestamp.Before(ca.ValidityPeriodStart) {
 		return nil, errors.New("certificate is not valid yet")
