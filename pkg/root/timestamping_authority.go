@@ -41,6 +41,8 @@ type SigstoreTimestampingAuthority struct {
 	URI                 string
 }
 
+var _ TimestampingAuthority = &SigstoreTimestampingAuthority{}
+
 func (tsa *SigstoreTimestampingAuthority) Verify(signedTimestamp []byte, signatureBytes []byte) (*Timestamp, error) {
 	trustedRootVerificationOptions := tsaverification.VerifyOpts{
 		Roots:          []*x509.Certificate{tsa.Root},

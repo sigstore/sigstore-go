@@ -15,20 +15,24 @@
 package root_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
+	tsx509 "github.com/sigstore/timestamp-authority/pkg/x509"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCertificateAuthority(t *testing.T) {
-	rootCert, intermediateCert, leafCert, now := genChain(t)
-	rootCert2, intermediateCert2, leafCert2, _ := genChain(t)
+	_, rootCert, intermediateCert, leafCert, now := genChain(t, false)
+	_, rootCert2, intermediateCert2, leafCert2, _ := genChain(t, false)
 
 	for _, test := range []struct {
 		name        string
@@ -148,7 +152,7 @@ func TestCertificateAuthority(t *testing.T) {
 	}
 }
 
-func genChain(t *testing.T) (*x509.Certificate, *x509.Certificate, *x509.Certificate, time.Time) {
+func genChain(t *testing.T, tsa bool) (*ecdsa.PrivateKey, *x509.Certificate, *x509.Certificate, *x509.Certificate, time.Time) {
 	now := time.Now()
 
 	rootCertTemplate := &x509.Certificate{
@@ -171,11 +175,27 @@ func genChain(t *testing.T) (*x509.Certificate, *x509.Certificate, *x509.Certifi
 		NotBefore:    now,
 		NotAfter:     now.Add(10 * time.Minute),
 	}
-	caKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	if tsa {
+		rootCertTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping}
+		intermediateCertTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping}
+		leafCertTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping}
+		timestampExt, err := asn1.Marshal([]asn1.ObjectIdentifier{tsx509.EKUTimestampingOID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		leafCertTemplate.ExtraExtensions = []pkix.Extension{
+			{
+				Id:       asn1.ObjectIdentifier{2, 5, 29, 37},
+				Critical: true,
+				Value:    timestampExt,
+			},
+		}
+	}
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) //nolint:gosec
 	require.NoError(t, err)
-	intermediateKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	intermediateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) //nolint:gosec
 	require.NoError(t, err)
-	leafKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) //nolint:gosecec
 	require.NoError(t, err)
 	rootDer, err := x509.CreateCertificate(rand.Reader, rootCertTemplate, rootCertTemplate, &caKey.PublicKey, caKey)
 	require.NoError(t, err)
@@ -190,5 +210,5 @@ func genChain(t *testing.T) (*x509.Certificate, *x509.Certificate, *x509.Certifi
 	leafCert, err := x509.ParseCertificate(leafDer)
 	require.NoError(t, err)
 
-	return rootCert, intermediateCert, leafCert, now
+	return leafKey, rootCert, intermediateCert, leafCert, now
 }
