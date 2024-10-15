@@ -31,7 +31,7 @@ import (
 // timestamps using the TrustedMaterial's FulcioCertificateAuthorities() and
 // CTLogs()
 func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
-	if len(chains) == 0 && len(chains[0]) == 0 && chains[0][0] == nil {
+	if len(chains) == 0 || len(chains[0]) == 0 || chains[0][0] == nil {
 		return errors.New("no chains provided")
 	}
 	// The first certificate in the chain is always the leaf certificate
