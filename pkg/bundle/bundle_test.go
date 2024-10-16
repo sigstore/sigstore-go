@@ -520,7 +520,7 @@ func Test_validate(t *testing.T) {
 					Content: &protobundle.Bundle_MessageSignature{},
 				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "v0.3 without x.509 certificate chain",
@@ -584,11 +584,12 @@ func TestVerificationContent(t *testing.T) {
 	leafDer, err := x509.CreateCertificate(rand.Reader, leafCert, caCert, &leafKey.PublicKey, caKey)
 	require.NoError(t, err)
 	tests := []struct {
-		name            string
-		pb              Bundle
-		wantCertificate bool
-		wantPublicKey   bool
-		wantErr         bool
+		name                 string
+		pb                   Bundle
+		wantCertificateChain bool
+		wantCertificate      bool
+		wantPublicKey        bool
+		wantErr              bool
 	}{
 		{
 			name: "no verification material",
@@ -649,7 +650,8 @@ func TestVerificationContent(t *testing.T) {
 					},
 				},
 			},
-			wantCertificate: true,
+			wantCertificateChain: true,
+			wantCertificate:      true,
 		},
 		{
 			name: "certificate chain with invalid cert",
@@ -813,14 +815,15 @@ func TestVerificationContent(t *testing.T) {
 				return
 			}
 			require.NoError(t, gotErr)
+			if tt.wantCertificateChain {
+				require.NotNil(t, got.GetIntermediates())
+			}
 			if tt.wantCertificate {
-				require.NotNil(t, got.GetCertificate())
-				return
+				require.NotNil(t, got.GetLeafCertificate())
 			}
 			if tt.wantPublicKey {
 				_, hasPubKey := got.HasPublicKey()
 				require.True(t, hasPubKey)
-				return
 			}
 		})
 	}
