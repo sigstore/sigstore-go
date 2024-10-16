@@ -15,6 +15,7 @@
 package verify
 
 import (
+	"crypto/x509"
 	"encoding/asn1"
 	"errors"
 	"fmt"
@@ -552,9 +553,10 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 			leafCert.UnhandledCriticalExtensions = unhandledExts
 		}
 
+		var chains [][]*x509.Certificate
 		for _, verifiedTs := range verifiedTimestamps {
 			// verify the leaf certificate against the root
-			err = VerifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial)
+			chains, err = VerifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial)
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify leaf certificate: %w", err)
 			}
@@ -564,7 +566,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
 		if v.config.weExpectSCTs {
-			err = VerifySignedCertificateTimestamp(leafCert, v.config.ctlogEntriesThreshold, v.trustedMaterial)
+			err = VerifySignedCertificateTimestamp(chains, v.config.ctlogEntriesThreshold, v.trustedMaterial)
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify signed certificate timestamp: %w", err)
 			}

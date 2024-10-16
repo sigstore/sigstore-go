@@ -60,7 +60,7 @@ func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	var ts []verify.Timestamp
+	var ts []*root.Timestamp
 
 	// expect one verified timestamp
 	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore)
@@ -137,10 +137,10 @@ func TestBadTSASignature(t *testing.T) {
 
 type customTSAChainTrustedMaterial struct {
 	*ca.VirtualSigstore
-	tsaChain []root.CertificateAuthority
+	tsaChain []root.TimestampingAuthority
 }
 
-func (i *customTSAChainTrustedMaterial) TimestampingAuthorities() []root.CertificateAuthority {
+func (i *customTSAChainTrustedMaterial) TimestampingAuthorities() []root.TimestampingAuthority {
 	return i.tsaChain
 }
 
@@ -151,9 +151,9 @@ func TestBadTSACertificateChain(t *testing.T) {
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	ca1 := virtualSigstore.TimestampingAuthorities()[0]
-	ca2 := virtualSigstore2.TimestampingAuthorities()[0]
-	badChain := root.CertificateAuthority{
+	ca1 := virtualSigstore.TimestampingAuthorities()[0].(*root.SigstoreTimestampingAuthority)
+	ca2 := virtualSigstore2.TimestampingAuthorities()[0].(*root.SigstoreTimestampingAuthority)
+	badChain := &root.SigstoreTimestampingAuthority{
 		Root:                ca2.Root,
 		Intermediates:       ca2.Intermediates,
 		Leaf:                ca1.Leaf,
@@ -164,7 +164,7 @@ func TestBadTSACertificateChain(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{badChain}}, 1)
+	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.TimestampingAuthority{badChain}}, 1)
 	assert.Error(t, err)
 }
 
@@ -172,17 +172,17 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	ca := virtualSigstore.TimestampingAuthorities()[0]
+	ca := virtualSigstore.TimestampingAuthorities()[0].(*root.SigstoreTimestampingAuthority)
 
 	for _, test := range []struct {
 		name string
 		err  bool
-		ca   root.CertificateAuthority
+		ca   *root.SigstoreTimestampingAuthority
 	}{
 		{
 			name: "valid",
 			err:  false,
-			ca: root.CertificateAuthority{
+			ca: &root.SigstoreTimestampingAuthority{
 				Root:          ca.Root,
 				Intermediates: ca.Intermediates,
 				Leaf:          ca.Leaf,
@@ -192,7 +192,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 		{
 			name: "invalid: start time in the future",
 			err:  true,
-			ca: root.CertificateAuthority{
+			ca: &root.SigstoreTimestampingAuthority{
 				Root:                ca.Root,
 				Intermediates:       ca.Intermediates,
 				Leaf:                ca.Leaf,
@@ -202,7 +202,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 		{
 			name: "invalid: end time in the past",
 			err:  true,
-			ca: root.CertificateAuthority{
+			ca: &root.SigstoreTimestampingAuthority{
 				Root:              ca.Root,
 				Intermediates:     ca.Intermediates,
 				Leaf:              ca.Leaf,
@@ -214,7 +214,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 			entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 			assert.NoError(t, err)
 
-			_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.CertificateAuthority{test.ca}}, 1)
+			_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.TimestampingAuthority{test.ca}}, 1)
 			if test.err {
 				assert.Error(t, err)
 			} else {
