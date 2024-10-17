@@ -389,16 +389,6 @@ func TestOfflineInclusionProofVerification(t *testing.T) {
 	entity, err := virtualSigstore.AttestAtTime("foo@example.com", "issuer", statement, integratedTime, true)
 	assert.NoError(t, err)
 
-	entriesClient, err := newMockRekorEntriesClient(*virtualSigstore, statement, integratedTime)
-	assert.NoError(t, err)
-	mockRekor := &rekorGeneratedClient.Rekor{
-		Entries: entriesClient,
-	}
-
-	oldRekorClientGetter := verify.RekorClientGetter
-	verify.RekorClientGetter = func(_ string) (*rekorGeneratedClient.Rekor, error) { return mockRekor, nil }
-	defer func() { verify.RekorClientGetter = oldRekorClientGetter }()
-
 	_, err = verify.VerifyArtifactTransparencyLog(entity, virtualSigstore, 1, true, false)
 	assert.NoError(t, err)
 }
