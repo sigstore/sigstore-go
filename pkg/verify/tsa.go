@@ -16,26 +16,17 @@ package verify
 
 import (
 	"bytes"
-	"crypto/x509"
 	"errors"
 	"fmt"
-	"time"
-
-	tsaverification "github.com/sigstore/timestamp-authority/pkg/verification"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
 const maxAllowedTimestamps = 32
 
-type Timestamp struct {
-	Time time.Time
-	URI  string
-}
-
 // VerifyTimestampAuthority verifies that the given entity has been timestamped
 // by a trusted timestamp authority and that the timestamp is valid.
-func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]Timestamp, error) { //nolint:revive
+func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]*root.Timestamp, error) { //nolint:revive
 	signedTimestamps, err := entity.Timestamps()
 	if err != nil {
 		return nil, err
@@ -62,14 +53,9 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 
 	signatureBytes := sigContent.Signature()
 
-	verificationContent, err := entity.VerificationContent()
-	if err != nil {
-		return nil, err
-	}
-
-	verifiedTimestamps := []Timestamp{}
+	verifiedTimestamps := []*root.Timestamp{}
 	for _, timestamp := range signedTimestamps {
-		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial, verificationContent)
+		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial)
 
 		// Timestamps from unknown source are okay, but don't count as verified
 		if err != nil {
@@ -87,7 +73,7 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 //
 // The threshold parameter is the number of unique timestamps that must be
 // verified.
-func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]Timestamp, error) { //nolint:revive
+func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) { //nolint:revive
 	verifiedTimestamps, err := VerifyTimestampAuthority(entity, trustedMaterial)
 	if err != nil {
 		return nil, err
@@ -98,39 +84,16 @@ func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial 
 	return verifiedTimestamps, nil
 }
 
-func verifySignedTimestamp(signedTimestamp []byte, dsseSignatureBytes []byte, trustedMaterial root.TrustedMaterial, verificationContent VerificationContent) (Timestamp, error) {
-	certAuthorities := trustedMaterial.TimestampingAuthorities()
+func verifySignedTimestamp(signedTimestamp []byte, signatureBytes []byte, trustedMaterial root.TrustedMaterial) (*root.Timestamp, error) {
+	timestampAuthorities := trustedMaterial.TimestampingAuthorities()
 
 	// Iterate through TSA certificate authorities to find one that verifies
-	for _, ca := range certAuthorities {
-		trustedRootVerificationOptions := tsaverification.VerifyOpts{
-			Roots:          []*x509.Certificate{ca.Root},
-			Intermediates:  ca.Intermediates,
-			TSACertificate: ca.Leaf,
+	for _, tsa := range timestampAuthorities {
+		ts, err := tsa.Verify(signedTimestamp, signatureBytes)
+		if err == nil {
+			return ts, nil
 		}
-
-		// Ensure timestamp responses are from trusted sources
-		timestamp, err := tsaverification.VerifyTimestampResponse(signedTimestamp, bytes.NewReader(dsseSignatureBytes), trustedRootVerificationOptions)
-		if err != nil {
-			continue
-		}
-
-		if !ca.ValidityPeriodStart.IsZero() && timestamp.Time.Before(ca.ValidityPeriodStart) {
-			continue
-		}
-		if !ca.ValidityPeriodEnd.IsZero() && timestamp.Time.After(ca.ValidityPeriodEnd) {
-			continue
-		}
-
-		// Check tlog entry time against bundle certificates
-		// TODO: technically no longer needed since we check the cert validity period in the main Verify loop
-		if !verificationContent.ValidAtTime(timestamp.Time, trustedMaterial) {
-			continue
-		}
-
-		// All above verification successful, so return nil
-		return Timestamp{Time: timestamp.Time, URI: ca.URI}, nil
 	}
 
-	return Timestamp{}, errors.New("unable to verify signed timestamps")
+	return nil, errors.New("unable to verify signed timestamps")
 }

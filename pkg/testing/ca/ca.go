@@ -56,9 +56,9 @@ import (
 )
 
 type VirtualSigstore struct {
-	fulcioCA              root.CertificateAuthority
+	fulcioCA              *root.FulcioCertificateAuthority
 	fulcioIntermediateKey *ecdsa.PrivateKey
-	tsaCA                 root.CertificateAuthority
+	tsaCA                 *root.SigstoreTimestampingAuthority
 	tsaLeafKey            *ecdsa.PrivateKey
 	rekorKey              *ecdsa.PrivateKey
 	ctlogKey              *ecdsa.PrivateKey
@@ -66,7 +66,7 @@ type VirtualSigstore struct {
 }
 
 func NewVirtualSigstore() (*VirtualSigstore, error) {
-	ss := &VirtualSigstore{fulcioCA: root.CertificateAuthority{}, tsaCA: root.CertificateAuthority{}}
+	ss := &VirtualSigstore{fulcioCA: &root.FulcioCertificateAuthority{}, tsaCA: &root.SigstoreTimestampingAuthority{}}
 
 	rootCert, rootKey, err := GenerateRootCa()
 	if err != nil {
@@ -464,8 +464,8 @@ func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey 
 	return tsTemplate.CreateResponseWithOpts(tsaCert, tsaKey, hash)
 }
 
-func (ca *VirtualSigstore) TimestampingAuthorities() []root.CertificateAuthority {
-	return []root.CertificateAuthority{ca.tsaCA}
+func (ca *VirtualSigstore) TimestampingAuthorities() []root.TimestampingAuthority {
+	return []root.TimestampingAuthority{ca.tsaCA}
 }
 
 func (ca *VirtualSigstore) FulcioCertificateAuthorities() []root.CertificateAuthority {
