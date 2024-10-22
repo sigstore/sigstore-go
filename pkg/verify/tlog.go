@@ -44,7 +44,7 @@ var RekorClientGetter = getRekorClient
 // that must be verified.
 //
 // If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]Timestamp, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]root.Timestamp, error) { //nolint:revive
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 		return nil, err
 	}
 
-	verifiedTimestamps := []Timestamp{}
+	verifiedTimestamps := []root.Timestamp{}
 	logEntriesVerified := 0
 
 	for _, entry := range entries {
@@ -104,7 +104,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 					continue
 				}
 				if trustIntegratedTime {
-					verifiedTimestamps = append(verifiedTimestamps, Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
+					verifiedTimestamps = append(verifiedTimestamps, root.Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 				}
 			}
 			if entry.HasInclusionProof() {
@@ -152,7 +152,7 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 				}
 			}
 			if trustIntegratedTime {
-				verifiedTimestamps = append(verifiedTimestamps, Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
+				verifiedTimestamps = append(verifiedTimestamps, root.Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 			}
 		}
 		// Ensure entry signature matches signature from bundle
