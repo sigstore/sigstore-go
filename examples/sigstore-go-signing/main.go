@@ -21,13 +21,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
-	"google.golang.org/protobuf/encoding/protojson"
-
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/util"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var idToken *string
