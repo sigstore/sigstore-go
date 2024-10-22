@@ -64,7 +64,8 @@ type SignedEntity interface {
 type VerificationContent interface {
 	CompareKey(any, root.TrustedMaterial) bool
 	ValidAtTime(time.Time, root.TrustedMaterial) bool
-	GetCertificate() *x509.Certificate
+	GetLeafCertificate() *x509.Certificate
+	GetIntermediates() []*x509.Certificate
 	HasPublicKey() (PublicKeyProvider, bool)
 }
 

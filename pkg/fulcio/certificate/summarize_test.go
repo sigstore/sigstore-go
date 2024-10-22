@@ -30,7 +30,7 @@ func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
 		t.Fatalf("failed to get verification content: %v", err)
 	}
 
-	leaf := vc.GetCertificate()
+	leaf := vc.GetLeafCertificate()
 
 	if leaf == nil {
 		t.Fatalf("expected verification content to be a certificate chain")
@@ -79,7 +79,7 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 		t.Fatalf("failed to get verification content: %v", err)
 	}
 
-	leaf := vc.GetCertificate()
+	leaf := vc.GetLeafCertificate()
 
 	if leaf == nil {
 		t.Fatalf("expected verification content to be a certificate chain")
@@ -108,7 +108,7 @@ func TestSummarizeCertificateWithOtherNameSAN(t *testing.T) {
 		t.Fatalf("failed to get verification content: %v", err)
 	}
 
-	leaf := vc.GetCertificate()
+	leaf := vc.GetLeafCertificate()
 
 	if leaf == nil {
 		t.Fatalf("expected verification content to be a certificate chain")
