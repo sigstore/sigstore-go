@@ -18,7 +18,7 @@ reference metadata as a prerequisite to the verification process.
 ## Requirements
 
 - Unix-compatible OS
-- [Go 1.21](https://go.dev/doc/install)
+- [Go 1.22](https://go.dev/doc/install)
 
 ## Getting started
 
