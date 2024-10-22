@@ -51,6 +51,7 @@ var expectedOIDIssuer *string
 var expectedOIDIssuerRegex *string
 var expectedSAN *string
 var expectedSANRegex *string
+var ignoreSCT *bool
 var requireTimestamp *bool
 var requireTlog *bool
 var minBundleVersion *string
@@ -69,6 +70,7 @@ func init() {
 	expectedOIDIssuerRegex = flag.String("expectedIssuerRegex", "", "The expected OIDC issuer for the signing certificate")
 	expectedSAN = flag.String("expectedSAN", "", "The expected identity in the signing certificate's SAN extension")
 	expectedSANRegex = flag.String("expectedSANRegex", "", "The expected identity in the signing certificate's SAN extension")
+	ignoreSCT = flag.Bool("ignore-sct", false, "Ignore SCT verification - do not check that a certificate contains an embedded SCT, a proof of inclusion in a certificate transparency log")
 	requireTimestamp = flag.Bool("requireTimestamp", true, "Require either an RFC3161 signed timestamp or log entry integrated timestamp")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
@@ -103,7 +105,7 @@ func run() error {
 
 	if *ociImage != "" {
 		// Build a bundle from OCI image reference and get its digest
-		b, artifactDigest, err = bundleFromOCIImage(*ociImage)
+		b, artifactDigest, err = bundleFromOCIImage(*ociImage, *requireTlog, *requireTimestamp)
 	} else {
 		// Load the bundle from file
 		b, err = bundle.LoadJSONFromPath(flag.Arg(0))
@@ -121,7 +123,9 @@ func run() error {
 	identityPolicies := []verify.PolicyOption{}
 	var artifactPolicy verify.ArtifactPolicyOption
 
-	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+	if !*ignoreSCT {
+		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+	}
 
 	if *requireTimestamp {
 		verifierConfig = append(verifierConfig, verify.WithObserverTimestamps(1))
@@ -247,14 +251,14 @@ func trustedPublicKeyMaterial(pk crypto.PublicKey) *root.TrustedPublicKeyMateria
 }
 
 // bundleFromOCIImage returns a Bundle based on OCI image reference.
-func bundleFromOCIImage(imageRef string) (*bundle.Bundle, *string, error) {
+func bundleFromOCIImage(imageRef string, hasTlog, hasTimestamp bool) (*bundle.Bundle, *string, error) {
 	// 1. Get the simple signing layer
 	simpleSigning, err := simpleSigningLayerFromOCIImage(imageRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting simple signing layer: %w", err)
 	}
 	// 2. Build the verification material for the bundle
-	verificationMaterial, err := getBundleVerificationMaterial(simpleSigning)
+	verificationMaterial, err := getBundleVerificationMaterial(simpleSigning, hasTlog, hasTimestamp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting verification material: %w", err)
 	}
@@ -319,22 +323,32 @@ func simpleSigningLayerFromOCIImage(imageRef string) (*v1.Descriptor, error) {
 }
 
 // getBundleVerificationMaterial returns the bundle verification material from the simple signing layer
-func getBundleVerificationMaterial(manifestLayer *v1.Descriptor) (*protobundle.VerificationMaterial, error) {
+func getBundleVerificationMaterial(manifestLayer *v1.Descriptor, hasTlog, hasTimestamp bool) (*protobundle.VerificationMaterial, error) {
 	// 1. Get the signing certificate chain
 	signingCert, err := getVerificationMaterialX509CertificateChain(manifestLayer)
 	if err != nil {
 		return nil, fmt.Errorf("error getting signing certificate: %w", err)
 	}
 	// 2. Get the transparency log entries
-	tlogEntries, err := getVerificationMaterialTlogEntries(manifestLayer)
-	if err != nil {
-		return nil, fmt.Errorf("error getting tlog entries: %w", err)
+	var tlogEntries []*protorekor.TransparencyLogEntry
+	if hasTlog {
+		tlogEntries, err = getVerificationMaterialTlogEntries(manifestLayer)
+		if err != nil {
+			return nil, fmt.Errorf("error getting tlog entries: %w", err)
+		}
+	}
+	var timestampEntries *protobundle.TimestampVerificationData
+	if hasTimestamp {
+		timestampEntries, err = getVerificationMaterialTimestampEntries(manifestLayer)
+		if err != nil {
+			return nil, fmt.Errorf("error getting timestamp entries: %w", err)
+		}
 	}
 	// 3. Construct the verification material
 	return &protobundle.VerificationMaterial{
 		Content:                   signingCert,
 		TlogEntries:               tlogEntries,
-		TimestampVerificationData: nil,
+		TimestampVerificationData: timestampEntries,
 	}, nil
 }
 
@@ -347,6 +361,7 @@ func getVerificationMaterialTlogEntries(manifestLayer *v1.Descriptor) ([]*protor
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling json: %w", err)
 	}
+
 	// 2. Get the log index, log ID, integrated time, signed entry timestamp and body
 	logIndex, ok := jsonData["Payload"].(map[string]interface{})["logIndex"].(float64)
 	if !ok {
@@ -404,6 +419,29 @@ func getVerificationMaterialTlogEntries(manifestLayer *v1.Descriptor) ([]*protor
 			},
 			InclusionProof:    nil,
 			CanonicalizedBody: bodyBytes,
+		},
+	}, nil
+}
+
+func getVerificationMaterialTimestampEntries(manifestLayer *v1.Descriptor) (*protobundle.TimestampVerificationData, error) {
+	// 1. Get the bundle annotation
+	ts := manifestLayer.Annotations["dev.sigstore.cosign/rfc3161timestamp"]
+	// 2. Get the key/value pairs maps
+	var keyValPairs map[string]string
+	err := json.Unmarshal([]byte(ts), &keyValPairs)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON blob into key/val map: %w", err)
+	}
+	// 3. Verify the key "SignedRFC3161Timestamp" is present
+	if _, ok := keyValPairs["SignedRFC3161Timestamp"]; !ok {
+		return nil, errors.New("error getting SignedRFC3161Timestamp from key/value pairs")
+	}
+	// 4. Construct the timestamp entry list
+	return &protobundle.TimestampVerificationData{
+		Rfc3161Timestamps: []*protocommon.RFC3161SignedTimestamp{
+			{
+				SignedTimestamp: []byte(keyValPairs["SignedRFC3161Timestamp"]),
+			},
 		},
 	}, nil
 }
