@@ -436,11 +436,16 @@ func getVerificationMaterialTimestampEntries(manifestLayer *v1.Descriptor) (*pro
 	if _, ok := keyValPairs["SignedRFC3161Timestamp"]; !ok {
 		return nil, errors.New("error getting SignedRFC3161Timestamp from key/value pairs")
 	}
+	// 4. Decode the base64 encoded timestamp
+	der, err := base64.StdEncoding.DecodeString(keyValPairs["SignedRFC3161Timestamp"])
+	if err != nil {
+		return nil, fmt.Errorf("error decoding base64 encoded timestamp: %w", err)
+	}
 	// 4. Construct the timestamp entry list
 	return &protobundle.TimestampVerificationData{
 		Rfc3161Timestamps: []*protocommon.RFC3161SignedTimestamp{
 			{
-				SignedTimestamp: []byte(keyValPairs["SignedRFC3161Timestamp"]),
+				SignedTimestamp: der,
 			},
 		},
 	}, nil
