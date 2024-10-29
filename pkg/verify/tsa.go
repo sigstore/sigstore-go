@@ -67,7 +67,7 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
 
-	if len(verifiedTimestamps) == 0 {
+	if len(verifiedTimestamps) == 0 && len(errs) > 0 {
 		return nil, fmt.Errorf("no verified signed timestamps: %w", errors.Join(errs...))
 	}
 	return verifiedTimestamps, nil
