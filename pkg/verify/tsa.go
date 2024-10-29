@@ -54,17 +54,22 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 	signatureBytes := sigContent.Signature()
 
 	verifiedTimestamps := []*root.Timestamp{}
+	var errs []error
 	for _, timestamp := range signedTimestamps {
 		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial)
 
 		// Timestamps from unknown source are okay, but don't count as verified
 		if err != nil {
+			errs = append(errs, err)
 			continue
 		}
 
 		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
 
+	if len(verifiedTimestamps) == 0 {
+		return nil, fmt.Errorf("no verified signed timestamps: %w", errors.Join(errs...))
+	}
 	return verifiedTimestamps, nil
 }
 
@@ -87,13 +92,16 @@ func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial 
 func verifySignedTimestamp(signedTimestamp []byte, signatureBytes []byte, trustedMaterial root.TrustedMaterial) (*root.Timestamp, error) {
 	timestampAuthorities := trustedMaterial.TimestampingAuthorities()
 
+	var errs []error
+
 	// Iterate through TSA certificate authorities to find one that verifies
 	for _, tsa := range timestampAuthorities {
 		ts, err := tsa.Verify(signedTimestamp, signatureBytes)
 		if err == nil {
 			return ts, nil
 		}
+		errs = append(errs, err)
 	}
 
-	return nil, errors.New("unable to verify signed timestamps")
+	return nil, fmt.Errorf("unable to verify signed timestamps: %w", errors.Join(errs...))
 }
