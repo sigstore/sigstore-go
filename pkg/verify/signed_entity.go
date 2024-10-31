@@ -17,6 +17,7 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -219,6 +221,45 @@ func NewVerificationResult() *VerificationResult {
 	return &VerificationResult{
 		MediaType: VerificationResultMediaType01,
 	}
+}
+
+// verificationResultRawStatement is a helper struct to marshal/unmarshal
+// It is used because in_toto.Statement is a protobuf message and we want to
+// store it as a raw message so we can use protojson to marshal/unmarshal it
+//
+// See https://github.com/in-toto/attestation/issues/363
+type verificationResultRawStatement struct {
+	MediaType          string                        `json:"mediaType"`
+	Statement          json.RawMessage               `json:"statement,omitempty"`
+	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
+	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
+	VerifiedIdentity   *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
+}
+
+func (b *VerificationResult) MarshalJSON() ([]byte, error) {
+	statement, err := protojson.Marshal(b.Statement)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(&verificationResultRawStatement{
+		MediaType:          b.MediaType,
+		Statement:          statement,
+		Signature:          b.Signature,
+		VerifiedTimestamps: b.VerifiedTimestamps,
+		VerifiedIdentity:   b.VerifiedIdentity,
+	})
+}
+
+func (b *VerificationResult) UnmarshalJSON(data []byte) error {
+	var aux verificationResultRawStatement
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	b.MediaType = aux.MediaType
+	b.Signature = aux.Signature
+	b.VerifiedTimestamps = aux.VerifiedTimestamps
+	b.VerifiedIdentity = aux.VerifiedIdentity
+	return protojson.Unmarshal(aux.Statement, b.Statement)
 }
 
 type PolicyOption func(*PolicyConfig) error
