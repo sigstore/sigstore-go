@@ -22,8 +22,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
-	"github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/common"
+	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
@@ -121,9 +120,9 @@ func TestTooManySubjects(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	tooManySubjectsStatement := in_toto.Statement{}
+	tooManySubjectsStatement := verify.Statement{}
 	for i := 0; i < 1025; i++ {
-		tooManySubjectsStatement.Subject = append(tooManySubjectsStatement.Subject, in_toto.Subject{
+		tooManySubjectsStatement.Subject = append(tooManySubjectsStatement.Subject, &in_toto.ResourceDescriptor{
 			Name: fmt.Sprintf("subject-%d", i),
 			Digest: map[string]string{
 				"sha256": "", // actual content of digest does not matter for this test
@@ -131,7 +130,7 @@ func TestTooManySubjects(t *testing.T) {
 		})
 	}
 
-	tooManySubjectsStatementBytes, err := json.Marshal(tooManySubjectsStatement)
+	tooManySubjectsStatementBytes, err := json.Marshal(&tooManySubjectsStatement)
 	assert.NoError(t, err)
 
 	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
@@ -149,19 +148,18 @@ func TestTooManyDigests(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	tooManyDigestsStatement := in_toto.Statement{}
-	tooManyDigestsStatement.Subject = []in_toto.Subject{
+	tooManyDigestsStatement := verify.Statement{}
+	tooManyDigestsStatement.Subject = []*in_toto.ResourceDescriptor{
 		{
 			Name:   fmt.Sprintf("subject"),
-			Digest: make(common.DigestSet),
+			Digest: map[string]string{"sha512": ""},
 		},
 	}
-	tooManyDigestsStatement.Subject[0].Digest["sha512"] = "" // verifier requires that at least one known hash algorithm is present in the digest map
 	for i := 0; i < 32; i++ {
 		tooManyDigestsStatement.Subject[0].Digest[fmt.Sprintf("digest-%d", i)] = ""
 	}
 
-	tooManySubjectsStatementBytes, err := json.Marshal(tooManyDigestsStatement)
+	tooManySubjectsStatementBytes, err := json.Marshal(&tooManyDigestsStatement)
 	assert.NoError(t, err)
 
 	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)

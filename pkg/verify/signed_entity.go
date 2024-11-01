@@ -17,7 +17,6 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/asn1"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -218,7 +217,7 @@ func (c *VerifierConfig) Validate() error {
 
 type VerificationResult struct {
 	MediaType          string                        `json:"mediaType"`
-	Statement          *in_toto.Statement            `json:"statement,omitempty"`
+	Statement          *Statement                    `json:"statement,omitempty"`
 	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
 	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
 	VerifiedIdentity   *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
@@ -241,43 +240,16 @@ func NewVerificationResult() *VerificationResult {
 	}
 }
 
-// verificationResultRawStatement is a helper struct to marshal/unmarshal
-// It is used because in_toto.Statement is a protobuf message and we want to
-// store it as a raw message so we can use protojson to marshal/unmarshal it
-//
-// See https://github.com/in-toto/attestation/issues/363
-type verificationResultRawStatement struct {
-	MediaType          string                        `json:"mediaType"`
-	Statement          json.RawMessage               `json:"statement,omitempty"`
-	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
-	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
-	VerifiedIdentity   *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
+type Statement struct {
+	in_toto.Statement
 }
 
-func (b *VerificationResult) MarshalJSON() ([]byte, error) {
-	statement, err := protojson.Marshal(b.Statement)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&verificationResultRawStatement{
-		MediaType:          b.MediaType,
-		Statement:          statement,
-		Signature:          b.Signature,
-		VerifiedTimestamps: b.VerifiedTimestamps,
-		VerifiedIdentity:   b.VerifiedIdentity,
-	})
+func (s *Statement) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(&s.Statement)
 }
 
-func (b *VerificationResult) UnmarshalJSON(data []byte) error {
-	var aux verificationResultRawStatement
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	b.MediaType = aux.MediaType
-	b.Signature = aux.Signature
-	b.VerifiedTimestamps = aux.VerifiedTimestamps
-	b.VerifiedIdentity = aux.VerifiedIdentity
-	return protojson.Unmarshal(aux.Statement, b.Statement)
+func (s *Statement) UnmarshalJSON(data []byte) error {
+	return protojson.Unmarshal(data, s)
 }
 
 type PolicyOption func(*PolicyConfig) error
