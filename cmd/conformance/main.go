@@ -330,12 +330,14 @@ func main() {
 		fileOrDigest := os.Args[len(os.Args)-1]
 
 		// Load digest or file
-		if strings.HasPrefix(fileOrDigest, "sha256:") {
-			digest, err := hex.DecodeString(fileOrDigest[7:])
+		if strings.Contains(fileOrDigest, ":") {
+			algDigest := strings.Split(fileOrDigest, ":")
+			alg, hexDigest := algDigest[0], algDigest[1]
+			digest, err := hex.DecodeString(hexDigest)
 			if err != nil {
 				log.Fatal(err)
 			}
-			artifactPolicyOption = verify.WithArtifactDigest("sha256", digest)
+			artifactPolicyOption = verify.WithArtifactDigest(alg, digest)
 		} else {
 			file, err := os.Open(fileOrDigest)
 			if err != nil {
