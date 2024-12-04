@@ -17,10 +17,12 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -324,10 +326,22 @@ func main() {
 			log.Fatal(err)
 		}
 
-		// Load artifact
-		file, err := os.Open(os.Args[len(os.Args)-1])
-		if err != nil {
-			log.Fatal(err)
+		var artifactPolicyOption verify.ArtifactPolicyOption
+		fileOrDigest := os.Args[len(os.Args)-1]
+
+		// Load digest or file
+		if strings.HasPrefix(fileOrDigest, "sha256:") {
+			digest, err := hex.DecodeString(fileOrDigest[7:])
+			if err != nil {
+				log.Fatal(err)
+			}
+			artifactPolicyOption = verify.WithArtifactDigest("sha256", digest)
+		} else {
+			file, err := os.Open(fileOrDigest)
+			if err != nil {
+				log.Fatal(err)
+			}
+			artifactPolicyOption = verify.WithArtifact(file)
 		}
 
 		// Configure verification options
@@ -370,7 +384,7 @@ func main() {
 		}
 
 		// Verify bundle
-		_, err = sev.Verify(b, verify.NewPolicy(verify.WithArtifact(file), identityPolicies...))
+		_, err = sev.Verify(b, verify.NewPolicy(artifactPolicyOption, identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}
