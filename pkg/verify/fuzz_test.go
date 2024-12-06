@@ -99,8 +99,7 @@ func FuzzVerifyArtifactTransparencyLog(f *testing.F) {
 		verify.VerifyArtifactTransparencyLog(entity,
 			virtualSigstore,
 			logThreshold,
-			trustIntegratedTime,
-			false)
+			trustIntegratedTime)
 	})
 }
 
