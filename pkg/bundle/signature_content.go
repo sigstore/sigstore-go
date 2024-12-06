@@ -17,7 +17,6 @@ package bundle
 import (
 	"encoding/base64"
 
-	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -51,12 +50,12 @@ type Envelope struct {
 	*dsse.Envelope
 }
 
-func (e *Envelope) Statement() (*in_toto.Statement, error) {
+func (e *Envelope) Statement() (*verify.Statement, error) {
 	if e.PayloadType != IntotoMediaType {
 		return nil, ErrUnsupportedMediaType
 	}
 
-	var statement in_toto.Statement
+	var statement verify.Statement
 	raw, err := e.DecodeB64Payload()
 	if err != nil {
 		return nil, ErrDecodingB64
