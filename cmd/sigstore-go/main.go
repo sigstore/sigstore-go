@@ -48,7 +48,6 @@ var requireTimestamp *bool
 var requireCTlog *bool
 var requireTlog *bool
 var minBundleVersion *string
-var onlineTlog *bool
 var trustedPublicKey *string
 var trustedrootJSONpath *string
 var tufRootURL *string
@@ -66,7 +65,6 @@ func init() {
 	requireCTlog = flag.Bool("requireCTlog", true, "Require Certificate Transparency log entry")
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
-	onlineTlog = flag.Bool("onlineTlog", false, "Verify Artifact Transparency log entry online (Rekor)")
 	trustedPublicKey = flag.String("publicKey", "", "Path to trusted public key")
 	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
@@ -116,10 +114,6 @@ func run() error {
 
 	if *requireTlog {
 		verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
-	}
-
-	if *onlineTlog {
-		verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
 	}
 
 	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedOIDIssuerRegex, *expectedSAN, *expectedSANRegex)

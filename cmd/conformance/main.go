@@ -300,9 +300,6 @@ func main() {
 
 		verifierConfig := []verify.VerifierOption{}
 		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
-		if len(tr.RekorLogs()) > 0 {
-			verifierConfig = append(verifierConfig, verify.WithOnlineVerification())
-		}
 
 		// Verify bundle
 		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
