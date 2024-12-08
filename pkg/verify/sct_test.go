@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package verify
+package verify_test
 
 import (
 	"crypto"
@@ -32,6 +32,8 @@ import (
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	ctx509util "github.com/google/certificate-transparency-go/x509util"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/testing/ca"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 )
@@ -350,7 +352,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			chain := []*x509.Certificate{test.getCertFn()}
 			chain = append(chain, test.chain...)
-			err = VerifySignedCertificateTimestamp([][]*x509.Certificate{chain}, test.threshold, test.trustedMaterial)
+			err = verify.VerifySignedCertificateTimestamp([][]*x509.Certificate{chain}, test.threshold, test.trustedMaterial)
 			if test.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -468,4 +470,22 @@ func (t *fakeTrustedMaterial) TimestampingAuthorities() []root.TimestampingAutho
 func (t *fakeTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog { panic("not implemented") }
 func (t *fakeTrustedMaterial) PublicKeyVerifier(string) (root.TimeConstrainedVerifier, error) {
 	panic("not implemented")
+}
+
+func TestVerifySCTVirtualSigstore(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	leaf, _, err := virtualSigstore.GenerateLeafCert("example@example.com", "issuer")
+	assert.NoError(t, err)
+
+	cas := virtualSigstore.FulcioCertificateAuthorities()
+	ca := cas[0].(*root.FulcioCertificateAuthority)
+	root := ca.Root
+	intermediate := ca.Intermediates[0]
+
+	err = verify.VerifySignedCertificateTimestamp([][]*x509.Certificate{{leaf, intermediate, root}}, 1, virtualSigstore)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
