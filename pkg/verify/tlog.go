@@ -16,35 +16,25 @@ package verify
 
 import (
 	"bytes"
-	"context"
 	"crypto"
 	"encoding/hex"
 	"errors"
 	"fmt"
 
-	rekorClient "github.com/sigstore/rekor/pkg/client"
-	rekorGeneratedClient "github.com/sigstore/rekor/pkg/generated/client"
-	rekorEntries "github.com/sigstore/rekor/pkg/generated/client/entries"
-	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
-	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 const maxAllowedTlogEntries = 32
-
-var RekorClientGetter = getRekorClient
 
 // VerifyArtifactTransparencyLog verifies that the given entity has been logged
 // in the transparency log and that the log entry is valid.
 //
 // The threshold parameter is the number of unique transparency log entries
 // that must be verified.
-//
-// If online is true, the log entry is verified against the Rekor server.
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime, online bool) ([]root.Timestamp, error) { //nolint:revive
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime bool) ([]root.Timestamp, error) { //nolint:revive
 	entries, err := entity.TlogEntries()
 	if err != nil {
 		return nil, err
@@ -93,68 +83,33 @@ func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.Tru
 			// skip entries the trust root cannot verify
 			continue
 		}
-		if !online {
-			if !entry.HasInclusionPromise() && !entry.HasInclusionProof() {
-				return nil, fmt.Errorf("entry must contain an inclusion proof and/or promise")
-			}
-			if entry.HasInclusionPromise() {
-				err = tlog.VerifySET(entry, rekorLogs)
-				if err != nil {
-					// skip entries the trust root cannot verify
-					continue
-				}
-				if trustIntegratedTime {
-					verifiedTimestamps = append(verifiedTimestamps, root.Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
-				}
-			}
-			if entry.HasInclusionProof() {
-				verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
-				if err != nil {
-					return nil, err
-				}
 
-				err = tlog.VerifyInclusion(entry, *verifier)
-				if err != nil {
-					return nil, err
-				}
-				// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
-			}
-		} else {
-			client, err := RekorClientGetter(tlogVerifier.BaseURL)
+		if !entry.HasInclusionPromise() && !entry.HasInclusionProof() {
+			return nil, fmt.Errorf("entry must contain an inclusion proof and/or promise")
+		}
+		if entry.HasInclusionPromise() {
+			err = tlog.VerifySET(entry, rekorLogs)
 			if err != nil {
-				return nil, err
-			}
-
-			verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
-			if err != nil {
-				return nil, err
-			}
-
-			logIndex := entry.LogIndex()
-
-			searchParams := rekorEntries.NewGetLogEntryByIndexParams()
-			searchParams.LogIndex = logIndex
-
-			resp, err := client.Entries.GetLogEntryByIndex(searchParams)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(resp.Payload) == 0 {
-				return nil, fmt.Errorf("unable to locate log entry %d", logIndex)
-			}
-
-			for _, v := range resp.Payload {
-				v := v
-				err = rekorVerify.VerifyLogEntry(context.TODO(), &v, *verifier)
-				if err != nil {
-					return nil, err
-				}
+				// skip entries the trust root cannot verify
+				continue
 			}
 			if trustIntegratedTime {
 				verifiedTimestamps = append(verifiedTimestamps, root.Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 			}
 		}
+		if entry.HasInclusionProof() {
+			verifier, err := getVerifier(tlogVerifier.PublicKey, tlogVerifier.SignatureHashFunc)
+			if err != nil {
+				return nil, err
+			}
+
+			err = tlog.VerifyInclusion(entry, *verifier)
+			if err != nil {
+				return nil, err
+			}
+			// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
+		}
+
 		// Ensure entry signature matches signature from bundle
 		if !bytes.Equal(entry.Signature(), entitySignature) {
 			return nil, errors.New("transparency log signature does not match")
@@ -190,13 +145,4 @@ func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.V
 	}
 
 	return &verifier, nil
-}
-
-func getRekorClient(baseURL string) (*rekorGeneratedClient.Rekor, error) {
-	client, err := rekorClient.GetRekorClient(baseURL, rekorClient.WithUserAgent(util.ConstructUserAgent()))
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
 }

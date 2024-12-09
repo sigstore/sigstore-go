@@ -38,9 +38,6 @@ type SignedEntityVerifier struct {
 }
 
 type VerifierConfig struct { // nolint: revive
-	// performOnlineVerification queries logs during verification.
-	// Default is offline
-	performOnlineVerification bool
 	// weExpectSignedTimestamps requires RFC3161 timestamps to verify
 	// short-lived certificates
 	weExpectSignedTimestamps bool
@@ -107,16 +104,6 @@ func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...Ve
 	}
 
 	return v, nil
-}
-
-// WithOnlineVerification configures the SignedEntityVerifier to perform
-// online verification when verifying Transparency Log entries and
-// Signed Certificate Timestamps.
-func WithOnlineVerification() VerifierOption {
-	return func(c *VerifierConfig) error {
-		c.performOnlineVerification = true
-		return nil
-	}
 }
 
 // WithSignedTimestamps configures the SignedEntityVerifier to expect RFC 3161
@@ -663,7 +650,7 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 	if v.config.weExpectTlogEntries {
 		// log timestamps should be verified if with WithIntegratedTimestamps or WithObserverTimestamps is used
 		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
-			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps, v.config.performOnlineVerification)
+			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps)
 		if err != nil {
 			return nil, err
 		}
