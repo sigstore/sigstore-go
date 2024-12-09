@@ -42,11 +42,11 @@ jobs:
 
       - run: go build -o conformance cmd/conformance/main.go
 
-      - uses: sigstore/sigstore-conformance@e472219febb4fe9c6ce62033be8a811963ef4f27 # v0.0.12
+      - uses: sigstore/sigstore-conformance@6bd1c54e236c9517da56f7344ad16cc00439fe19 # v0.0.13
         with:
           entrypoint: ${{ github.workspace }}/conformance
 
-      - uses: sigstore/sigstore-conformance@e472219febb4fe9c6ce62033be8a811963ef4f27 # v0.0.12
+      - uses: sigstore/sigstore-conformance@6bd1c54e236c9517da56f7344ad16cc00439fe19 # v0.0.13
         with:
           entrypoint: ${{ github.workspace }}/conformance
           environment: staging
