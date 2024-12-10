@@ -56,8 +56,8 @@ func (c *Certificate) Certificate() *x509.Certificate {
 	return c.certificate
 }
 
-func (c *Certificate) HasPublicKey() (verify.PublicKeyProvider, bool) {
-	return PublicKey{}, false
+func (c *Certificate) PublicKey() verify.PublicKeyProvider {
+	return nil
 }
 
 func (pk *PublicKey) CompareKey(key any, tm root.TrustedMaterial) bool {
@@ -87,6 +87,6 @@ func (pk *PublicKey) Certificate() *x509.Certificate {
 	return nil
 }
 
-func (pk *PublicKey) HasPublicKey() (verify.PublicKeyProvider, bool) {
-	return *pk, true
+func (pk *PublicKey) PublicKey() verify.PublicKeyProvider {
+	return pk
 }

@@ -818,8 +818,8 @@ func TestVerificationContent(t *testing.T) {
 				return
 			}
 			if tt.wantPublicKey {
-				_, hasPubKey := got.HasPublicKey()
-				require.True(t, hasPubKey)
+				k := got.PublicKey()
+				require.NotNil(t, k)
 				return
 			}
 		})

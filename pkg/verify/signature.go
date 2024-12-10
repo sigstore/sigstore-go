@@ -97,7 +97,7 @@ func getSignatureVerifier(verificationContent VerificationContent, tm root.Trust
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
 		// TODO: Inspect certificate's SignatureAlgorithm to determine hash function
 		return signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
-	} else if pk, ok := verificationContent.HasPublicKey(); ok {
+	} else if pk := verificationContent.PublicKey(); pk != nil {
 		return tm.PublicKeyVerifier(pk.Hint())
 	}
 
