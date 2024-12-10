@@ -255,7 +255,7 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 			return nil, ErrValidationError(err)
 		}
 		cert := &Certificate{
-			Certificate: parsedCert,
+			certificate: parsedCert,
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_Certificate:
@@ -267,7 +267,7 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 			return nil, ErrValidationError(err)
 		}
 		cert := &Certificate{
-			Certificate: parsedCert,
+			certificate: parsedCert,
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_PublicKey:

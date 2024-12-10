@@ -24,7 +24,11 @@ import (
 )
 
 type Certificate struct {
-	*x509.Certificate
+	certificate *x509.Certificate
+}
+
+func NewCertificate(cert *x509.Certificate) *Certificate {
+	return &Certificate{certificate: cert}
 }
 
 type PublicKey struct {
@@ -41,15 +45,15 @@ func (c *Certificate) CompareKey(key any, _ root.TrustedMaterial) bool {
 		return false
 	}
 
-	return c.Certificate.Equal(x509Key)
+	return c.certificate.Equal(x509Key)
 }
 
 func (c *Certificate) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
-	return !(c.Certificate.NotAfter.Before(t) || c.Certificate.NotBefore.After(t))
+	return !(c.certificate.NotAfter.Before(t) || c.certificate.NotBefore.After(t))
 }
 
 func (c *Certificate) GetCertificate() *x509.Certificate {
-	return c.Certificate
+	return c.certificate
 }
 
 func (c *Certificate) HasPublicKey() (verify.PublicKeyProvider, bool) {
