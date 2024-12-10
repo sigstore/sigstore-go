@@ -19,7 +19,6 @@ import (
 	"errors"
 	"time"
 
-	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
@@ -85,7 +84,7 @@ type MessageSignatureContent interface {
 
 type EnvelopeContent interface {
 	RawEnvelope() *dsse.Envelope
-	Statement() (*in_toto.Statement, error)
+	Statement() (*Statement, error)
 }
 
 // BaseSignedEntity is a helper struct that implements all the interfaces

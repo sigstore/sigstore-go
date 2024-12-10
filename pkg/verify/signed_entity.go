@@ -26,6 +26,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -203,7 +204,7 @@ func (c *VerifierConfig) Validate() error {
 
 type VerificationResult struct {
 	MediaType          string                        `json:"mediaType"`
-	Statement          *in_toto.Statement            `json:"statement,omitempty"`
+	Statement          *Statement                    `json:"statement,omitempty"`
 	Signature          *SignatureVerificationResult  `json:"signature,omitempty"`
 	VerifiedTimestamps []TimestampVerificationResult `json:"verifiedTimestamps"`
 	VerifiedIdentity   *CertificateIdentity          `json:"verifiedIdentity,omitempty"`
@@ -224,6 +225,18 @@ func NewVerificationResult() *VerificationResult {
 	return &VerificationResult{
 		MediaType: VerificationResultMediaType01,
 	}
+}
+
+type Statement struct {
+	in_toto.Statement
+}
+
+func (s *Statement) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(&s.Statement)
+}
+
+func (s *Statement) UnmarshalJSON(data []byte) error {
+	return protojson.Unmarshal(data, s)
 }
 
 type PolicyOption func(*PolicyConfig) error
