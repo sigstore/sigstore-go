@@ -52,7 +52,7 @@ func (c *Certificate) ValidAtTime(t time.Time, _ root.TrustedMaterial) bool {
 	return !(c.certificate.NotAfter.Before(t) || c.certificate.NotBefore.After(t))
 }
 
-func (c *Certificate) GetCertificate() *x509.Certificate {
+func (c *Certificate) Certificate() *x509.Certificate {
 	return c.certificate
 }
 
@@ -83,7 +83,7 @@ func (pk *PublicKey) ValidAtTime(t time.Time, tm root.TrustedMaterial) bool {
 	return verifier.ValidAtTime(t)
 }
 
-func (pk *PublicKey) GetCertificate() *x509.Certificate {
+func (pk *PublicKey) Certificate() *x509.Certificate {
 	return nil
 }
 

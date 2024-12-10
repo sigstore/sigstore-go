@@ -508,7 +508,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 	// If the bundle was signed with a long-lived key, and does not have a Fulcio certificate,
 	// then skip the certificate verification steps
-	if leafCert := verificationContent.GetCertificate(); leafCert != nil {
+	if leafCert := verificationContent.Certificate(); leafCert != nil {
 		if policy.WeExpectSigningKey() {
 			return nil, errors.New("expected key signature, not certificate")
 		}
@@ -719,7 +719,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 			return nil, err
 		}
 
-		if leafCert := verificationContent.GetCertificate(); leafCert != nil {
+		if leafCert := verificationContent.Certificate(); leafCert != nil {
 			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "LeafCert.NotBefore", URI: "", Timestamp: leafCert.NotBefore})
 		} else {
 			// no cert? use current time

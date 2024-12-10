@@ -814,7 +814,7 @@ func TestVerificationContent(t *testing.T) {
 			}
 			require.NoError(t, gotErr)
 			if tt.wantCertificate {
-				require.NotNil(t, got.GetCertificate())
+				require.NotNil(t, got.Certificate())
 				return
 			}
 			if tt.wantPublicKey {
