@@ -516,7 +516,7 @@ type TestEntity struct {
 }
 
 func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
-	return &bundle.Certificate{Certificate: e.certChain[0]}, nil
+	return bundle.NewCertificate(e.certChain[0]), nil
 }
 
 func (e *TestEntity) HasInclusionPromise() bool {
