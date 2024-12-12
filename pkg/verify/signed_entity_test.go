@@ -40,7 +40,7 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	assert.Nil(t, err)
 
 	// unless we are really sure we want a verifier without either tlog or tsa
-	_, err = verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsUnsafe())
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithCurrentTime())
 	assert.Nil(t, err)
 
 	// can configure the verifiers with thresholds
@@ -68,7 +68,7 @@ func TestSignedEntityVerifierInitRequiresTimestamp(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
-	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithoutAnyObserverTimestampsUnsafe())
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithCurrentTime())
 	assert.NoError(t, err)
 }
 

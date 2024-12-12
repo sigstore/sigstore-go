@@ -299,7 +299,7 @@ func main() {
 		tr := getTrustedRoot(staging)
 
 		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithoutAnyObserverTimestampsUnsafe(), verify.WithSignedCertificateTimestamps(1))
+		verifierConfig = append(verifierConfig, verify.WithCurrentTime(), verify.WithSignedCertificateTimestamps(1))
 
 		// Verify bundle
 		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
