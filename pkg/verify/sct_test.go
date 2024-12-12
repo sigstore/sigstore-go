@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	ct "github.com/google/certificate-transparency-go"
 	"github.com/google/certificate-transparency-go/tls"
@@ -123,7 +124,9 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 			trustedMaterial: &fakeTrustedMaterial{
 				transparencyLog: map[string]*root.TransparencyLog{
 					hex.EncodeToString(logID[:]): {
-						PublicKey: &privateKey.PublicKey,
+						PublicKey:           &privateKey.PublicKey,
+						ValidityPeriodStart: time.UnixMilli(12344),
+						ValidityPeriodEnd:   time.UnixMilli(12346),
 					},
 				},
 				cas: []root.CertificateAuthority{
@@ -313,6 +316,35 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 			chain:           []*x509.Certificate{},
 			threshold:       0,
 			trustedMaterial: &fakeTrustedMaterial{},
+		},
+		{
+			name: "sct not valid for ctlog key time range",
+			getCertFn: func() *x509.Certificate {
+				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
+					{
+						SCTVersion: ct.V1,
+						Timestamp:  12345,
+						LogID:      ct.LogID{KeyID: logID},
+					},
+				})
+			},
+			chain:     []*x509.Certificate{caCert},
+			threshold: 1,
+			trustedMaterial: &fakeTrustedMaterial{
+				transparencyLog: map[string]*root.TransparencyLog{
+					hex.EncodeToString(logID[:]): {
+						PublicKey:           &privateKey.PublicKey,
+						ValidityPeriodStart: time.UnixMilli(10),
+						ValidityPeriodEnd:   time.UnixMilli(10000),
+					},
+				},
+				cas: []root.CertificateAuthority{
+					&root.FulcioCertificateAuthority{
+						Root: caCert,
+					},
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name: "threshold of 2 with 2 valid scts",

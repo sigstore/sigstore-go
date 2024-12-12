@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	ct "github.com/google/certificate-transparency-go"
 	"github.com/google/certificate-transparency-go/ctutil"
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	"github.com/google/certificate-transparency-go/x509util"
@@ -55,6 +56,17 @@ func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold in
 		key, ok := ctlogs[encodedKeyID]
 		if !ok {
 			// skip entries the trust root cannot verify
+			continue
+		}
+
+		// Ensure sct is within ctlog validity window
+		sctTime := ct.TimestampToTime(sct.Timestamp)
+		if !key.ValidityPeriodStart.IsZero() && sctTime.Before(key.ValidityPeriodStart) {
+			// skip entries that were before ctlog key start time
+			continue
+		}
+		if !key.ValidityPeriodEnd.IsZero() && sctTime.After(key.ValidityPeriodEnd) {
+			// skip entries that were after ctlog key end time
 			continue
 		}
 
