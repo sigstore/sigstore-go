@@ -40,7 +40,7 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 	assert.Nil(t, err)
 
 	// unless we are really sure we want a verifier without either tlog or tsa
-	_, err = verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsUnsafe())
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithCurrentTime())
 	assert.Nil(t, err)
 
 	// can configure the verifiers with thresholds
@@ -68,7 +68,7 @@ func TestSignedEntityVerifierInitRequiresTimestamp(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
-	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithoutAnyObserverTimestampsUnsafe())
+	_, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithCurrentTime())
 	assert.NoError(t, err)
 }
 
@@ -108,7 +108,7 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 	tr := data.PublicGoodTrustedMaterialRoot(t)
 	entity := data.SigstoreJS200ProvenanceBundle(t)
 
-	v, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsUnsafe())
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
 
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
@@ -205,7 +205,7 @@ func TestEntityWithOthernameSan(t *testing.T) {
 	tr := data.ScaffoldingTrustedMaterialRoot(t)
 	entity := data.OthernameBundle(t)
 
-	v, err := verify.NewSignedEntityVerifier(tr, verify.WithoutAnyObserverTimestampsUnsafe())
+	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
 
 	digest, err := hex.DecodeString("bc103b4a84971ef6459b294a2b98568a2bfb72cded09d4acd1e16366a401f95b")

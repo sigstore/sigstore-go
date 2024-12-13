@@ -38,9 +38,9 @@ type SignedEntityVerifier struct {
 }
 
 type VerifierConfig struct { // nolint: revive
-	// weExpectSignedTimestamps requires RFC3161 timestamps to verify
+	// requireSignedTimestamps requires RFC3161 timestamps to verify
 	// short-lived certificates
-	weExpectSignedTimestamps bool
+	requireSignedTimestamps bool
 	// signedTimestampThreshold is the minimum number of verified
 	// RFC3161 timestamps in a bundle
 	signedTimestampThreshold int
@@ -56,20 +56,19 @@ type VerifierConfig struct { // nolint: revive
 	// observerTimestampThreshold is the minimum number of verified
 	// RFC3161 timestamps and/or log integrated timestamps in a bundle
 	observerTimestampThreshold int
-	// weExpectTlogEntries requires log inclusion proofs in a bundle
-	weExpectTlogEntries bool
+	// requireTlogEntries requires log inclusion proofs in a bundle
+	requireTlogEntries bool
 	// tlogEntriesThreshold is the minimum number of verified inclusion
 	// proofs in a bundle
 	tlogEntriesThreshold int
-	// weExpectSCTs requires SCTs in Fulcio certificates
-	weExpectSCTs bool
+	// requireSCTs requires SCTs in Fulcio certificates
+	requireSCTs bool
 	// ctlogEntriesTreshold is the minimum number of verified SCTs in
 	// a Fulcio certificate
 	ctlogEntriesThreshold int
-	// weDoNotExpectAnyObserverTimestamps uses the certificate's lifetime
-	// rather than a provided signed or log timestamp. Most workflows will
-	// not use this option
-	weDoNotExpectAnyObserverTimestamps bool
+	// useCurrentTime uses the current time rather than a provided signed
+	// or log timestamp. Most workflows will not use this option
+	useCurrentTime bool
 }
 
 type VerifierOption func(*VerifierConfig) error
@@ -115,7 +114,7 @@ func WithSignedTimestamps(threshold int) VerifierOption {
 		if threshold < 1 {
 			return errors.New("signed timestamp threshold must be at least 1")
 		}
-		c.weExpectSignedTimestamps = true
+		c.requireSignedTimestamps = true
 		c.signedTimestampThreshold = threshold
 		return nil
 	}
@@ -145,7 +144,7 @@ func WithTransparencyLog(threshold int) VerifierOption {
 		if threshold < 1 {
 			return errors.New("transparency log entry threshold must be at least 1")
 		}
-		c.weExpectTlogEntries = true
+		c.requireTlogEntries = true
 		c.tlogEntriesThreshold = threshold
 		return nil
 	}
@@ -170,30 +169,26 @@ func WithSignedCertificateTimestamps(threshold int) VerifierOption {
 		if threshold < 1 {
 			return errors.New("ctlog entry threshold must be at least 1")
 		}
-		c.weExpectSCTs = true
+		c.requireSCTs = true
 		c.ctlogEntriesThreshold = threshold
 		return nil
 	}
 }
 
-// WithoutAnyObserverTimestampsUnsafe configures the SignedEntityVerifier to not expect
+// WithCurrentTime configures the SignedEntityVerifier to not expect
 // any timestamps from either a Timestamp Authority or a Transparency Log.
-//
-// A SignedEntity without a trusted "observer" timestamp to verify the attached
-// Fulcio certificate can't provide the same kind of integrity guarantee.
-//
-// Do not enable this if you don't know what you are doing; as the name implies,
-// using it defeats part of the security guarantees offered by Sigstore. This
-// option is only useful for testing.
-func WithoutAnyObserverTimestampsUnsafe() VerifierOption {
+// This option should not be enabled when verifying short-lived certificates,
+// as an observer timestamp is needed. This option is useful primarily for
+// private deployments with long-lived code signing certificates.
+func WithCurrentTime() VerifierOption {
 	return func(c *VerifierConfig) error {
-		c.weDoNotExpectAnyObserverTimestamps = true
+		c.useCurrentTime = true
 		return nil
 	}
 }
 
 func (c *VerifierConfig) Validate() error {
-	if !c.requireObserverTimestamps && !c.weExpectSignedTimestamps && !c.requireIntegratedTimestamps && !c.weDoNotExpectAnyObserverTimestamps {
+	if !c.requireObserverTimestamps && !c.requireSignedTimestamps && !c.requireIntegratedTimestamps && !c.useCurrentTime {
 		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one of " +
 			"WithObserverTimestamps(), WithSignedTimestamps(), WithIntegratedTimestamps(), or WithoutAnyObserverTimestampsUnsafe()")
 	}
@@ -552,7 +547,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		// From spec:
 		// > Unless performing online verification (see §Alternative Workflows), the Verifier MUST extract the  SignedCertificateTimestamp embedded in the leaf certificate, and verify it as in RFC 9162 §8.1.3, using the verification key from the Certificate Transparency Log.
 
-		if v.config.weExpectSCTs {
+		if v.config.requireSCTs {
 			err = VerifySignedCertificateTimestamp(chains, v.config.ctlogEntriesThreshold, v.trustedMaterial)
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify signed certificate timestamp: %w", err)
@@ -647,7 +642,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntity) ([]TimestampVerificationResult, error) {
 	verifiedTimestamps := []TimestampVerificationResult{}
 
-	if v.config.weExpectTlogEntries {
+	if v.config.requireTlogEntries {
 		// log timestamps should be verified if with WithIntegratedTimestamps or WithObserverTimestamps is used
 		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
 			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps)
@@ -675,7 +670,7 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 
 	// From spec:
 	// > … if verification or timestamp parsing fails, the Verifier MUST abort
-	if v.config.weExpectSignedTimestamps {
+	if v.config.requireSignedTimestamps {
 		verifiedSignedTimestamps, err := VerifyTimestampAuthorityWithThreshold(entity, v.trustedMaterial, v.config.signedTimestampThreshold)
 		if err != nil {
 			return nil, err
@@ -712,19 +707,9 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 		}
 	}
 
-	if v.config.weDoNotExpectAnyObserverTimestamps {
-		// if we have a cert, let's pop the leafcert's NotBefore
-		verificationContent, err := entity.VerificationContent()
-		if err != nil {
-			return nil, err
-		}
-
-		if leafCert := verificationContent.Certificate(); leafCert != nil {
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "LeafCert.NotBefore", URI: "", Timestamp: leafCert.NotBefore})
-		} else {
-			// no cert? use current time
-			verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "CurrentTime", URI: "", Timestamp: time.Now()})
-		}
+	if v.config.useCurrentTime {
+		// use current time to verify certificate if no signed timestamps are provided
+		verifiedTimestamps = append(verifiedTimestamps, TimestampVerificationResult{Type: "CurrentTime", URI: "", Timestamp: time.Now()})
 	}
 
 	if len(verifiedTimestamps) == 0 {
