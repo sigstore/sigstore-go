@@ -15,10 +15,7 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
@@ -26,7 +23,6 @@ import (
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
-	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -39,19 +35,15 @@ import (
 )
 
 var bundlePath *string
-var certPath *string
 var certOIDC *string
 var certSAN *string
 var identityToken *string
-var signaturePath *string
 var staging = false
 var trustedRootPath *string
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Printf("\t%s sign --identity-token TOKEN --signature FILE --certificate FILE [--staging] FILE", os.Args[0])
 	fmt.Printf("\t%s sign-bundle --identity-token TOKEN --bundle FILE [--staging] FILE", os.Args[0])
-	fmt.Printf("\t%s verify --signature FILE --certificate FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 }
 
@@ -100,9 +92,6 @@ func parseArgs() {
 		case "--bundle":
 			bundlePath = &os.Args[i+1]
 			i += 2
-		case "--certificate":
-			certPath = &os.Args[i+1]
-			i += 2
 		case "--certificate-oidc-issuer":
 			certOIDC = &os.Args[i+1]
 			i += 2
@@ -111,9 +100,6 @@ func parseArgs() {
 			i += 2
 		case "--identity-token":
 			identityToken = &os.Args[i+1]
-			i += 2
-		case "--signature":
-			signaturePath = &os.Args[i+1]
 			i += 2
 		case "--staging":
 			staging = true
@@ -186,36 +172,6 @@ func main() {
 	parseArgs()
 
 	switch os.Args[1] {
-	case "sign":
-		// We don't need Rekor entries for detached materials
-		bundle, err := signBundle(false)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		messageSignature := bundle.GetMessageSignature()
-		if messageSignature == nil {
-			log.Fatal("unable to load signature")
-		}
-		b64MessageSignature := base64.StdEncoding.EncodeToString(messageSignature.Signature)
-		err = os.WriteFile(*signaturePath, []byte(b64MessageSignature), 0600)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		verificationMaterial := bundle.GetVerificationMaterial()
-		if verificationMaterial == nil {
-			log.Fatal("unable to load verification material")
-		}
-		certificate := verificationMaterial.GetCertificate()
-		if certificate == nil {
-			log.Fatal("unable to load certificate")
-		}
-		pemBlock := &pem.Block{Type: "certificate", Bytes: certificate.RawBytes}
-		err = os.WriteFile(*certPath, pem.EncodeToMemory(pemBlock), 0600)
-		if err != nil {
-			log.Fatal(err)
-		}
 	case "sign-bundle":
 		bundle, err := signBundle(true)
 		if err != nil {
@@ -227,92 +183,6 @@ func main() {
 			log.Fatal(err)
 		}
 		err = os.WriteFile(*bundlePath, bundleBytes, 0600)
-		if err != nil {
-			log.Fatal(err)
-		}
-	case "verify":
-		// Load certificate
-		cert, err := os.ReadFile(*certPath)
-		if err != nil {
-			log.Fatalf("unable to open certificate file %s", *certPath)
-		}
-
-		pemCert, _ := pem.Decode(cert)
-		if pemCert == nil {
-			log.Fatalf("unable to load cerficate from %s", *certPath)
-		}
-
-		// Load signature
-		sig, err := os.ReadFile(*signaturePath)
-		if err != nil {
-			log.Fatalf("unable to open signature file %s", *signaturePath)
-		}
-		sigBytes, err := base64.StdEncoding.DecodeString(string(sig))
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		fileDigest := sha256.Sum256(fileBytes)
-
-		// Construct bundle
-		signingCert := protocommon.X509Certificate{
-			RawBytes: pemCert.Bytes,
-		}
-
-		pb := protobundle.Bundle{
-			MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
-			VerificationMaterial: &protobundle.VerificationMaterial{
-				Content: &protobundle.VerificationMaterial_X509CertificateChain{
-					X509CertificateChain: &protocommon.X509CertificateChain{
-						Certificates: []*protocommon.X509Certificate{&signingCert},
-					},
-				},
-			},
-			Content: &protobundle.Bundle_MessageSignature{
-				MessageSignature: &protocommon.MessageSignature{
-					MessageDigest: &protocommon.HashOutput{
-						Algorithm: protocommon.HashAlgorithm_SHA2_256,
-						Digest:    fileDigest[:],
-					},
-					Signature: sigBytes,
-				},
-			},
-		}
-
-		identityPolicies := []verify.PolicyOption{}
-		if *certOIDC != "" || *certSAN != "" {
-			certID, err := verify.NewShortCertificateIdentity(*certOIDC, "", *certSAN, "")
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-
-			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
-		}
-
-		// Load trust root
-		tr := getTrustedRoot(staging)
-
-		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithCurrentTime(), verify.WithSignedCertificateTimestamps(1))
-
-		// Verify bundle
-		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		bun, err := bundle.NewBundle(&pb)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, err = sev.Verify(bun, verify.NewPolicy(verify.WithArtifactDigest("sha256", fileDigest[:]), identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}
