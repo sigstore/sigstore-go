@@ -269,3 +269,37 @@ func limitSubjects(statement *in_toto.Statement) error {
 	}
 	return nil
 }
+
+type multihasher struct {
+	hashfuncs []crypto.Hash
+	hashes    []hash.Hash
+}
+
+func newMultihasher(hashfuncs []crypto.Hash) *multihasher {
+	hashes := make([]hash.Hash, len(hashfuncs))
+	for i := range hashfuncs {
+		hashes[i] = hashfuncs[i].New()
+	}
+	return &multihasher{
+		hashfuncs: hashfuncs,
+		hashes:    hashes,
+	}
+}
+
+func (m *multihasher) Write(p []byte) (n int, err error) {
+	for i := range m.hashes {
+		n, err = m.hashes[i].Write(p)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (m *multihasher) Sum(b []byte) map[crypto.Hash][]byte {
+	sums := make(map[crypto.Hash][]byte, len(m.hashes))
+	for i := range m.hashes {
+		sums[m.hashfuncs[i]] = m.hashes[i].Sum(b)
+	}
+	return sums
+}
