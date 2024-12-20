@@ -20,6 +20,7 @@ import (
 	"crypto/sha512"
 	"testing"
 
+	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,4 +38,71 @@ func TestMultiHasher(t *testing.T) {
 	assert.Equal(t, 2, len(hashes))
 	assert.EqualValues(t, hash256[:], hashes[crypto.SHA256])
 	assert.EqualValues(t, hash512[:], hashes[crypto.SHA512])
+}
+
+func makeStatement(subjectalgs [][]string) *in_toto.Statement {
+	statement := &in_toto.Statement{
+		Subject: make([]*in_toto.ResourceDescriptor, len(subjectalgs)),
+	}
+	for i, subjectAlg := range subjectalgs {
+		statement.Subject[i] = &in_toto.ResourceDescriptor{
+			Digest: make(map[string]string),
+		}
+		for _, digest := range subjectAlg {
+			// content of digest doesn't matter for this test
+			statement.Subject[i].Digest[digest] = "foobar"
+		}
+	}
+	return statement
+}
+
+func TestGetHashFunctions(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		algs         [][]string
+		expectOutput []crypto.Hash
+		expectError  bool
+	}{
+		{
+			name:         "choose strongest algorithm",
+			algs:         [][]string{{"sha256", "sha512"}},
+			expectOutput: []crypto.Hash{crypto.SHA512},
+		},
+		{
+			name:         "choose both algorithms",
+			algs:         [][]string{{"sha256"}, {"sha512"}},
+			expectOutput: []crypto.Hash{crypto.SHA256, crypto.SHA512},
+		},
+		{
+			name:         "choose one algorithm",
+			algs:         [][]string{{"sha512"}, {"sha256", "sha512"}},
+			expectOutput: []crypto.Hash{crypto.SHA512},
+		},
+		{
+			name:         "choose two algorithms",
+			algs:         [][]string{{"sha256", "sha512"}, {"sha384", "sha512"}, {"sha256", "sha384"}},
+			expectOutput: []crypto.Hash{crypto.SHA512, crypto.SHA384},
+		},
+		{
+			name:         "ignore unknown algorithm",
+			algs:         [][]string{{"md5", "sha512"}, {"sha256", "sha512"}},
+			expectOutput: []crypto.Hash{crypto.SHA512},
+		},
+		{
+			name:        "no recognized algorithms",
+			algs:        [][]string{{"md5"}, {"sha1"}},
+			expectError: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			statement := makeStatement(test.algs)
+			hfs, err := getHashFunctions(statement)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, test.expectOutput, hfs)
+		})
+	}
 }
