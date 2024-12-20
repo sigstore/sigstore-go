@@ -426,7 +426,6 @@ func TestSigstoreBundle2Sig(t *testing.T) {
 }
 
 func TestStatementSerializesToValidInTotoStatement(t *testing.T) {
-	// create instance of verify.Statement with dummy values
 	statement := in_toto.Statement{}
 	statement.Type = "https://in-toto.io/Statement/v0.1"
 	statement.PredicateType = "https://example.org/predicate"
@@ -446,7 +445,7 @@ func TestStatementSerializesToValidInTotoStatement(t *testing.T) {
 	result.Statement = &statement
 
 	// marshal the statement to JSON
-	statementJSON, err := json.Marshal(result)
+	resultJSON, err := json.Marshal(result)
 	assert.NoError(t, err)
 	want := `
 	{
@@ -466,5 +465,12 @@ func TestStatementSerializesToValidInTotoStatement(t *testing.T) {
 			"predicate": {}
 		}
 	}`
-	assert.JSONEq(t, want, string(statementJSON))
+	assert.JSONEq(t, want, string(resultJSON))
+
+	// unmarshal the JSON back to a VerificationResult
+	result2 := verify.NewVerificationResult()
+	err = json.Unmarshal(resultJSON, result2)
+	assert.NoError(t, err)
+	assert.Equal(t, result.MediaType, result2.MediaType)
+	assert.Equal(t, result.Statement, result2.Statement)
 }

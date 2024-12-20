@@ -225,7 +225,6 @@ func NewVerificationResult() *VerificationResult {
 
 // MarshalJSON deals with protojson needed for the Statement.
 // Can be removed when https://github.com/in-toto/attestation/pull/403 is merged.
-// TODO: Should we also add UnmarshalJSON?
 func (b *VerificationResult) MarshalJSON() ([]byte, error) {
 	statement, err := protojson.Marshal(b.Statement)
 	if err != nil {
@@ -241,6 +240,21 @@ func (b *VerificationResult) MarshalJSON() ([]byte, error) {
 		Alias:     Alias(*b),
 		Statement: statement,
 	})
+}
+
+func (b *VerificationResult) UnmarshalJSON(data []byte) error {
+	b.Statement = &in_toto.Statement{}
+	type Alias VerificationResult
+	aux := &struct {
+		Alias
+		Statement json.RawMessage `json:"statement,omitempty"`
+	}{
+		Alias: Alias(*b),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	return protojson.Unmarshal(aux.Statement, b.Statement)
 }
 
 type PolicyOption func(*PolicyConfig) error
