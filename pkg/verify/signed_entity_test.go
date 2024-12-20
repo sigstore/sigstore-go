@@ -23,9 +23,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/sigstore/sigstore-go/pkg/testing/data"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestSignedEntityVerifierInitialization(t *testing.T) {
@@ -421,4 +423,48 @@ func TestSigstoreBundle2Sig(t *testing.T) {
 	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
 	assert.True(t, errors.Is(err, verify.ErrDSSEInvalidSignatureCount))
 	assert.Nil(t, res)
+}
+
+func TestStatementSerializesToValidInTotoStatement(t *testing.T) {
+	// create instance of verify.Statement with dummy values
+	statement := in_toto.Statement{}
+	statement.Type = "https://in-toto.io/Statement/v0.1"
+	statement.PredicateType = "https://example.org/predicate"
+	statement.Subject = []*in_toto.ResourceDescriptor{
+		{
+			Name: "artifact-name",
+			Digest: map[string]string{
+				"sha256": "artifact-digest",
+			},
+		},
+	}
+	statement.Predicate = &structpb.Struct{
+		Fields: map[string]*structpb.Value{},
+	}
+
+	result := verify.NewVerificationResult()
+	result.Statement = &statement
+
+	// marshal the statement to JSON
+	statementJSON, err := json.Marshal(result)
+	assert.NoError(t, err)
+	want := `
+	{
+		"mediaType": "application/vnd.dev.sigstore.verificationresult+json;version=0.1",
+		"verifiedTimestamps": null,
+		"statement": {
+			"_type": "https://in-toto.io/Statement/v0.1",
+			"predicateType": "https://example.org/predicate",
+			"subject": [
+				{
+					"name": "artifact-name",
+					"digest": {
+						"sha256": "artifact-digest"
+					}
+				}
+			],
+			"predicate": {}
+		}
+	}`
+	assert.JSONEq(t, want, string(statementJSON))
 }
