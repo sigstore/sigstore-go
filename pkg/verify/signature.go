@@ -333,7 +333,7 @@ func getHashFunctions(statement *in_toto.Statement) ([]crypto.Hash, error) {
 			continue
 		}
 
-		// check each supported hash func and add chose it if the subject
+		// check each supported hash func and add it if the subject
 		// has a digest for it
 		for _, hf := range supportedHashFuncs {
 			if slices.Contains(hfs, hf) {
