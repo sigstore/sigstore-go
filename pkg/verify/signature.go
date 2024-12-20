@@ -168,17 +168,17 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 
 	// Look for artifact digest in statement
 	for _, subject := range statement.Subject {
-		for alg, digest := range subject.Digest {
+		for alg, hexdigest := range subject.Digest {
 			hf, err := algStringToHashFunc(alg)
 			if err != nil {
 				continue
 			}
 			if artifactDigest, ok := artifactDigests[hf]; ok {
-				hexdigest, err := hex.DecodeString(digest)
+				digest, err := hex.DecodeString(hexdigest)
 				if err != nil {
 					continue
 				}
-				if bytes.Equal(artifactDigest, hexdigest) {
+				if bytes.Equal(artifactDigest, digest) {
 					return nil
 				}
 			}
