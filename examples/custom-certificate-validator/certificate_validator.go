@@ -57,8 +57,8 @@ func (tm *TrustedMaterialWithCertificateValidator) FulcioCertificateAuthorities(
 	return cas
 }
 
-// NewBasicCRLTrustedMaterial creates a TrustedMaterial that validates certificates against a list of revoked serial numbers.
-func NewBasicCRLTrustedMaterial(trustedMaterial root.TrustedMaterial, revokedSerialNumbers []*big.Int) root.TrustedMaterial {
+// NewValidatingTrustedMaterial creates a TrustedMaterial that validates certificates against a list of revoked serial numbers.
+func NewValidatingTrustedMaterial(trustedMaterial root.TrustedMaterial, revokedSerialNumbers []*big.Int) root.TrustedMaterial {
 	return &TrustedMaterialWithCertificateValidator{
 		TrustedMaterial: trustedMaterial,
 		validator: func(cert *x509.Certificate) error {

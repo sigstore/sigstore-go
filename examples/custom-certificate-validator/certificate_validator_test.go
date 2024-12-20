@@ -31,12 +31,12 @@ func TestCRLWrapper(t *testing.T) {
 	leaf, _, err := virtualSigstore.GenerateLeafCert("example@example.com", "issuer")
 	assert.NoError(t, err)
 
-	trustedMaterial := NewBasicCRLTrustedMaterial(virtualSigstore, []*big.Int{})
-	trustedMaterialWithRevocation := NewBasicCRLTrustedMaterial(virtualSigstore, []*big.Int{leaf.SerialNumber})
+	trustedMaterial := NewValidatingTrustedMaterial(virtualSigstore, []*big.Int{})
+	validatingTrustedMaterial := NewValidatingTrustedMaterial(virtualSigstore, []*big.Int{leaf.SerialNumber})
 
 	_, err = verify.VerifyLeafCertificate(time.Now(), leaf, trustedMaterial)
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyLeafCertificate(time.Now(), leaf, trustedMaterialWithRevocation)
+	_, err = verify.VerifyLeafCertificate(time.Now(), leaf, validatingTrustedMaterial)
 	assert.Error(t, err)
 }
