@@ -153,7 +153,7 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 	}
 
 	// determine which hash functions to use
-	hashFuncs, err := determineHashFunctions(statement)
+	hashFuncs, err := getHashFunctions(statement)
 	if err != nil {
 		return fmt.Errorf("could not verify artifact: unable to determine hash functions: %w", err)
 	}
@@ -302,74 +302,62 @@ func algStringToHashFunc(alg string) (crypto.Hash, error) {
 	}
 }
 
-func determineHashFunctions(statement *in_toto.Statement) ([]crypto.Hash, error) {
+// getHashFunctions returns the smallest subset of supported hash functions
+// that are needed to verify all subjects in a statement.
+func getHashFunctions(statement *in_toto.Statement) ([]crypto.Hash, error) {
 	if len(statement.Subject) == 0 {
 		return nil, errors.New("no subjects found in statement")
 	}
 
-	algorithmCounts := supportedHashFuncsCount()
-	for _, subject := range statement.Subject {
+	supportedHashFuncs := []crypto.Hash{crypto.SHA512, crypto.SHA384, crypto.SHA256}
+	chosenHashFuncs := make([]crypto.Hash, 0, len(supportedHashFuncs))
+	subjectHashFuncs := make([][]crypto.Hash, len(statement.Subject))
+
+	// go through the statement and make a simple data structure to hold the
+	// list of hash funcs for each subject (subjectHashFuncs)
+	for i, subject := range statement.Subject {
 		for alg := range subject.Digest {
 			hf, err := algStringToHashFunc(alg)
 			if err != nil {
 				continue
 			}
-			algorithmCounts[hf]++
+			subjectHashFuncs[i] = append(subjectHashFuncs[i], hf)
 		}
-	}
-	anyCompatibleAlgorithms := false
-	var mostCommonHashFunc crypto.Hash
-	largestCount := 0
-	seenHashFuncs := make([]crypto.Hash, 0)
-	for hf, count := range algorithmCounts {
-		if count > 0 {
-			anyCompatibleAlgorithms = true
-			if !slices.Contains(seenHashFuncs, hf) {
-				seenHashFuncs = append(seenHashFuncs, hf)
-			}
-		}
-		// if this algorithm is supported by all subjects, we can use it alone
-		if count == len(statement.Subject) {
-			return []crypto.Hash{hf}, nil
-		}
-		if count > largestCount {
-			largestCount = count
-			mostCommonHashFunc = hf
-		}
-	}
-	if !anyCompatibleAlgorithms {
-		return nil, errors.New("no supported digest algorithms found in statement")
 	}
 
-	// If we didn't find a common algorithm, see if we cover more digests by using all seen algorithms
-	countWithAllAlgorithms := 0
-	for _, subject := range statement.Subject {
-		for alg := range subject.Digest {
-			hf, err := algStringToHashFunc(alg)
-			if err != nil {
-				continue
-			}
-			if slices.Contains(seenHashFuncs, hf) {
-				countWithAllAlgorithms++
+	// for each subject, see if we have chosen a compatible hash func, and if
+	// not, add the first one that is supported
+	for _, hfs := range subjectHashFuncs {
+		// if any of the hash funcs are already in chosenHashFuncs, skip
+		if len(intersection(hfs, chosenHashFuncs)) > 0 {
+			continue
+		}
+
+		// check each supported hash func and add chose it if the subject
+		// has a digest for it
+		for _, hf := range supportedHashFuncs {
+			if slices.Contains(hfs, hf) {
+				chosenHashFuncs = append(chosenHashFuncs, hf)
 				break
 			}
 		}
 	}
-	// No need to calculate all digests if the most common one covers the same number of subjects
-	if countWithAllAlgorithms > largestCount {
-		return seenHashFuncs, nil
+
+	if len(chosenHashFuncs) == 0 {
+		return nil, errors.New("no supported digest algorithms found")
 	}
-	return []crypto.Hash{mostCommonHashFunc}, nil
+
+	return chosenHashFuncs, nil
 }
 
-func supportedHashFuncsCount() map[crypto.Hash]int {
-	counts := make(map[crypto.Hash]int)
-	for _, hf := range supportedHashFuncs() {
-		counts[hf] = 0
+func intersection(a, b []crypto.Hash) []crypto.Hash {
+	var result []crypto.Hash
+	for _, x := range a {
+		for _, y := range b {
+			if x == y {
+				result = append(result, x)
+			}
+		}
 	}
-	return counts
-}
-
-func supportedHashFuncs() []crypto.Hash {
-	return []crypto.Hash{crypto.SHA512, crypto.SHA384, crypto.SHA256}
+	return result
 }
