@@ -143,8 +143,7 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 	if err != nil {
 		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
 	}
-	err = limitSubjects(statement)
-	if err != nil {
+	if err = limitSubjects(statement); err != nil {
 		return err
 	}
 
@@ -212,8 +211,7 @@ func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope Enve
 	if err != nil {
 		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
 	}
-	err = limitSubjects(statement)
-	if err != nil {
+	if err = limitSubjects(statement); err != nil {
 		return err
 	}
 
