@@ -17,6 +17,7 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -219,6 +221,40 @@ func NewVerificationResult() *VerificationResult {
 	return &VerificationResult{
 		MediaType: VerificationResultMediaType01,
 	}
+}
+
+// MarshalJSON deals with protojson needed for the Statement.
+// Can be removed when https://github.com/in-toto/attestation/pull/403 is merged.
+func (b *VerificationResult) MarshalJSON() ([]byte, error) {
+	statement, err := protojson.Marshal(b.Statement)
+	if err != nil {
+		return nil, err
+	}
+	// creating a type alias to avoid infinite recursion, as MarshalJSON is
+	// not copied into the alias.
+	type Alias VerificationResult
+	return json.Marshal(struct {
+		Alias
+		Statement json.RawMessage `json:"statement,omitempty"`
+	}{
+		Alias:     Alias(*b),
+		Statement: statement,
+	})
+}
+
+func (b *VerificationResult) UnmarshalJSON(data []byte) error {
+	b.Statement = &in_toto.Statement{}
+	type Alias VerificationResult
+	aux := &struct {
+		Alias
+		Statement json.RawMessage `json:"statement,omitempty"`
+	}{
+		Alias: Alias(*b),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	return protojson.Unmarshal(aux.Statement, b.Statement)
 }
 
 type PolicyOption func(*PolicyConfig) error
