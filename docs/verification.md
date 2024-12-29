@@ -197,12 +197,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	trustedrootJSON, err := client.GetTarget("trusted_root.json")
-	if err != nil {
-		panic(err)
-	}
 
-	trustedMaterial, err := root.NewTrustedRootFromJSON(trustedrootJSON)
+	trustedMaterial, err := root.GetTrustedRoot(client)
 	if err != nil {
 		panic(err)
 	}
