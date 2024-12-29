@@ -63,12 +63,8 @@ Going through this step-by-step, we'll start by loading the trusted root from th
 	if err != nil {
 		panic(err)
 	}
-	trustedrootJSON, err := client.GetTarget("trusted_root.json")
-	if err != nil {
-		panic(err)
-	}
 
-	trustedMaterial, err := root.NewTrustedRootFromJSON(trustedrootJSON)
+	trustedMaterial, err := root.GetTrustedRoot(client)
 	if err != nil {
 		panic(err)
 	}
