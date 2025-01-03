@@ -192,7 +192,7 @@ func WithCurrentTime() VerifierOption {
 func (c *VerifierConfig) Validate() error {
 	if !c.requireObserverTimestamps && !c.requireSignedTimestamps && !c.requireIntegratedTimestamps && !c.useCurrentTime {
 		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one of " +
-			"WithObserverTimestamps(), WithSignedTimestamps(), WithIntegratedTimestamps(), or WithoutAnyObserverTimestampsUnsafe()")
+			"WithObserverTimestamps(), WithSignedTimestamps(), or WithIntegratedTimestamps()")
 	}
 
 	return nil
