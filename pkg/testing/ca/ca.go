@@ -37,6 +37,10 @@ import (
 	"github.com/digitorus/timestamp"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/swag"
+	ct "github.com/google/certificate-transparency-go"
+	"github.com/google/certificate-transparency-go/tls"
+	"github.com/google/certificate-transparency-go/trillian/ctfe"
+	ctx509util "github.com/google/certificate-transparency-go/x509util"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
@@ -53,6 +57,13 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
 	tsx509 "github.com/sigstore/timestamp-authority/pkg/x509"
+)
+
+var (
+	// OIDExtensionCTPoison is defined in RFC 6962 s3.1.
+	OIDExtensionCTPoison = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}
+	// OIDExtensionCTSCT is defined in RFC 6962 s3.3.
+	OIDExtensionCTSCT = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
 )
 
 type VirtualSigstore struct {
@@ -152,7 +163,7 @@ func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Cert
 	if err != nil {
 		return nil, nil, err
 	}
-	leafCert, err := GenerateLeafCert(identity, issuer, time.Now(), privKey, ca.fulcioCA.Intermediates[0], ca.fulcioIntermediateKey)
+	leafCert, err := GenerateLeafCert(identity, issuer, time.Now(), privKey, ca.fulcioCA.Intermediates[0], ca.fulcioIntermediateKey, ca.ctlogKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -646,7 +657,13 @@ func GenerateTSAIntermediate(rootTemplate *x509.Certificate, rootPriv crypto.Sig
 }
 
 func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, priv *ecdsa.PrivateKey,
-	parentTemplate *x509.Certificate, parentPriv crypto.Signer) (*x509.Certificate, error) {
+	parentTemplate *x509.Certificate, parentPriv crypto.Signer, sctKey crypto.Signer) (*x509.Certificate, error) {
+
+	skid, err := cryptoutils.SKID(&priv.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
 	certTemplate := &x509.Certificate{
 		SerialNumber:   big.NewInt(1),
 		EmailAddresses: []string{subject},
@@ -655,13 +672,21 @@ func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, p
 		KeyUsage:       x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		IsCA:           false,
-		ExtraExtensions: []pkix.Extension{{
-			// OID for OIDC Issuer extension
-			Id:       asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 57264, 1, 1},
-			Critical: false,
-			Value:    []byte(oidcIssuer),
+		ExtraExtensions: []pkix.Extension{
+			{
+				// OID for OIDC Issuer extension
+				Id:       asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 57264, 1, 1},
+				Critical: false,
+				Value:    []byte(oidcIssuer),
+			},
+			{
+				// Poison extension for pre-certificate
+				Id:       OIDExtensionCTPoison,
+				Critical: true,
+				Value:    asn1.NullBytes,
+			},
 		},
-		},
+		SubjectKeyId: skid,
 	}
 
 	cert, err := createCertificate(certTemplate, parentTemplate, &priv.PublicKey, parentPriv)
@@ -669,7 +694,87 @@ func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, p
 		return nil, err
 	}
 
-	return cert, nil
+	logID, err := ctfe.GetCTLogID(sctKey.Public())
+	if err != nil {
+		return nil, err
+	}
+
+	return embedSCTs(cert, parentTemplate, parentPriv, &priv.PublicKey, sctKey, []ct.SignedCertificateTimestamp{
+		{
+			SCTVersion: ct.V1,
+			Timestamp:  12345,
+			LogID:      ct.LogID{KeyID: logID},
+		},
+	})
+}
+
+func embedSCTs(preCert *x509.Certificate, parentCert *x509.Certificate, parentPriv crypto.Signer, pk crypto.PublicKey, sctKey crypto.Signer, sctInput []ct.SignedCertificateTimestamp) (*x509.Certificate, error) {
+	scts := make([]*ct.SignedCertificateTimestamp, len(sctInput))
+	for i, s := range sctInput {
+		logEntry := ct.LogEntry{
+			Leaf: ct.MerkleTreeLeaf{
+				Version:  ct.V1,
+				LeafType: ct.TimestampedEntryLeafType,
+				TimestampedEntry: &ct.TimestampedEntry{
+					Timestamp: s.Timestamp,
+					EntryType: ct.PrecertLogEntryType,
+					PrecertEntry: &ct.PreCert{
+						IssuerKeyHash:  sha256.Sum256(parentCert.RawSubjectPublicKeyInfo),
+						TBSCertificate: preCert.RawTBSCertificate,
+					},
+				},
+			},
+		}
+		data, err := ct.SerializeSCTSignatureInput(s, logEntry)
+		if err != nil {
+			return nil, err
+		}
+		h := sha256.Sum256(data)
+		signature, err := sctKey.Sign(rand.Reader, h[:], crypto.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		scts[i] = &ct.SignedCertificateTimestamp{
+			SCTVersion: s.SCTVersion,
+			LogID:      s.LogID,
+			Timestamp:  s.Timestamp,
+			Signature: ct.DigitallySigned{
+				Algorithm: tls.SignatureAndHashAlgorithm{
+					Hash:      tls.SHA256,
+					Signature: tls.ECDSA,
+				},
+				Signature: signature,
+			},
+		}
+	}
+	sctList, err := ctx509util.MarshalSCTsIntoSCTList(scts)
+	if err != nil {
+		return nil, err
+	}
+	sctBytes, err := tls.Marshal(*sctList)
+	if err != nil {
+		return nil, err
+	}
+	asnSCT, err := asn1.Marshal(sctBytes)
+	if err != nil {
+		return nil, err
+	}
+	var exts []pkix.Extension
+	for _, pext := range preCert.Extensions {
+		if !pext.Id.Equal(OIDExtensionCTPoison) {
+			exts = append(exts, pext)
+		}
+	}
+	exts = append(exts, pkix.Extension{
+		Id:    OIDExtensionCTSCT,
+		Value: asnSCT,
+	})
+	preCert.ExtraExtensions = exts
+	certDERBytes, err := x509.CreateCertificate(rand.Reader, preCert, parentCert, pk, parentPriv)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
 }
 
 func GenerateTSALeafCert(expiration time.Time, priv *ecdsa.PrivateKey, parentTemplate *x509.Certificate, parentPriv crypto.Signer) (*x509.Certificate, error) {
