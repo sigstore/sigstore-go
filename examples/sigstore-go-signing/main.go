@@ -96,12 +96,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	trustedRootJSON, err := tufClient.GetTarget("trusted_root.json")
+	trustedRoot, err := root.GetTrustedRoot(tufClient)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	trustedRoot, err := root.NewTrustedRootFromJSON(trustedRootJSON)
+	// TODO: Uncomment once the TUF staging root distributes this file
+	// signingConfig, err := root.GetSigningConfig(tufClient)
+	signingConfig, err := root.NewSigningConfig(root.SigningConfigMediaType01,
+		"https://fulcio.sigstage.dev",
+		"https://oauth2.sigstage.dev/auth",
+		[]string{"https://rekor.sigstage.dev"},
+		[]string{"https://timestamp.githubapp.com/api/v1/timestamp"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -110,7 +116,7 @@ func main() {
 
 	if *idToken != "" {
 		fulcioOpts := &sign.FulcioOptions{
-			BaseURL: "https://fulcio.sigstage.dev",
+			BaseURL: signingConfig.FulcioCertificateAuthorityURL(),
 			Timeout: time.Duration(30 * time.Second),
 			Retries: 1,
 		}
@@ -121,24 +127,28 @@ func main() {
 	}
 
 	if *tsa {
-		tsaOpts := &sign.TimestampAuthorityOptions{
-			URL:     "https://timestamp.githubapp.com/api/v1/timestamp",
-			Timeout: time.Duration(30 * time.Second),
-			Retries: 1,
+		for _, tsaURL := range signingConfig.TimestampAuthorityURLs() {
+			tsaOpts := &sign.TimestampAuthorityOptions{
+				URL:     tsaURL,
+				Timeout: time.Duration(30 * time.Second),
+				Retries: 1,
+			}
+			opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 		}
-		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 
 		// staging TUF repo doesn't have accessible timestamp authorities
 		opts.TrustedRoot = nil
 	}
 
 	if *rekor {
-		rekorOpts := &sign.RekorOptions{
-			BaseURL: "https://rekor.sigstage.dev",
-			Timeout: time.Duration(90 * time.Second),
-			Retries: 1,
+		for _, rekorURL := range signingConfig.RekorLogURLs() {
+			rekorOpts := &sign.RekorOptions{
+				BaseURL: rekorURL,
+				Timeout: time.Duration(90 * time.Second),
+				Retries: 1,
+			}
+			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 		}
-		opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
 
 	bundle, err := sign.Bundle(content, keypair, opts)

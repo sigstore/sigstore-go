@@ -14,7 +14,7 @@ require (
 	github.com/in-toto/attestation v1.1.0
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
-	github.com/sigstore/protobuf-specs v0.3.2
+	github.com/sigstore/protobuf-specs v0.3.3
 	github.com/sigstore/rekor v1.3.7
 	github.com/sigstore/sigstore v1.8.11
 	github.com/sigstore/timestamp-authority v1.2.3
@@ -22,7 +22,7 @@ require (
 	github.com/theupdateframework/go-tuf/v2 v2.0.2
 	golang.org/x/crypto v0.31.0
 	golang.org/x/mod v0.22.0
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/protobuf v1.36.2
 )
 
 require (
