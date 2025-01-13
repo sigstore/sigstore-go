@@ -7,7 +7,7 @@ replace github.com/sigstore/sigstore-go => ../../
 require (
 	github.com/google/go-containerregistry v0.20.2
 	github.com/sigstore/protobuf-specs v0.3.3
-	github.com/sigstore/sigstore v1.8.11
+	github.com/sigstore/sigstore v1.8.12
 	github.com/sigstore/sigstore-go v0.6.2
 )
 
