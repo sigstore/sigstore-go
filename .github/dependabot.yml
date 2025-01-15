@@ -17,8 +17,7 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directories:
-      - "/"
-      - "/examples/oci-image-verification"
+      - "**/*"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
