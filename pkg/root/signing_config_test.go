@@ -213,3 +213,37 @@ func TestNewSigningConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestNewSigningConfigWithOptions(t *testing.T) {
+	expectedCAURL := "ca-url"
+	expectedOIDCURL := "oidc-url"
+	expectedRekorLogURLs := []string{"rekor-url"}
+	expectedTSAURLs := []string{"tsa-url"}
+	sc, err := NewSigningConfig(SigningConfigMediaType01, "invalid", "invalid", []string{"invalid"}, []string{"invalid"})
+	sc = sc.WithFulcioCertificateAuthorityURL(expectedCAURL).WithOIDCProviderURL(expectedOIDCURL).WithRekorLogURLs(expectedRekorLogURLs).WithTimestampAuthorityURLs(expectedTSAURLs)
+	if err != nil {
+		t.Errorf("NewSigningConfig() error = %v", err)
+	}
+	if sc.FulcioCertificateAuthorityURL() != expectedCAURL {
+		t.Errorf("unexpected CA URL, expected %v, got %v", expectedCAURL, sc.FulcioCertificateAuthorityURL())
+	}
+	if sc.OIDCProviderURL() != expectedOIDCURL {
+		t.Errorf("unexpected OIDC URL, expected %v, got %v", expectedOIDCURL, sc.OIDCProviderURL())
+	}
+	if !reflect.DeepEqual(sc.RekorLogURLs(), expectedRekorLogURLs) {
+		t.Errorf("unexpected Rekor URLs, expected %v, got %v", expectedRekorLogURLs, sc.RekorLogURLs())
+	}
+	if !reflect.DeepEqual(sc.TimestampAuthorityURLs(), expectedTSAURLs) {
+		t.Errorf("unexpected TSA URLs, expected %v, got %v", expectedTSAURLs, sc.TimestampAuthorityURLs())
+	}
+
+	expectedAddedRekorLogURLs := []string{"rekor-1-url", "rekor-2-url"}
+	expectedAddedTSAURLs := []string{"tsa-1-url", "tsa-2-url"}
+	sc = sc.AddRekorLogURLs(expectedAddedRekorLogURLs...).AddTimestampAuthorityURLs(expectedAddedTSAURLs...)
+	if !reflect.DeepEqual(sc.RekorLogURLs(), append(expectedRekorLogURLs, expectedAddedRekorLogURLs...)) {
+		t.Errorf("unexpected Rekor URLs, expected %v, got %v", expectedRekorLogURLs, sc.RekorLogURLs())
+	}
+	if !reflect.DeepEqual(sc.TimestampAuthorityURLs(), append(expectedTSAURLs, expectedAddedTSAURLs...)) {
+		t.Errorf("unexpected Rekor URLs, expected %v, got %v", expectedTSAURLs, sc.TimestampAuthorityURLs())
+	}
+}

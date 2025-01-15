@@ -101,16 +101,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO: Uncomment once the TUF staging root distributes this file
-	// signingConfig, err := root.GetSigningConfig(tufClient)
-	signingConfig, err := root.NewSigningConfig(root.SigningConfigMediaType01,
-		"https://fulcio.sigstage.dev",
-		"https://oauth2.sigstage.dev/auth",
-		[]string{"https://rekor.sigstage.dev"},
-		[]string{"https://timestamp.githubapp.com/api/v1/timestamp"})
+	signingConfigPGI, err := root.GetSigningConfig(tufClient)
 	if err != nil {
 		log.Fatal(err)
 	}
+	signingConfig := signingConfigPGI.AddTimestampAuthorityURLs("https://timestamp.githubapp.com/api/v1/timestamp")
 
 	opts.TrustedRoot = trustedRoot
 

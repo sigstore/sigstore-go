@@ -45,6 +45,41 @@ func (sc *SigningConfig) TimestampAuthorityURLs() []string {
 	return sc.signingConfig.GetTsaUrls()
 }
 
+func (sc *SigningConfig) WithFulcioCertificateAuthorityURL(fulcioURL string) *SigningConfig {
+	sc.signingConfig.CaUrl = fulcioURL
+	return sc
+}
+
+func (sc *SigningConfig) WithOIDCProviderURL(oidcURL string) *SigningConfig {
+	sc.signingConfig.OidcUrl = oidcURL
+	return sc
+}
+
+func (sc *SigningConfig) WithRekorLogURLs(logURLs []string) *SigningConfig {
+	sc.signingConfig.TlogUrls = logURLs
+	return sc
+}
+
+func (sc *SigningConfig) AddRekorLogURLs(logURLs ...string) *SigningConfig {
+	sc.signingConfig.TlogUrls = append(sc.signingConfig.TlogUrls, logURLs...)
+	return sc
+}
+
+func (sc *SigningConfig) WithTimestampAuthorityURLs(tsaURLs []string) *SigningConfig {
+	sc.signingConfig.TsaUrls = tsaURLs
+	return sc
+}
+
+func (sc *SigningConfig) AddTimestampAuthorityURLs(tsaURLs ...string) *SigningConfig {
+	sc.signingConfig.TsaUrls = append(sc.signingConfig.TsaUrls, tsaURLs...)
+	return sc
+}
+
+func (sc SigningConfig) String() string {
+	return fmt.Sprintf("{CA: %v, OIDC: %v, RekorLogs: %v, TSAs: %v, MediaType: %s}",
+		sc.FulcioCertificateAuthorityURL(), sc.OIDCProviderURL(), sc.RekorLogURLs(), sc.TimestampAuthorityURLs(), SigningConfigMediaType01)
+}
+
 // NewSigningConfig initializes a SigningConfig object from a mediaType string, Fulcio certificate
 // authority URL, OIDC provider URL, list of Rekor transpraency log URLs, and a list of
 // timestamp authorities.
