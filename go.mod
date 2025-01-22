@@ -17,7 +17,7 @@ require (
 	github.com/sigstore/protobuf-specs v0.3.3
 	github.com/sigstore/rekor v1.3.8
 	github.com/sigstore/sigstore v1.8.12
-	github.com/sigstore/timestamp-authority v1.2.2
+	github.com/sigstore/timestamp-authority v1.2.4
 	github.com/stretchr/testify v1.10.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.2
 	golang.org/x/crypto v0.32.0
