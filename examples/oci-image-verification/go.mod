@@ -2,7 +2,7 @@ module github.com/sigstore/sigstore-go/examples/oci-image-verification
 
 go 1.22.0
 
-toolchain go1.23.4
+toolchain go1.23.5
 
 replace github.com/sigstore/sigstore-go => ../../
 
@@ -64,7 +64,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sigstore/rekor v1.3.8 // indirect
-	github.com/sigstore/timestamp-authority v1.2.2 // indirect
+	github.com/sigstore/timestamp-authority v1.2.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
