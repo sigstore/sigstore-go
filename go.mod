@@ -22,7 +22,7 @@ require (
 	github.com/theupdateframework/go-tuf/v2 v2.0.2
 	golang.org/x/crypto v0.32.0
 	golang.org/x/mod v0.22.0
-	google.golang.org/protobuf v1.36.3
+	google.golang.org/protobuf v1.36.4
 )
 
 require (
