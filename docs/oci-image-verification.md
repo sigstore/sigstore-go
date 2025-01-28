@@ -136,4 +136,4 @@ and the verification result:
 }
 ```
 
-To explore a more advanced/configurable verification process, see the CLI implementation in [`cmd/sigstore-go/main.go`](../cmd/sigstore-go/main.go).
+To explore a more advanced/configurable verification process, see the CLI implementation in [`examples/sigstore-go-verification/main.go`](../examples/sigstore-go-verification/main.go).

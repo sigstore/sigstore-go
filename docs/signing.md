@@ -12,7 +12,6 @@ This document will walk you through using `sigstore-go` to generate a Sigstore b
 Clone this repository and run the following command:
 
 ```shell
-$ make build-examples
 $ go install ./examples/sigstore-go-signing
 ```
 
