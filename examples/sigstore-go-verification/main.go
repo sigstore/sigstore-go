@@ -66,7 +66,7 @@ func init() {
 	requireTlog = flag.Bool("requireTlog", true, "Require Artifact Transparency log entry (Rekor)")
 	minBundleVersion = flag.String("minBundleVersion", "", "Minimum acceptable bundle version (e.g. '0.1')")
 	trustedPublicKey = flag.String("publicKey", "", "Path to trusted public key")
-	trustedrootJSONpath = flag.String("trustedrootJSONpath", "examples/trusted-root-public-good.json", "Path to trustedroot JSON file")
+	trustedrootJSONpath = flag.String("trustedrootJSONpath", "../trusted-root-public-good.json", "Path to trustedroot JSON file")
 	tufRootURL = flag.String("tufRootURL", "", "URL of TUF root containing trusted root JSON file")
 	tufTrustedRoot = flag.String("tufTrustedRoot", "", "Path to the trusted TUF root.json to bootstrap trust in the remote TUF repository")
 	flag.Parse()
