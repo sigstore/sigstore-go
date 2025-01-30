@@ -8,17 +8,15 @@ A client library for [Sigstore](https://www.sigstore.dev/), written in Go.
 
 Features:
 - Signing and verification of [Sigstore bundles](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto) compliant with Sigstore Client Spec
-- Verification of raw Sigstore signatures by creating bundles for them (see [conformance tests](cmd/conformance/main.go) for example)
+- Verification of raw Sigstore signatures by creating bundles for them (see [conformance tests](test/conformance/main.go) for example)
 - Signing and verifying with a Timestamp Authority (TSA)
 - Signing and verifying (offline or online) with Rekor (Artifact Transparency Log)
 - Structured verification results including certificate metadata
 - TUF support
 - Verification support for custom [trusted root](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_trustroot.proto)
-- Basic CLI and examples
+- Examples for signing and verifying artifacts
 
 There is not built-in support for signing with a KMS or other bring-your-own-key; however you can easily add support by implementing your own version of the interface `pkg/sign/keys.go:Keypair`.
-
-For an example of how to use this library, see [the verification documentation](./docs/verification.md), the CLI [cmd/sigstore-go](./cmd/sigstore-go/main.go), or the CLI examples below. Note that the CLI is to demonstrate how to use the library, and not intended as a fully-featured Sigstore CLI like [cosign](https://github.com/sigstore/cosign).
 
 ## Background
 
@@ -28,9 +26,13 @@ Sigstore already has a canonical Go client implementation, [cosign](https://gith
 
 `sigstore-go` is currently beta, and may have minor API changes before the 1.0.0 release. It does however pass the [`sigstore-conformance`](https://github.com/sigstore/sigstore-conformance) signing and verification test suite, and correctness is taken very seriously.
 
-## Documentation
+## Documentation and examples
 
-Documentation is found in the [`docs`](./docs) subdirectory.
+Documentation is found in the [`docs`](./docs) subdirectory and on [pkg.go.dev](https://pkg.go.dev/github.com/sigstore/sigstore-go).
+
+See the [examples directory](./examples/README.md) for examples of how to use this library.
+
+Note that the CLI examples are to demonstrate how to use the library, and not intended as a fully-featured Sigstore CLI like [cosign](https://github.com/sigstore/cosign).
 
 ## Requirements
 
@@ -40,43 +42,6 @@ Tested with:
 - [Go 1.23](https://go.dev/doc/install)
 
 Note that we do not provide built versions of this library, but you can see what architectures your version of `go` supports with `go tool dist list`.
-
-## Installation
-
-You can use the CLI with `go run` as in the below examples, or compile/install the `sigstore-go` CLI:
-
-```shell
-$ make install
-```
-## Examples
-
-```shell
-$ go run cmd/sigstore-go/main.go \
-  -artifact-digest 76176ffa33808b54602c7c35de5c6e9a4deb96066dba6533f50ac234f4f1f4c6b3527515dc17c06fbe2860030f410eee69ea20079bd3a2c6f3dcf3b329b10751 \
-  -artifact-digest-algorithm sha512 \
-  -expectedIssuer https://token.actions.githubusercontent.com \
-  -expectedSAN https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main \
-  examples/bundle-provenance.json
-Verification successful!
-{
-   "version": 20230823,
-   "statement": {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "predicateType": "https://slsa.dev/provenance/v0.2",
-      "subject": ...
-    },
-    ...
-}
-```
-
-You can also specify a TUF root with something like `-tufRootURL tuf-repo-cdn.sigstore.dev`.
-
-Alternatively, you can install a binary of the CLI like so:
-
-```shell
-$ go install ./cmd/sigstore-go
-$ sigstore-go ...
-```
 
 ## Testing
 

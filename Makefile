@@ -13,25 +13,17 @@
 # limitations under the License.
 
 .PHONY: all
-all: build build-examples
-
-.PHONY: build
-build:
-	go build ./cmd/sigstore-go
-	go build -o conformance ./cmd/conformance
+all: build-examples
 
 .PHONY: build-examples
 build-examples:
-	go build -C ./examples/oci-image-verification -o oci-image-verification .
 	go build -C ./examples/sigstore-go-signing -o sigstore-go-signing .
+	go build -C ./examples/sigstore-go-verification -o sigstore-go-verification .
+	go build -C ./examples/oci-image-verification -o oci-image-verification .
 
 .PHONY: test
 test:
 	go test ./...
-
-.PHONY: install
-install:
-	go install ./cmd/...
 
 .PHONY: tidy
 tidy:

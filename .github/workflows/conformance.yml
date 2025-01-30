@@ -40,7 +40,7 @@ jobs:
 
       - run: go mod download
 
-      - run: go build -o conformance cmd/conformance/main.go
+      - run: go build -o conformance test/conformance/main.go
 
       - uses: sigstore/sigstore-conformance@d658ea74a060aeabae78f8a379167f219dc38c38 # v0.0.16
         with:

@@ -9,11 +9,10 @@ This document will walk through using `sigstore-go` to verify a Sigstore Bundle.
 
 ## Installation
 
-Clone this repository and use `make install` to install the `sigstore-go` CLI:
+Clone this repository and use the `go` tool to install the `sigstore-go` CLI:
 
 ```shell
-$ make install
-go install ./cmd/...
+go install ./examples/sigstore-go-verification
 ```
 
 ## Bundle
@@ -335,4 +334,4 @@ func main() {
 }
 ```
 
-To explore a more advanced/configurable verification process, see the CLI implementation in [`cmd/sigstore-go/main.go`](../cmd/sigstore-go/main.go).
+To explore a more advanced/configurable verification process, see the CLI implementation in [`examples/sigstore-go-verification/main.go`](../examples/sigstore-go-verification/main.go).
