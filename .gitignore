@@ -7,3 +7,4 @@
 /pkg/tuf/testing.local.json
 /examples/oci-image-verification/oci-image-verification
 /examples/sigstore-go-signing/sigstore-go-signing
+/examples/sigstore-go-verification/sigstore-go-verification
