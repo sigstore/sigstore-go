@@ -15,94 +15,38 @@
 package data
 
 import (
+	"embed"
 	_ "embed"
-	"encoding/json"
-	"os"
+	"path/filepath"
 	"testing"
 
-	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// Unmarshal returns the Go value for the given bytes
-func Unmarshal[T any](t *testing.T, data []byte) T {
-	var v T
-	err := json.Unmarshal(data, &v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return v
+//go:embed bundles/*.json trusted-roots/*.json
+var embedded embed.FS
+
+// Bundle reads a file from the embedded file system and returns a *bundle.Bundle
+func Bundle(t *testing.T, filename string) (b *bundle.Bundle) {
+	b = &bundle.Bundle{}
+	data, err := embedded.ReadFile(filepath.Join("bundles", filename))
+	assert.NoError(t, err)
+
+	err = b.UnmarshalJSON(data)
+	assert.NoError(t, err)
+
+	return b
 }
 
-//go:embed sigstoreBundle.json
-var SigstoreBundleRaw []byte
+// TrustedRoot reads a file from the embedded file system and returns a *root.TrustedRoot
+func TrustedRoot(t *testing.T, filename string) *root.TrustedRoot {
+	data, err := embedded.ReadFile(filepath.Join("trusted-roots", filename))
+	assert.NoError(t, err)
 
-//go:embed sigstoreBundle2Sig.json
-var SigstoreBundle2SigRaw []byte
-
-//go:embed sigstore.js@2.0.0-provenanceBundle.json
-var SigstoreJS200ProvenanceBundleRaw []byte
-
-//go:embed othernameBundle.json
-var OthernameBundleRaw []byte
-
-// TestBundle creates *bundle.Bundle from a raw byte stream
-// containing a JSON encoded protobuf bundle.
-func TestBundle(t *testing.T, raw []byte) *bundle.Bundle {
-	var b protobundle.Bundle
-	err := protojson.Unmarshal(raw, &b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bun, err := bundle.NewBundle(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return bun
-}
-
-// SigstoreBundle returns a test *sigstore.Bundle.
-func SigstoreBundle(t *testing.T) *bundle.Bundle {
-	return TestBundle(t, SigstoreBundleRaw)
-}
-
-// SigstoreBundle2Sig returns a test *sigstore.Bundle with two signatures.
-func SigstoreBundle2Sig(t *testing.T) *bundle.Bundle {
-	return TestBundle(t, SigstoreBundle2SigRaw)
-}
-
-// SigstoreJS200ProvenanceBundle returns a test *sigstore.Bundle that
-// contains a complete sigstore-js build provenance.
-func SigstoreJS200ProvenanceBundle(t *testing.T) *bundle.Bundle {
-	return TestBundle(t, SigstoreJS200ProvenanceBundleRaw)
-}
-
-// OthernameBundle returns a test *sigstore.Bundle that contains verification
-// content for an artifact signed with an Othername identity.
-func OthernameBundle(t *testing.T) *bundle.Bundle {
-	return TestBundle(t, OthernameBundleRaw)
-}
-
-// PublicGoodTrustedMaterialRoot returns a *root.TrustedRoot for PGI.
-func PublicGoodTrustedMaterialRoot(t *testing.T) *root.TrustedRoot {
-	trustedrootJSON, _ := os.ReadFile("../../examples/trusted-root-public-good.json")
-	trustedRoot, _ := root.NewTrustedRootFromJSON(trustedrootJSON)
-
-	assert.NotNil(t, trustedRoot)
-
-	return trustedRoot
-}
-
-// ScaffoldingTrustedMaterialRoot returns a *root.TrustedRoot for a private
-// sigstore deployment.
-func ScaffoldingTrustedMaterialRoot(t *testing.T) *root.TrustedRoot {
-	trustedrootJSON, _ := os.ReadFile("../testing/data/trusted-root-scaffolding.json")
-	trustedRoot, _ := root.NewTrustedRootFromJSON(trustedrootJSON)
-
-	assert.NotNil(t, trustedRoot)
+	trustedRoot, _ := root.NewTrustedRootFromJSON(data)
+	assert.NoError(t, err)
 
 	return trustedRoot
 }

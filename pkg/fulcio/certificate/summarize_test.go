@@ -23,7 +23,7 @@ import (
 )
 
 func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	vc, err := entity.VerificationContent()
 	if err != nil {
@@ -72,7 +72,7 @@ func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
 }
 
 func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
-	entity := data.SigstoreBundle(t)
+	entity := data.Bundle(t, "dsse.sigstore.json")
 
 	vc, err := entity.VerificationContent()
 	if err != nil {
@@ -102,7 +102,7 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 }
 
 func TestSummarizeCertificateWithOtherNameSAN(t *testing.T) {
-	entity := data.OthernameBundle(t)
+	entity := data.Bundle(t, "othername.sigstore.json")
 	vc, err := entity.VerificationContent()
 	if err != nil {
 		t.Fatalf("failed to get verification content: %v", err)

@@ -31,7 +31,7 @@ import (
 )
 
 func TestSignedEntityVerifierInitialization(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
+	tr := data.TrustedRoot(t, "public-good.json")
 
 	// can't create a verifier without specifying either tlog or tsa
 	_, err := verify.NewSignedEntityVerifier(tr)
@@ -56,7 +56,7 @@ func TestSignedEntityVerifierInitialization(t *testing.T) {
 }
 
 func TestSignedEntityVerifierInitRequiresTimestamp(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
+	tr := data.TrustedRoot(t, "public-good.json")
 
 	_, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1))
 	assert.Error(t, err)
@@ -80,8 +80,8 @@ func TestSignedEntityVerifierInitRequiresTimestamp(t *testing.T) {
 // - zero tsa entries
 
 func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
@@ -107,8 +107,8 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
@@ -119,8 +119,8 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 }
 
 func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
@@ -134,8 +134,8 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithoutVerifyingLogEntryFails(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
@@ -159,8 +159,8 @@ func TestEntitySignedByPublicGoodWithoutVerifyingLogEntryFails(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithHighLogTimestampThresholdFails(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(2))
 	assert.NoError(t, err)
@@ -174,8 +174,8 @@ func TestEntitySignedByPublicGoodWithHighLogTimestampThresholdFails(t *testing.T
 }
 
 func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
@@ -189,8 +189,8 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithHighObserverTimestampThresholdFails(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(2))
 	assert.NoError(t, err)
@@ -204,8 +204,8 @@ func TestEntitySignedByPublicGoodWithHighObserverTimestampThresholdFails(t *test
 }
 
 func TestEntityWithOthernameSan(t *testing.T) {
-	tr := data.ScaffoldingTrustedMaterialRoot(t)
-	entity := data.OthernameBundle(t)
+	tr := data.TrustedRoot(t, "scaffolding.json")
+	entity := data.Bundle(t, "othername.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
@@ -232,8 +232,8 @@ func TestEntityWithOthernameSan(t *testing.T) {
 // Now we test policy:
 
 func TestVerifyPolicyOptionErors(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
@@ -326,8 +326,8 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	goodCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "", verify.SigstoreSanRegex)
 	badCI, _ := verify.NewShortCertificateIdentity(verify.ActionsIssuerValue, "", "BadSANValue", "")
@@ -377,8 +377,8 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 // - with a messagesignature (and artifact)
 
 func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreJS200ProvenanceBundle(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
@@ -414,8 +414,8 @@ func ensureKeysBeginWithLowercase(t *testing.T, obj interface{}) {
 }
 
 func TestSigstoreBundle2Sig(t *testing.T) {
-	tr := data.PublicGoodTrustedMaterialRoot(t)
-	entity := data.SigstoreBundle2Sig(t)
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "dsse-2sigs.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
