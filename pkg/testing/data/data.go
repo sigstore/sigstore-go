@@ -17,7 +17,7 @@ package data
 import (
 	"embed"
 	_ "embed"
-	"path/filepath"
+	"path"
 	"testing"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
@@ -31,7 +31,7 @@ var embedded embed.FS
 // Bundle reads a file from the embedded file system and returns a *bundle.Bundle
 func Bundle(t *testing.T, filename string) (b *bundle.Bundle) {
 	b = &bundle.Bundle{}
-	data, err := embedded.ReadFile(filepath.Join("bundles", filename))
+	data, err := embedded.ReadFile(path.Join("bundles", filename))
 	assert.NoError(t, err)
 
 	err = b.UnmarshalJSON(data)
@@ -42,7 +42,7 @@ func Bundle(t *testing.T, filename string) (b *bundle.Bundle) {
 
 // TrustedRoot reads a file from the embedded file system and returns a *root.TrustedRoot
 func TrustedRoot(t *testing.T, filename string) *root.TrustedRoot {
-	data, err := embedded.ReadFile(filepath.Join("trusted-roots", filename))
+	data, err := embedded.ReadFile(path.Join("trusted-roots", filename))
 	assert.NoError(t, err)
 
 	trustedRoot, _ := root.NewTrustedRootFromJSON(data)
