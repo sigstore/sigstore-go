@@ -17,16 +17,15 @@ package tuf
 import (
 	"crypto"
 	"crypto/sha256"
+	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
@@ -461,5 +460,51 @@ func (r *testRepo) SetTimestamp(date time.Time) {
 	_, err = r.roles.Timestamp().Sign(signer)
 	if err != nil {
 		r.t.Fatal(err)
+	}
+}
+
+func TestURLToPath(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{
+			name: "no-change",
+			url:  "example.com",
+			want: "example.com",
+		},
+		{
+			name: "simple",
+			url:  "https://example.com",
+			want: "example.com",
+		},
+		{
+			name: "simple with path",
+			url:  "https://example.com/foo/bar",
+			want: "example.com-foo-bar",
+		},
+		{
+			name: "http scheme",
+			url:  "http://example.com/foo/bar",
+			want: "example.com-foo-bar",
+		},
+		{
+			name: "different port",
+			url:  "http://example.com:8080/foo/bar",
+			want: "example.com-8080-foo-bar",
+		},
+		{
+			name: "lowercase",
+			url:  "http://EXAMPLE.COM:8080/foo/bar",
+			want: "example.com-8080-foo-bar",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := URLToPath(tt.url); got != tt.want {
+				t.Errorf("URLToPath() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
