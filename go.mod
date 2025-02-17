@@ -1,7 +1,6 @@
 module github.com/sigstore/sigstore-go
 
 go 1.22.0
-
 toolchain go1.23.5
 
 require (
@@ -16,7 +15,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/protobuf-specs v0.4.0
 	github.com/sigstore/rekor v1.3.9
-	github.com/sigstore/sigstore v1.8.12
+	github.com/sigstore/sigstore v1.8.14
 	github.com/sigstore/timestamp-authority v1.2.4
 	github.com/stretchr/testify v1.10.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.2
@@ -46,7 +45,7 @@ require (
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
-	github.com/google/go-containerregistry v0.20.2 // indirect
+	github.com/google/go-containerregistry v0.20.3 // indirect
 	github.com/google/trillian v1.7.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
