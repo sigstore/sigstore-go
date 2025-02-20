@@ -17,9 +17,9 @@ all: build-examples
 
 .PHONY: build-examples
 build-examples:
+	go build -C ./examples/oci-image-verification -o oci-image-verification .
 	go build -C ./examples/sigstore-go-signing -o sigstore-go-signing .
 	go build -C ./examples/sigstore-go-verification -o sigstore-go-verification .
-	go build -C ./examples/oci-image-verification -o oci-image-verification .
 
 .PHONY: test
 test:
