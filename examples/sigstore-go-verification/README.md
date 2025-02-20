@@ -3,7 +3,7 @@
 To build example programs, run `make build-examples` in the repo root.
 The built executables will be in the `examples/` subdirectory:
 ```shell
-$ make build-examples && ls -tr examples | tail -3
+$ make build-examples
 go build -C ./examples/oci-image-verification -o oci-image-verification .
 go build -C ./examples/sigstore-go-signing -o sigstore-go-signing .
 go build -C ./examples/sigstore-go-verification -o sigstore-go-verification .
@@ -16,13 +16,42 @@ examples/sigstore-go-verification/sigstore-go-verification
 
 # oci-image-verification
 
-This is a CLI fo verifying signatures on the OCI images. View the help text with `-h` or `--help` for all the options.
-(The usage example below is not intended to represent the best practices - add all the restrictions and verification parameters
-such as `-expectedIssuer` and `-expectedSAN` applicable to your environment.)
+This is a CLI for verifying signatures on the OCI images. View the help text with `-h` or `--help` for all the options.
 ```shell
-./oci-image-verification \
-  -requireTlog=false -ignore-sct -expectedIssuerRegex='.*' -expectedSANRegex='.*' \
-  -trustedrootJSONpath=$HOME/dev/files/trustedroot.json -ociImage docker.company.com:4443/repo/image/name
+$ ./oci-image-verification -h
+Usage of ./oci-image-verification:
+  -artifact string
+        Path to artifact to verify
+  -artifact-digest string
+        Hex-encoded digest of artifact to verify
+  -artifact-digest-algorithm string
+        Digest algorithm (default "sha256")
+  -expectedIssuer string
+        The expected OIDC issuer for the signing certificate
+  -expectedIssuerRegex string
+        The expected OIDC issuer for the signing certificate
+  -expectedSAN string
+        The expected identity in the signing certificate's SAN extension
+  -expectedSANRegex string
+        The expected identity in the signing certificate's SAN extension
+  -ignore-sct
+        Ignore SCT verification - do not check that a certificate contains an embedded SCT, a proof of inclusion in a certificate transparency log
+  -minBundleVersion string
+        Minimum acceptable bundle version (e.g. '0.1')
+  -ociImage string
+        OCI image to verify
+  -publicKey string
+        Path to trusted public key
+  -requireTimestamp
+        Require either an RFC3161 signed timestamp or log entry integrated timestamp (default true)
+  -requireTlog
+        Require Artifact Transparency log entry (Rekor) (default true)
+  -trustedrootJSONpath string
+        Path to trustedroot JSON file (default "examples/trusted-root-public-good.json")
+  -tufDirectory string
+        Directory to store TUF metadata (default "tufdata")
+  -tufRootURL string
+        URL of TUF root containing trusted root JSON file
 ```
 
 # sigstore-go-signing
@@ -64,4 +93,3 @@ Verification successful!
 ```
 
 You can also specify a TUF root with something like `-tufRootURL tuf-repo-cdn.sigstore.dev`.
-
