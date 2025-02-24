@@ -1,6 +1,7 @@
 module github.com/sigstore/sigstore-go/examples/oci-image-verification
 
-go 1.22.0
+go 1.23.0
+
 toolchain go1.23.5
 
 replace github.com/sigstore/sigstore-go => ../../
