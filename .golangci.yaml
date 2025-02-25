@@ -14,7 +14,6 @@
 
 run:
   timeout: 10m
-  go: '1.22'
 linters:
   enable:
     - revive
