@@ -353,10 +353,8 @@ func getHashFunctions(statement *in_toto.Statement) ([]crypto.Hash, error) {
 func intersection(a, b []crypto.Hash) []crypto.Hash {
 	var result []crypto.Hash
 	for _, x := range a {
-		for _, y := range b {
-			if x == y {
-				result = append(result, x)
-			}
+		if slices.Contains(b, x) {
+			result = append(result, x)
 		}
 	}
 	return result
