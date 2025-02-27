@@ -155,11 +155,14 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 	// determine which hash functions to use
 	hashFuncs, err := getHashFunctions(statement)
 	if err != nil {
-		return fmt.Errorf("could not verify artifact: unable to determine hash functions: %w", err)
+		return fmt.Errorf("unable to determine hash functions: %w", err)
 	}
 
 	// Compute digest of the artifact.
-	hasher := newMultihasher(hashFuncs)
+	hasher, err := newMultihasher(hashFuncs)
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
+	}
 	_, err = io.Copy(hasher, artifact)
 	if err != nil {
 		return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
@@ -260,7 +263,10 @@ type multihasher struct {
 	hashes    []hash.Hash
 }
 
-func newMultihasher(hashfuncs []crypto.Hash) *multihasher {
+func newMultihasher(hashfuncs []crypto.Hash) (*multihasher, error) {
+	if len(hashfuncs) == 0 {
+		return nil, errors.New("no hash functions specified")
+	}
 	hashes := make([]hash.Hash, len(hashfuncs))
 	for i := range hashfuncs {
 		hashes[i] = hashfuncs[i].New()
@@ -268,7 +274,7 @@ func newMultihasher(hashfuncs []crypto.Hash) *multihasher {
 	return &multihasher{
 		hashfuncs: hashfuncs,
 		hashes:    hashes,
-	}
+	}, nil
 }
 
 func (m *multihasher) Write(p []byte) (n int, err error) {
