@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"slices"
 
 	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -146,56 +147,43 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 	if err = limitSubjects(statement); err != nil {
 		return err
 	}
-
-	var artifactDigestAlgorithm string
-	var artifactDigest []byte
-
-	// Determine artifact digest algorithm by looking at the first subject's
-	// digests. This assumes that if a statement contains multiple subjects,
-	// they all use the same digest algorithm(s).
+	// Sanity check (no subjects)
 	if len(statement.Subject) == 0 {
 		return errors.New("no subjects found in statement")
 	}
-	if len(statement.Subject[0].Digest) == 0 {
-		return errors.New("no digests found in statement")
-	}
 
-	// Select the strongest digest algorithm available.
-	for _, alg := range []string{"sha512", "sha384", "sha256"} {
-		if _, ok := statement.Subject[0].Digest[alg]; ok {
-			artifactDigestAlgorithm = alg
-			continue
-		}
-	}
-	if artifactDigestAlgorithm == "" {
-		return errors.New("could not verify artifact: unsupported digest algorithm")
+	// determine which hash functions to use
+	hashFuncs, err := getHashFunctions(statement)
+	if err != nil {
+		return fmt.Errorf("unable to determine hash functions: %w", err)
 	}
 
 	// Compute digest of the artifact.
-	var hasher hash.Hash
-	switch artifactDigestAlgorithm {
-	case "sha512":
-		hasher = crypto.SHA512.New()
-	case "sha384":
-		hasher = crypto.SHA384.New()
-	case "sha256":
-		hasher = crypto.SHA256.New()
+	hasher, err := newMultihasher(hashFuncs)
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
 	}
 	_, err = io.Copy(hasher, artifact)
 	if err != nil {
 		return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
 	}
-	artifactDigest = hasher.Sum(nil)
+	artifactDigests := hasher.Sum(nil)
 
 	// Look for artifact digest in statement
 	for _, subject := range statement.Subject {
-		for alg, digest := range subject.Digest {
-			hexdigest, err := hex.DecodeString(digest)
+		for alg, hexdigest := range subject.Digest {
+			hf, err := algStringToHashFunc(alg)
 			if err != nil {
-				return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
+				continue
 			}
-			if alg == artifactDigestAlgorithm && bytes.Equal(artifactDigest, hexdigest) {
-				return nil
+			if artifactDigest, ok := artifactDigests[hf]; ok {
+				digest, err := hex.DecodeString(hexdigest)
+				if err != nil {
+					continue
+				}
+				if bytes.Equal(artifactDigest, digest) {
+					return nil
+				}
 			}
 		}
 	}
@@ -268,4 +256,112 @@ func limitSubjects(statement *in_toto.Statement) error {
 		}
 	}
 	return nil
+}
+
+type multihasher struct {
+	hashfuncs []crypto.Hash
+	hashes    []hash.Hash
+}
+
+func newMultihasher(hashfuncs []crypto.Hash) (*multihasher, error) {
+	if len(hashfuncs) == 0 {
+		return nil, errors.New("no hash functions specified")
+	}
+	hashes := make([]hash.Hash, len(hashfuncs))
+	for i := range hashfuncs {
+		hashes[i] = hashfuncs[i].New()
+	}
+	return &multihasher{
+		hashfuncs: hashfuncs,
+		hashes:    hashes,
+	}, nil
+}
+
+func (m *multihasher) Write(p []byte) (n int, err error) {
+	for i := range m.hashes {
+		n, err = m.hashes[i].Write(p)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (m *multihasher) Sum(b []byte) map[crypto.Hash][]byte {
+	sums := make(map[crypto.Hash][]byte, len(m.hashes))
+	for i := range m.hashes {
+		sums[m.hashfuncs[i]] = m.hashes[i].Sum(b)
+	}
+	return sums
+}
+
+func algStringToHashFunc(alg string) (crypto.Hash, error) {
+	switch alg {
+	case "sha256":
+		return crypto.SHA256, nil
+	case "sha384":
+		return crypto.SHA384, nil
+	case "sha512":
+		return crypto.SHA512, nil
+	default:
+		return 0, errors.New("unsupported digest algorithm")
+	}
+}
+
+// getHashFunctions returns the smallest subset of supported hash functions
+// that are needed to verify all subjects in a statement.
+func getHashFunctions(statement *in_toto.Statement) ([]crypto.Hash, error) {
+	if len(statement.Subject) == 0 {
+		return nil, errors.New("no subjects found in statement")
+	}
+
+	supportedHashFuncs := []crypto.Hash{crypto.SHA512, crypto.SHA384, crypto.SHA256}
+	chosenHashFuncs := make([]crypto.Hash, 0, len(supportedHashFuncs))
+	subjectHashFuncs := make([][]crypto.Hash, len(statement.Subject))
+
+	// go through the statement and make a simple data structure to hold the
+	// list of hash funcs for each subject (subjectHashFuncs)
+	for i, subject := range statement.Subject {
+		for alg := range subject.Digest {
+			hf, err := algStringToHashFunc(alg)
+			if err != nil {
+				continue
+			}
+			subjectHashFuncs[i] = append(subjectHashFuncs[i], hf)
+		}
+	}
+
+	// for each subject, see if we have chosen a compatible hash func, and if
+	// not, add the first one that is supported
+	for _, hfs := range subjectHashFuncs {
+		// if any of the hash funcs are already in chosenHashFuncs, skip
+		if len(intersection(hfs, chosenHashFuncs)) > 0 {
+			continue
+		}
+
+		// check each supported hash func and add it if the subject
+		// has a digest for it
+		for _, hf := range supportedHashFuncs {
+			if slices.Contains(hfs, hf) {
+				chosenHashFuncs = append(chosenHashFuncs, hf)
+				break
+			}
+		}
+	}
+
+	if len(chosenHashFuncs) == 0 {
+		return nil, errors.New("no supported digest algorithms found")
+	}
+
+	return chosenHashFuncs, nil
+}
+
+func intersection(a, b []crypto.Hash) []crypto.Hash {
+	var result []crypto.Hash
+	for _, x := range a {
+		if slices.Contains(b, x) {
+			result = append(result, x)
+		}
+	}
+	return result
 }
