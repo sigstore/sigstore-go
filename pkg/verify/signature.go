@@ -259,38 +259,30 @@ func limitSubjects(statement *in_toto.Statement) error {
 }
 
 type multihasher struct {
+	io.Writer
 	hashfuncs []crypto.Hash
-	hashes    []hash.Hash
+	hashes    []io.Writer
 }
 
 func newMultihasher(hashfuncs []crypto.Hash) (*multihasher, error) {
 	if len(hashfuncs) == 0 {
 		return nil, errors.New("no hash functions specified")
 	}
-	hashes := make([]hash.Hash, len(hashfuncs))
+	hashes := make([]io.Writer, len(hashfuncs))
 	for i := range hashfuncs {
 		hashes[i] = hashfuncs[i].New()
 	}
 	return &multihasher{
+		Writer:    io.MultiWriter(hashes...),
 		hashfuncs: hashfuncs,
 		hashes:    hashes,
 	}, nil
 }
 
-func (m *multihasher) Write(p []byte) (n int, err error) {
-	for i := range m.hashes {
-		n, err = m.hashes[i].Write(p)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
 func (m *multihasher) Sum(b []byte) map[crypto.Hash][]byte {
 	sums := make(map[crypto.Hash][]byte, len(m.hashes))
 	for i := range m.hashes {
-		sums[m.hashfuncs[i]] = m.hashes[i].Sum(b)
+		sums[m.hashfuncs[i]] = m.hashes[i].(hash.Hash).Sum(b)
 	}
 	return sums
 }
