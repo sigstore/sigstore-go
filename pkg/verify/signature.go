@@ -97,8 +97,13 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
-		// TODO: Inspect certificate's SignatureAlgorithm to determine hash function
-		return signature.LoadVerifier(leafCert.PublicKey, crypto.SHA256)
+		// LoadDefaultSigner/Verifier functions accept a few options to select
+		// the default signer/verifier when there are ambiguities, like for
+		// ED25519 keys, which could be used with PureEd25519 or Ed25519ph.
+		//
+		// Pass `WithED25519ph()` to select Ed25519ph by default, when ED25519
+		// key is found, because for hashedrekord entries this is the only option.
+		return signature.LoadDefaultVerifier(leafCert.PublicKey, options.WithED25519ph())
 	} else if pk := verificationContent.PublicKey(); pk != nil {
 		return tm.PublicKeyVerifier(pk.Hint())
 	}
