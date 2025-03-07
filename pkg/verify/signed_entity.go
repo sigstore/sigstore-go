@@ -300,7 +300,9 @@ type PolicyConfig struct {
 	weExpectSigningKey      bool
 	certificateIdentities   CertificateIdentities
 	verifyArtifact          bool
+	verifyArtifacts         bool
 	artifact                io.Reader
+	artifacts               []io.Reader
 	verifyArtifactDigest    bool
 	verifyArtifactDigests   bool
 	artifactDigests         []ArtifactDigest
@@ -466,6 +468,28 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 
 		p.verifyArtifact = true
 		p.artifact = artifact
+		return nil
+	}
+}
+
+// WithArtifacts allows the caller of Verify to enforce that the SignedEntity
+// being verified was created from, or references, a slice of artifacts.
+//
+// If the SignedEntity contains a DSSE envelope, then the artifact digest is
+// calculated from the given artifact, and compared to the digest in the
+// envelope's statement.
+func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
+	return func(p *PolicyConfig) error {
+		if p.verifyArtifact || p.verifyArtifacts || p.verifyArtifactDigest {
+			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		}
+
+		if p.weDoNotExpectAnArtifact {
+			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
+		}
+
+		p.verifyArtifacts = true
+		p.artifacts = artifacts
 		return nil
 	}
 }

@@ -76,6 +76,20 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
+func VerifySignatureWithArtifacts(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifacts []io.Reader) error { // nolint: revive
+	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial)
+	if err != nil {
+		return fmt.Errorf("could not load signature verifier: %w", err)
+	}
+
+	if envelope := sigContent.EnvelopeContent(); envelope != nil {
+		return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
+	}
+
+	// handle an invalid signature content message
+	return fmt.Errorf("signature content does not have an envelope")
+}
+
 func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifactDigest []byte, artifactDigestAlgorithm string) error { // nolint: revive
 	var verifier signature.Verifier
 	var err error
@@ -201,6 +215,90 @@ func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeCo
 			}
 		}
 	}
+	return fmt.Errorf("could not verify artifact: unable to confirm artifact digest is present in subject digests: %w", err)
+}
+
+func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeContent, artifacts []io.Reader) error {
+	if err := verifyEnvelope(verifier, envelope); err != nil {
+		return err
+	}
+	statement, err := envelope.Statement()
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
+	}
+	if err = limitSubjects(statement); err != nil {
+		return err
+	}
+	// Sanity check (no subjects)
+	if len(statement.Subject) == 0 {
+		return errors.New("no subjects found in statement")
+	}
+
+	// determine which hash functions to use
+	hashFuncs, err := getHashFunctions(statement)
+	if err != nil {
+		return fmt.Errorf("unable to determine hash functions: %w", err)
+	}
+
+	// Compute digest of the artifact.
+	hasher, err := newMultihasher(hashFuncs)
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
+	}
+
+	hashedArtifacts := make([]map[crypto.Hash][]byte, len(artifacts))
+	for i, artifact := range artifacts {
+		_, err = io.Copy(hasher, artifact)
+		if err != nil {
+			return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
+		}
+		hashedArtifacts[i] = hasher.Sum(nil)
+	}
+
+	// create a map based on algorithms and digests found in the statement
+	// the key is the algorithm and the field is a slice of digests
+	// associated with that key
+	subjectDigests := make(map[crypto.Hash][][]byte)
+	for _, subject := range statement.Subject {
+		for alg, digest := range subject.Digest {
+			hf, err := algStringToHashFunc(alg)
+			if err != nil {
+				continue
+			}
+			if _, ok := subjectDigests[hf]; !ok {
+				subjectDigests[hf] = make([][]byte, 0)
+			}
+			hexdigest, err := hex.DecodeString(digest)
+			if err != nil {
+				return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
+			}
+			subjectDigests[hf] = append(subjectDigests[hf], hexdigest)
+		}
+	}
+
+	// now loop over the provided artifact digests and try to compare them
+	// to the mapped subject digests
+	// if we cannot find a match, exit with an error
+	for _, ha := range hashedArtifacts {
+		for key, value := range ha {
+			statementDigests, ok := subjectDigests[key]
+			if !ok {
+				return fmt.Errorf("provided artifact digest does not match any digest in statement")
+			}
+			matchFound := false
+			for _, sd := range statementDigests {
+				// if we have found a match, exit the for loop early
+				if bytes.Equal(value, sd) {
+					matchFound = true
+					break
+				}
+			}
+			if !matchFound {
+				return fmt.Errorf("provided artifact digest does not match any digest in statement")
+			}
+		}
+	}
+
 	return fmt.Errorf("could not verify artifact: unable to confirm artifact digest is present in subject digests: %w", err)
 }
 
