@@ -95,6 +95,20 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
+func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, digests []ArtifactDigest) error { // nolint: revive
+	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial)
+	if err != nil {
+		return fmt.Errorf("could not load signature verifier: %w", err)
+	}
+
+	if envelope := sigContent.EnvelopeContent(); envelope != nil {
+		return verifyEnvelopeWithArtifactDigests(verifier, envelope, digests)
+	}
+
+	// handle an invalid signature content message
+	return fmt.Errorf("signature content does not have an envelope")
+}
+
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
 		// TODO: Inspect certificate's SignatureAlgorithm to determine hash function
@@ -217,6 +231,60 @@ func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope Enve
 		}
 	}
 	return errors.New("provided artifact digest does not match any digest in statement")
+}
+
+func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope EnvelopeContent, digests []ArtifactDigest) error {
+	if err := verifyEnvelope(verifier, envelope); err != nil {
+		return err
+	}
+	statement, err := envelope.Statement()
+	if err != nil {
+		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
+	}
+	if err = limitSubjects(statement); err != nil {
+		return err
+	}
+
+	// create a map based on algorithms and digests found in the statement
+	// the key is the algorithm and the field is a slice of digests
+	// associated with that key
+	subjectDigests := make(map[string][][]byte)
+	for _, subject := range statement.Subject {
+		for alg, digest := range subject.Digest {
+			if _, ok := subjectDigests[alg]; !ok {
+				subjectDigests[alg] = make([][]byte, 0)
+			}
+			hexdigest, err := hex.DecodeString(digest)
+			if err != nil {
+				return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
+			}
+			subjectDigests[alg] = append(subjectDigests[alg], hexdigest)
+		}
+	}
+
+	// now loop over the provided artifact digests and try to compare them
+	// to the mapped subject digests
+	// if we cannot find a match, exit with an error
+	for _, artifactDigest := range digests {
+		statementDigests, ok := subjectDigests[artifactDigest.Algorithm]
+		if !ok {
+			return fmt.Errorf("provided artifact digest does not match any digest in statement")
+		}
+
+		matchFound := false
+		for _, sd := range statementDigests {
+			// if we have found a match, exit the for loop early
+			if bytes.Equal(artifactDigest.Digest, sd) {
+				matchFound = true
+				break
+			}
+		}
+		if !matchFound {
+			return fmt.Errorf("provided artifact digest does not match any digest in statement")
+		}
+	}
+
+	return nil
 }
 
 func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent, artifact io.Reader) error {
