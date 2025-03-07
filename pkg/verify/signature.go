@@ -283,7 +283,7 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 		for key, value := range ha {
 			statementDigests, ok := subjectDigests[key]
 			if !ok {
-				return fmt.Errorf("provided artifact digest does not match any digest in statement")
+				return fmt.Errorf("provided artifact digests do not match digests in statement")
 			}
 			matchFound := false
 			for _, sd := range statementDigests {
@@ -294,7 +294,7 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 				}
 			}
 			if !matchFound {
-				return fmt.Errorf("provided artifact digest does not match any digest in statement")
+				return fmt.Errorf("provided artifact digests do not match digests in statement")
 			}
 		}
 	}
@@ -366,7 +366,7 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 	for _, artifactDigest := range digests {
 		statementDigests, ok := subjectDigests[artifactDigest.Algorithm]
 		if !ok {
-			return fmt.Errorf("provided artifact digest does not match any digest in statement")
+			return fmt.Errorf("provided artifact digests does not match digests in statement")
 		}
 
 		matchFound := false
