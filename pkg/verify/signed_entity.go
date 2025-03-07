@@ -289,6 +289,11 @@ func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
 	return policy, nil
 }
 
+type ArtifactDigest struct {
+	Algorithm string
+	Digest    []byte
+}
+
 type PolicyConfig struct {
 	weDoNotExpectAnArtifact bool
 	weDoNotExpectIdentities bool
@@ -297,6 +302,8 @@ type PolicyConfig struct {
 	verifyArtifact          bool
 	artifact                io.Reader
 	verifyArtifactDigest    bool
+	verifyArtifactDigests   bool
+	artifactDigests         []ArtifactDigest
 	artifactDigest          []byte
 	artifactDigestAlgorithm string
 }
@@ -489,6 +496,29 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 	}
 }
 
+// WithArtifactDigests allows the caller of Verify to enforce that the
+// SignedEntity being verified was created for a given array of artifact digests.
+//
+// If the SignedEntity contains a DSSE envelope, then the artifact digests
+// are compared to the digests in the envelope's statement.
+//
+// If the SignedEntity does not contain a DSSE envelope, verification fails.
+func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
+	return func(p *PolicyConfig) error {
+		if p.verifyArtifact || p.verifyArtifactDigest || p.verifyArtifactDigests {
+			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		}
+
+		if p.weDoNotExpectAnArtifact {
+			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
+		}
+
+		p.verifyArtifactDigests = true
+		p.artifactDigests = digests
+		return nil
+	}
+}
+
 // Verify checks the cryptographic integrity of a given SignedEntity according
 // to the options configured in the NewSignedEntityVerifier. Its purpose is to
 // determine whether the SignedEntity was created by a Sigstore deployment we
@@ -606,6 +636,8 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
 		case policy.verifyArtifactDigest:
 			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
+		case policy.verifyArtifactDigests:
+			err = VerifySignatureWithArtifactDigests(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
 		default:
 			// should never happen, but just in case:
 			err = errors.New("no artifact or artifact digest provided")
