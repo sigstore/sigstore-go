@@ -310,6 +310,14 @@ type PolicyConfig struct {
 	artifactDigestAlgorithm string
 }
 
+func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
+	if p.verifyArtifact || p.verifyArtifacts || p.verifyArtifactDigest || p.verifyArtifactDigests {
+		return errors.New("only one invocation of WithArtifact/WithArtifacts/WithArtifactDigest/WithArtifactDigests is allowed")
+	}
+
+	return nil
+}
+
 func (p *PolicyConfig) Validate() error {
 	if p.WeExpectIdentities() && len(p.certificateIdentities) == 0 {
 		return errors.New("can't verify identities without providing at least one identity")
@@ -441,8 +449,8 @@ func WithKey() PolicyOption {
 // an artifact.
 func WithoutArtifactUnsafe() ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest {
-			return errors.New("can't use WithoutArtifactUnsafe while using WithArtifact or WithArtifactDigest")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		p.weDoNotExpectAnArtifact = true
@@ -458,8 +466,8 @@ func WithoutArtifactUnsafe() ArtifactPolicyOption {
 // envelope's statement.
 func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		if p.weDoNotExpectAnArtifact {
@@ -480,8 +488,8 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 // envelope's statement.
 func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifacts || p.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		if p.weDoNotExpectAnArtifact {
@@ -505,8 +513,8 @@ func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
 // compared to the digest in the envelope's statement.
 func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		if p.weDoNotExpectAnArtifact {
@@ -529,8 +537,8 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 // If the SignedEntity does not contain a DSSE envelope, verification fails.
 func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest || p.verifyArtifactDigests {
-			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		if p.weDoNotExpectAnArtifact {
