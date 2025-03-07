@@ -493,7 +493,7 @@ func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
 		}
 
 		if p.weDoNotExpectAnArtifact {
-			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
+			return errors.New("can't use WithArtifacts while using WithoutArtifactUnsafe")
 		}
 
 		p.verifyArtifacts = true
@@ -542,7 +542,7 @@ func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 		}
 
 		if p.weDoNotExpectAnArtifact {
-			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
+			return errors.New("can't use WithArtifactDigests while using WithoutArtifactUnsafe")
 		}
 
 		p.verifyArtifactDigests = true
@@ -666,6 +666,8 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		switch {
 		case policy.verifyArtifact:
 			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
+		case policy.verifyArtifacts:
+			err = VerifySignatureWithArtifacts(sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
 		case policy.verifyArtifactDigest:
 			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
 		case policy.verifyArtifactDigests:
