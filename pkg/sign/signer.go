@@ -65,7 +65,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	verifierOptions := []verify.VerifierOption{}
 
 	// Sign content and add to bundle
-	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
+	signature, digest, err := keypair.SignData(opts.Context, content.PreAuthEncoding())
 	if err != nil {
 		return nil, err
 	}
