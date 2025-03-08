@@ -130,7 +130,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 	}
 
 	// Sign JWT subject for proof of possession
-	subjectSignature, _, err := keypair.SignData([]byte(subject))
+	subjectSignature, _, err := keypair.SignData(ctx, []byte(subject))
 	if err != nil {
 		return nil, err
 	}

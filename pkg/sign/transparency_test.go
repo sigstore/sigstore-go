@@ -103,6 +103,8 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 }
 
 func Test_GetTransparencyLogEntry(t *testing.T) {
+	ctx := context.TODO()
+
 	// First create a bundle with DSSE content
 	keypair, err := NewEphemeralKeypair(nil)
 	assert.Nil(t, err)
@@ -110,7 +112,7 @@ func Test_GetTransparencyLogEntry(t *testing.T) {
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
 	content := DSSEData{Data: []byte("hello world"), PayloadType: "something"}
 	envelopeBody = content.PreAuthEncoding()
-	signature, digest, err := keypair.SignData(content.PreAuthEncoding())
+	signature, digest, err := keypair.SignData(ctx, content.PreAuthEncoding())
 	assert.Nil(t, err)
 
 	content.Bundle(bundle, signature, digest, keypair.GetHashAlgorithm())

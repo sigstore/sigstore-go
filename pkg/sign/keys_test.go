@@ -15,6 +15,7 @@
 package sign
 
 import (
+	"context"
 	"testing"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -26,6 +27,7 @@ func Test_EphemeralKeypair(t *testing.T) {
 		Hint: []byte("asdf"),
 	}
 
+	ctx := context.TODO()
 	ephemeralKeypair, err := NewEphemeralKeypair(opts)
 	assert.NotNil(t, ephemeralKeypair)
 	assert.Nil(t, err)
@@ -43,7 +45,7 @@ func Test_EphemeralKeypair(t *testing.T) {
 	assert.NotEqual(t, pem, "")
 	assert.Nil(t, err)
 
-	signature, digest, err := ephemeralKeypair.SignData([]byte("hello world"))
+	signature, digest, err := ephemeralKeypair.SignData(ctx, []byte("hello world"))
 	assert.NotEqual(t, signature, "")
 	assert.NotEqual(t, digest, "")
 	assert.Nil(t, err)
