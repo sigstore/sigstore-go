@@ -240,14 +240,13 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 		return fmt.Errorf("unable to determine hash functions: %w", err)
 	}
 
-	// Compute digest of the artifact.
-	hasher, err := newMultihasher(hashFuncs)
-	if err != nil {
-		return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
-	}
-
 	hashedArtifacts := make([]map[crypto.Hash][]byte, len(artifacts))
 	for i, artifact := range artifacts {
+		// Compute digest of the artifact.
+		hasher, err := newMultihasher(hashFuncs)
+		if err != nil {
+			return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
+		}
 		_, err = io.Copy(hasher, artifact)
 		if err != nil {
 			return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
@@ -280,12 +279,12 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 	// to the mapped subject digests
 	// if we cannot find a match, exit with an error
 	for _, ha := range hashedArtifacts {
+		matchFound := false
 		for key, value := range ha {
 			statementDigests, ok := subjectDigests[key]
 			if !ok {
-				return fmt.Errorf("provided artifact digests do not match digests in statement")
+				return fmt.Errorf("no matching artifact hash algorithm found in subject digests")
 			}
-			matchFound := false
 			for _, sd := range statementDigests {
 				// if we have found a match, exit the for loop early
 				if bytes.Equal(value, sd) {
@@ -293,13 +292,16 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 					break
 				}
 			}
-			if !matchFound {
-				return fmt.Errorf("provided artifact digests do not match digests in statement")
+			if matchFound {
+				break
 			}
+		}
+		if !matchFound {
+			return fmt.Errorf("provided artifact digests do not match digests in statement")
 		}
 	}
 
-	return fmt.Errorf("could not verify artifact: unable to confirm artifact digest is present in subject digests: %w", err)
+	return nil
 }
 
 func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope EnvelopeContent, artifactDigest []byte, artifactDigestAlgorithm string) error {
