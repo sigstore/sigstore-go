@@ -591,6 +591,13 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		}
 	}
 
+	// If SCTs are required, ensure the bundle is certificate-signed not public key-signed
+	if v.config.requireSCTs {
+		if verificationContent.PublicKey() != nil {
+			return nil, errors.New("SCTs required but bundle is signed with a public key, which cannot contain SCTs")
+		}
+	}
+
 	// From spec:
 	// > ## Signature Verification
 	// > The Verifier MUST verify the provided signature for the constructed payload against the key in the leaf of the certificate chain.
