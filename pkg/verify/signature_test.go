@@ -178,12 +178,12 @@ func TestTooManyDigests(t *testing.T) {
 	assert.ErrorContains(t, err, "too many digests")
 }
 
-func TestVerifyEnvelopeWithArtifacts(t *testing.T) {
+func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	subjectBodies := make([]io.Reader, 10)
 	subjects := make([]in_toto.Subject, 10)
+	artifacts := make([]io.Reader, 10)
 	artifactDigests := make([]verify.ArtifactDigest, 10)
 	// Create ten test subjects
 	for i := range 10 {
@@ -191,15 +191,15 @@ func TestVerifyEnvelopeWithArtifacts(t *testing.T) {
 			Name: fmt.Sprintf("subject-%d", i),
 		}
 		subjectBody := fmt.Sprintf("Hi, I am a subject! #%d", i)
-		subjectBodies[i] = strings.NewReader(subjectBody)
+		artifacts[i] = strings.NewReader(subjectBody)
 		// alternate between sha256 and sha512 when creating the digests
-		// so that we can test that the verifier can handle multiple digest algorithms
+		// so that we can test that the verifier can handle digests created
+		// with different algorithms
 		if i%2 == 0 {
 			digest256 := sha256.Sum256([]byte(subjectBody))
 			digest := digest256[:]
-			digest256hex := hex.EncodeToString(digest)
 			s.Digest = common.DigestSet{
-				"sha256": digest256hex,
+				"sha256": hex.EncodeToString(digest),
 			}
 			a := verify.ArtifactDigest{
 				Algorithm: "sha256",
@@ -209,9 +209,8 @@ func TestVerifyEnvelopeWithArtifacts(t *testing.T) {
 		} else {
 			digest512 := sha512.Sum512([]byte(subjectBody))
 			digest := digest512[:]
-			digest512hex := hex.EncodeToString(digest)
 			s.Digest = common.DigestSet{
-				"sha512": digest512hex,
+				"sha512": hex.EncodeToString(digest),
 			}
 			a := verify.ArtifactDigest{
 				Algorithm: "sha512",
@@ -232,7 +231,7 @@ func TestVerifyEnvelopeWithArtifacts(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(subjectBodies), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(artifacts), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
 	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(artifactDigests), verify.WithoutIdentitiesUnsafe()))
