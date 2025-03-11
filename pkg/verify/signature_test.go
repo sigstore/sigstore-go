@@ -155,11 +155,10 @@ func TestTooManyDigests(t *testing.T) {
 	tooManyDigestsStatement := in_toto.Statement{}
 	tooManyDigestsStatement.Subject = []in_toto.Subject{
 		{
-			Name:   fmt.Sprintf("subject"),
+			Name:   "subject",
 			Digest: make(common.DigestSet),
 		},
 	}
-	// does sigstore-go already map multiple digests to a single digest algorithm key?
 	tooManyDigestsStatement.Subject[0].Digest["sha512"] = "" // verifier requires that at least one known hash algorithm is present in the digest map
 	for i := 0; i < 32; i++ {
 		tooManyDigestsStatement.Subject[0].Digest[fmt.Sprintf("digest-%d", i)] = ""
@@ -186,12 +185,15 @@ func TestVerifyEnvelopeWithArtifacts(t *testing.T) {
 	subjectBodies := make([]io.Reader, 10)
 	subjects := make([]in_toto.Subject, 10)
 	artifactDigests := make([]verify.ArtifactDigest, 10)
+	// Create ten test subjects
 	for i := range 10 {
 		s := in_toto.Subject{
 			Name: fmt.Sprintf("subject-%d", i),
 		}
 		subjectBody := fmt.Sprintf("Hi, I am a subject! #%d", i)
 		subjectBodies[i] = strings.NewReader(subjectBody)
+		// alternate between sha256 and sha512 when creating the digests
+		// so that we can test that the verifier can handle multiple digest algorithms
 		if i%2 == 0 {
 			digest256 := sha256.Sum256([]byte(subjectBody))
 			digest := digest256[:]

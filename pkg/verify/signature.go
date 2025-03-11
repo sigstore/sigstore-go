@@ -253,9 +253,9 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 		hashedArtifacts[i] = hasher.Sum(nil)
 	}
 
-	// create a map based on algorithms and digests found in the statement
-	// the key is the algorithm and the field is a slice of digests
-	// associated with that key
+	// create a map based on the digests present in the statement
+	// the map key is the hash algorithm and the field is a slice of digests
+	// created using that hash algorithm
 	subjectDigests := make(map[crypto.Hash][][]byte)
 	for _, subject := range statement.Subject {
 		for alg, digest := range subject.Digest {
@@ -338,9 +338,9 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 		return err
 	}
 
-	// create a map based on algorithms and digests found in the statement
-	// the key is the algorithm and the field is a slice of digests
-	// associated with that key
+	// create a map based on the digests present in the statement
+	// the map key is the hash algorithm and the field is a slice of digests
+	// created using that hash algorithm
 	subjectDigests := make(map[string][][]byte)
 	for _, subject := range statement.Subject {
 		for alg, digest := range subject.Digest {
