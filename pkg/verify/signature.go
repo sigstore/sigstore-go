@@ -247,8 +247,7 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 		if err != nil {
 			return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
 		}
-		_, err = io.Copy(hasher, artifact)
-		if err != nil {
+		if _, err = io.Copy(hasher, artifact); err != nil {
 			return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
 		}
 		hashedArtifacts[i] = hasher.Sum(nil)
@@ -285,14 +284,8 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 			if !ok {
 				return fmt.Errorf("no matching artifact hash algorithm found in subject digests")
 			}
-			for _, sd := range statementDigests {
-				// if we have found a match, exit the for loop early
-				if bytes.Equal(value, sd) {
-					matchFound = true
-					break
-				}
-			}
-			if matchFound {
+			if ok := isDigestInSlice(value, statementDigests); ok {
+				matchFound = true
 				break
 			}
 		}
@@ -370,21 +363,22 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 		if !ok {
 			return fmt.Errorf("provided artifact digests does not match digests in statement")
 		}
-
-		matchFound := false
-		for _, sd := range statementDigests {
-			// if we have found a match, exit the for loop early
-			if bytes.Equal(artifactDigest.Digest, sd) {
-				matchFound = true
-				break
-			}
-		}
-		if !matchFound {
+		if ok := isDigestInSlice(artifactDigest.Digest, statementDigests); !ok {
 			return fmt.Errorf("provided artifact digest does not match any digest in statement")
 		}
 	}
 
 	return nil
+}
+
+func isDigestInSlice(digest []byte, digestSlice [][]byte) bool {
+	for _, el := range digestSlice {
+		// if we have found a match, exit the for loop early
+		if bytes.Equal(digest, el) {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyMessageSignature(verifier signature.Verifier, msg MessageSignatureContent, artifact io.Reader) error {
