@@ -164,58 +164,8 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 }
 
 func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeContent, artifact io.Reader) error {
-	err := verifyEnvelope(verifier, envelope)
-	if err != nil {
-		return err
-	}
-	statement, err := envelope.Statement()
-	if err != nil {
-		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
-	}
-	if err = limitSubjects(statement); err != nil {
-		return err
-	}
-	// Sanity check (no subjects)
-	if len(statement.Subject) == 0 {
-		return errors.New("no subjects found in statement")
-	}
-
-	// determine which hash functions to use
-	hashFuncs, err := getHashFunctions(statement)
-	if err != nil {
-		return fmt.Errorf("unable to determine hash functions: %w", err)
-	}
-
-	// Compute digest of the artifact.
-	hasher, err := newMultihasher(hashFuncs)
-	if err != nil {
-		return fmt.Errorf("could not verify artifact: unable to create hasher: %w", err)
-	}
-	_, err = io.Copy(hasher, artifact)
-	if err != nil {
-		return fmt.Errorf("could not verify artifact: unable to calculate digest: %w", err)
-	}
-	artifactDigests := hasher.Sum(nil)
-
-	// Look for artifact digest in statement
-	for _, subject := range statement.Subject {
-		for alg, hexdigest := range subject.Digest {
-			hf, err := algStringToHashFunc(alg)
-			if err != nil {
-				continue
-			}
-			if artifactDigest, ok := artifactDigests[hf]; ok {
-				digest, err := hex.DecodeString(hexdigest)
-				if err != nil {
-					continue
-				}
-				if bytes.Equal(artifactDigest, digest) {
-					return nil
-				}
-			}
-		}
-	}
-	return fmt.Errorf("could not verify artifact: unable to confirm artifact digest is present in subject digests: %w", err)
+	artifacts := []io.Reader{artifact}
+	return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
 }
 
 func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeContent, artifacts []io.Reader) error {
@@ -298,32 +248,12 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 }
 
 func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope EnvelopeContent, artifactDigest []byte, artifactDigestAlgorithm string) error {
-	err := verifyEnvelope(verifier, envelope)
-	if err != nil {
-		return err
+	ad := ArtifactDigest{
+		Algorithm: artifactDigestAlgorithm,
+		Digest:    artifactDigest,
 	}
-	statement, err := envelope.Statement()
-	if err != nil {
-		return fmt.Errorf("could not verify artifact: unable to extract statement from envelope: %w", err)
-	}
-	if err = limitSubjects(statement); err != nil {
-		return err
-	}
-
-	for _, subject := range statement.Subject {
-		for alg, digest := range subject.Digest {
-			if alg == artifactDigestAlgorithm {
-				hexdigest, err := hex.DecodeString(digest)
-				if err != nil {
-					return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
-				}
-				if bytes.Equal(hexdigest, artifactDigest) {
-					return nil
-				}
-			}
-		}
-	}
-	return errors.New("provided artifact digest does not match any digest in statement")
+	artifactDigests := []ArtifactDigest{ad}
+	return verifyEnvelopeWithArtifactDigests(verifier, envelope, artifactDigests)
 }
 
 func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope EnvelopeContent, digests []ArtifactDigest) error {
@@ -355,8 +285,7 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 		}
 	}
 
-	// now loop over the provided artifact digests and try to compare them
-	// to the mapped subject digests
+	// now loop over the provided artifact digests and compare them to the mapped subject digests
 	// if we cannot find a match, exit with an error
 	for _, artifactDigest := range digests {
 		statementDigests, ok := subjectDigests[artifactDigest.Algorithm]
@@ -373,7 +302,6 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 
 func isDigestInSlice(digest []byte, digestSlice [][]byte) bool {
 	for _, el := range digestSlice {
-		// if we have found a match, exit the for loop early
 		if bytes.Equal(digest, el) {
 			return true
 		}
