@@ -208,7 +208,7 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 	// created using that hash algorithm
 	subjectDigests := make(map[crypto.Hash][][]byte)
 	for _, subject := range statement.Subject {
-		for alg, digest := range subject.Digest {
+		for alg, hexdigest := range subject.Digest {
 			hf, err := algStringToHashFunc(alg)
 			if err != nil {
 				continue
@@ -216,11 +216,11 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 			if _, ok := subjectDigests[hf]; !ok {
 				subjectDigests[hf] = make([][]byte, 0)
 			}
-			hexdigest, err := hex.DecodeString(digest)
+			digest, err := hex.DecodeString(hexdigest)
 			if err != nil {
-				return fmt.Errorf("could not verify artifact: unable to decode subject digest: %w", err)
+				continue
 			}
-			subjectDigests[hf] = append(subjectDigests[hf], hexdigest)
+			subjectDigests[hf] = append(subjectDigests[hf], digest)
 		}
 	}
 
