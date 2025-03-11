@@ -236,4 +236,17 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 
 	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(artifactDigests), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
+
+	noMatchingArtifacts := []io.Reader{strings.NewReader("some other artifact")}
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(noMatchingArtifacts), verify.WithoutIdentitiesUnsafe()))
+	assert.Error(t, err)
+
+	noMatchingArtifactDigests := []verify.ArtifactDigest{
+		{
+			Algorithm: "sha256",
+			Digest:    []byte("some other artifact"),
+		},
+	}
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(noMatchingArtifactDigests), verify.WithoutIdentitiesUnsafe()))
+	assert.Error(t, err)
 }
