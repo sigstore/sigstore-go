@@ -195,7 +195,7 @@ func genChain(t *testing.T, tsa bool) (*ecdsa.PrivateKey, *x509.Certificate, *x5
 	require.NoError(t, err)
 	intermediateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) //nolint:gosec
 	require.NoError(t, err)
-	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) //nolint:gosecec
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader) //nolint:gosec
 	require.NoError(t, err)
 	rootDer, err := x509.CreateCertificate(rand.Reader, rootCertTemplate, rootCertTemplate, &caKey.PublicKey, caKey)
 	require.NoError(t, err)
