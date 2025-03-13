@@ -111,8 +111,8 @@ func main() {
 		// Fulcio URLs
 		[]root.Service{
 			{
-				Url:                 "https://fulcio.sigstage.dev",
-				MajorApiVersion:     1,
+				URL:                 "https://fulcio.sigstage.dev",
+				MajorAPIVersion:     1,
 				ValidityPeriodStart: time.Now().Add(-time.Hour),
 				ValidityPeriodEnd:   time.Now().Add(time.Hour),
 			},
@@ -120,8 +120,8 @@ func main() {
 		// OIDC Provider URLs
 		[]root.Service{
 			{
-				Url:                 "https://oauth2.sigstage.dev/auth",
-				MajorApiVersion:     1,
+				URL:                 "https://oauth2.sigstage.dev/auth",
+				MajorAPIVersion:     1,
 				ValidityPeriodStart: time.Now().Add(-time.Hour),
 				ValidityPeriodEnd:   time.Now().Add(time.Hour),
 			},
@@ -129,8 +129,8 @@ func main() {
 		// Rekor URLs
 		[]root.Service{
 			{
-				Url:                 "https://rekor.sigstage.dev",
-				MajorApiVersion:     1,
+				URL:                 "https://rekor.sigstage.dev",
+				MajorAPIVersion:     1,
 				ValidityPeriodStart: time.Now().Add(-time.Hour),
 				ValidityPeriodEnd:   time.Now().Add(time.Hour),
 			},
@@ -140,8 +140,8 @@ func main() {
 		},
 		[]root.Service{
 			{
-				Url:                 "https://timestamp.githubapp.com/api/v1/timestamp",
-				MajorApiVersion:     1,
+				URL:                 "https://timestamp.githubapp.com/api/v1/timestamp",
+				MajorAPIVersion:     1,
 				ValidityPeriodStart: time.Now().Add(-time.Hour),
 				ValidityPeriodEnd:   time.Now().Add(time.Hour),
 			},

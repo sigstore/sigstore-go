@@ -35,8 +35,8 @@ type SigningConfig struct {
 }
 
 type Service struct {
-	Url                 string
-	MajorApiVersion     uint32
+	URL                 string
+	MajorAPIVersion     uint32
 	ValidityPeriodStart time.Time
 	ValidityPeriodEnd   time.Time
 }
@@ -50,41 +50,41 @@ type ServiceConfiguration struct {
 // and current time. It will select the first service that matches the criteria. Services should
 // be sorted from newest to oldest validity period start time, to minimize how far clients
 // need to search to find a matching service.
-func SelectService(services []Service, supportedApiVersions []uint32, currentTime time.Time) (string, error) {
+func SelectService(services []Service, supportedAPIVersions []uint32, currentTime time.Time) (string, error) {
 	for _, s := range services {
-		if slices.Contains(supportedApiVersions, s.MajorApiVersion) && s.ValidAtTime(currentTime) {
-			return s.Url, nil
+		if slices.Contains(supportedAPIVersions, s.MajorAPIVersion) && s.ValidAtTime(currentTime) {
+			return s.URL, nil
 		}
 	}
-	return "", fmt.Errorf("no matching service found for API versions %v and current time %v", supportedApiVersions, currentTime)
+	return "", fmt.Errorf("no matching service found for API versions %v and current time %v", supportedAPIVersions, currentTime)
 }
 
 // SelectServices returns which service endpoints should be used based on supported API versions
 // and current time. It will use the configuration's selector to pick a set of services.
 // ALL will return all service endpoints, ANY will return a random endpoint, and
 // EXACT will return a random selection of a specified number of endpoints.
-func SelectServices(services []Service, config ServiceConfiguration, supportedApiVersions []uint32, currentTime time.Time) ([]string, error) {
+func SelectServices(services []Service, config ServiceConfiguration, supportedAPIVersions []uint32, currentTime time.Time) ([]string, error) {
 	var urls []string
 	for _, s := range services {
-		if slices.Contains(supportedApiVersions, s.MajorApiVersion) && s.ValidAtTime(currentTime) {
-			urls = append(urls, s.Url)
+		if slices.Contains(supportedAPIVersions, s.MajorAPIVersion) && s.ValidAtTime(currentTime) {
+			urls = append(urls, s.URL)
 		}
 	}
 	if len(urls) == 0 {
-		return nil, fmt.Errorf("no matching services found for API versions %v and current time %v", supportedApiVersions, currentTime)
+		return nil, fmt.Errorf("no matching services found for API versions %v and current time %v", supportedAPIVersions, currentTime)
 	}
 	switch config.Selector {
 	case prototrustroot.ServiceSelector_ALL:
 		return urls, nil
 	case prototrustroot.ServiceSelector_ANY:
-		i := rand.Intn(len(urls))
+		i := rand.Intn(len(urls)) // #nosec G404
 		return []string{urls[i]}, nil
 	case prototrustroot.ServiceSelector_EXACT:
-		if matchedUrls, err := selectExact(urls, config.Count); err != nil {
+		matchedUrls, err := selectExact(urls, config.Count)
+		if err != nil {
 			return nil, err
-		} else {
-			return matchedUrls, nil
 		}
+		return matchedUrls, nil
 	default:
 		return nil, fmt.Errorf("invalid service selector")
 	}
@@ -94,14 +94,14 @@ func selectExact[T any](slice []T, count uint32) ([]T, error) {
 	if count == 0 {
 		return nil, fmt.Errorf("service selector count must be greater than 0")
 	}
-	if count > uint32(len(slice)) {
+	if int(count) > len(slice) {
 		return nil, fmt.Errorf("service selector count %d must be less than or equal to the slice length %d", count, len(slice))
 	}
 	sliceCopy := make([]T, len(slice))
 	copy(sliceCopy, slice)
 	var result []T
 	for range count {
-		i := rand.Intn(len(sliceCopy))
+		i := rand.Intn(len(sliceCopy)) // #nosec G404
 		result = append(result, sliceCopy[i])
 		// Remove element from slice
 		sliceCopy[i], sliceCopy[len(sliceCopy)-1] = sliceCopy[len(sliceCopy)-1], sliceCopy[i]
@@ -130,8 +130,8 @@ func (s Service) ValidAtTime(t time.Time) bool {
 
 func (s Service) ToServiceProtobuf() *prototrustroot.Service {
 	return &prototrustroot.Service{
-		Url:             s.Url,
-		MajorApiVersion: s.MajorApiVersion,
+		Url:             s.URL,
+		MajorApiVersion: s.MajorAPIVersion,
 		ValidFor: &v1.TimeRange{
 			Start: timestamppb.New(s.ValidityPeriodStart),
 			End:   timestamppb.New(s.ValidityPeriodEnd),
@@ -150,8 +150,8 @@ func (sc *SigningConfig) FulcioCertificateAuthorityURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetCaUrls() {
 		services = append(services, Service{
-			Url:                 s.GetUrl(),
-			MajorApiVersion:     s.GetMajorApiVersion(),
+			URL:                 s.GetUrl(),
+			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
 			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
 		})
@@ -163,8 +163,8 @@ func (sc *SigningConfig) OIDCProviderURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetOidcUrls() {
 		services = append(services, Service{
-			Url:                 s.GetUrl(),
-			MajorApiVersion:     s.GetMajorApiVersion(),
+			URL:                 s.GetUrl(),
+			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
 			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
 		})
@@ -176,8 +176,8 @@ func (sc *SigningConfig) RekorLogURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetRekorTlogUrls() {
 		services = append(services, Service{
-			Url:                 s.GetUrl(),
-			MajorApiVersion:     s.GetMajorApiVersion(),
+			URL:                 s.GetUrl(),
+			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
 			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
 		})
@@ -197,8 +197,8 @@ func (sc *SigningConfig) TimestampAuthorityURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetTsaUrls() {
 		services = append(services, Service{
-			Url:                 s.GetUrl(),
-			MajorApiVersion:     s.GetMajorApiVersion(),
+			URL:                 s.GetUrl(),
+			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
 			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
 		})
@@ -218,8 +218,8 @@ func (sc *SigningConfig) WithFulcioCertificateAuthorityURLs(fulcioURLs ...Servic
 	var services []*prototrustroot.Service
 	for _, u := range fulcioURLs {
 		services = append(services, &prototrustroot.Service{
-			Url:             u.Url,
-			MajorApiVersion: u.MajorApiVersion,
+			Url:             u.URL,
+			MajorApiVersion: u.MajorAPIVersion,
 			ValidFor: &v1.TimeRange{
 				Start: timestamppb.New(u.ValidityPeriodStart),
 				End:   timestamppb.New(u.ValidityPeriodEnd),
