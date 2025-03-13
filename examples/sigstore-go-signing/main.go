@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
@@ -101,17 +102,67 @@ func main() {
 		log.Fatal(err)
 	}
 
-	signingConfigPGI, err := root.GetSigningConfig(tufClient)
+	// TODO: Uncomment once an updated v0.2 SigningConfig is distributed
+	// via TUF
+	// signingConfigPGI, err := root.GetSigningConfig(tufClient)
+
+	signingConfig, err := root.NewSigningConfig(
+		root.SigningConfigMediaType02,
+		// Fulcio URLs
+		[]root.Service{
+			{
+				Url:                 "https://fulcio.sigstage.dev",
+				MajorApiVersion:     1,
+				ValidityPeriodStart: time.Now().Add(-time.Hour),
+				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			},
+		},
+		// OIDC Provider URLs
+		[]root.Service{
+			{
+				Url:                 "https://oauth2.sigstage.dev/auth",
+				MajorApiVersion:     1,
+				ValidityPeriodStart: time.Now().Add(-time.Hour),
+				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			},
+		},
+		// Rekor URLs
+		[]root.Service{
+			{
+				Url:                 "https://rekor.sigstage.dev",
+				MajorApiVersion:     1,
+				ValidityPeriodStart: time.Now().Add(-time.Hour),
+				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			},
+		},
+		root.ServiceConfiguration{
+			Selector: v1.ServiceSelector_ANY,
+		},
+		[]root.Service{
+			{
+				Url:                 "https://timestamp.githubapp.com/api/v1/timestamp",
+				MajorApiVersion:     1,
+				ValidityPeriodStart: time.Now().Add(-time.Hour),
+				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			},
+		},
+		root.ServiceConfiguration{
+			Selector: v1.ServiceSelector_ANY,
+		},
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	signingConfig := signingConfigPGI.AddTimestampAuthorityURLs("https://timestamp.githubapp.com/api/v1/timestamp")
 
 	opts.TrustedRoot = trustedRoot
 
 	if *idToken != "" {
+		fulcioUrl, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
+		if err != nil {
+			log.Fatal(err)
+		}
 		fulcioOpts := &sign.FulcioOptions{
-			BaseURL: signingConfig.FulcioCertificateAuthorityURL(),
+			BaseURL: fulcioUrl,
 			Timeout: time.Duration(30 * time.Second),
 			Retries: 1,
 		}
@@ -122,7 +173,12 @@ func main() {
 	}
 
 	if *tsa {
-		for _, tsaURL := range signingConfig.TimestampAuthorityURLs() {
+		tsaURLs, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(),
+			signingConfig.TimestampAuthorityURLsConfig(), []uint32{1}, time.Now())
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, tsaURL := range tsaURLs {
 			tsaOpts := &sign.TimestampAuthorityOptions{
 				URL:     tsaURL,
 				Timeout: time.Duration(30 * time.Second),
@@ -130,13 +186,15 @@ func main() {
 			}
 			opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 		}
-
-		// staging TUF repo doesn't have accessible timestamp authorities
-		opts.TrustedRoot = nil
 	}
 
 	if *rekor {
-		for _, rekorURL := range signingConfig.RekorLogURLs() {
+		rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(),
+			signingConfig.RekorLogURLsConfig(), []uint32{1}, time.Now())
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, rekorURL := range rekorURLs {
 			rekorOpts := &sign.RekorOptions{
 				BaseURL: rekorURL,
 				Timeout: time.Duration(90 * time.Second),
