@@ -284,7 +284,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: 2,
 			currentTime:       now,
-			expectedURLs:      []string{"url2", "url3"},
+			possibleURLs:      [][]string{{"url2", "url3"}, {"url3", "url2"}},
 			expectedErr:       false,
 		},
 		{
