@@ -289,16 +289,28 @@ func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
 	return policy, nil
 }
 
+type ArtifactDigest struct {
+	Algorithm string
+	Digest    []byte
+}
+
 type PolicyConfig struct {
 	weDoNotExpectAnArtifact bool
 	weDoNotExpectIdentities bool
 	weExpectSigningKey      bool
 	certificateIdentities   CertificateIdentities
-	verifyArtifact          bool
-	artifact                io.Reader
-	verifyArtifactDigest    bool
-	artifactDigest          []byte
-	artifactDigestAlgorithm string
+	verifyArtifacts         bool
+	artifacts               []io.Reader
+	verifyArtifactDigests   bool
+	artifactDigests         []ArtifactDigest
+}
+
+func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
+	if p.verifyArtifacts || p.verifyArtifactDigests {
+		return errors.New("only one invocation of WithArtifact/WithArtifacts/WithArtifactDigest/WithArtifactDigests is allowed")
+	}
+
+	return nil
 }
 
 func (p *PolicyConfig) Validate() error {
@@ -432,8 +444,8 @@ func WithKey() PolicyOption {
 // an artifact.
 func WithoutArtifactUnsafe() ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest {
-			return errors.New("can't use WithoutArtifactUnsafe while using WithArtifact or WithArtifactDigest")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		p.weDoNotExpectAnArtifact = true
@@ -449,16 +461,38 @@ func WithoutArtifactUnsafe() ArtifactPolicyOption {
 // envelope's statement.
 func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		if p.weDoNotExpectAnArtifact {
 			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
 		}
 
-		p.verifyArtifact = true
-		p.artifact = artifact
+		p.verifyArtifacts = true
+		p.artifacts = []io.Reader{artifact}
+		return nil
+	}
+}
+
+// WithArtifacts allows the caller of Verify to enforce that the SignedEntity
+// being verified was created from, or references, a slice of artifacts.
+//
+// If the SignedEntity contains a DSSE envelope, then the artifact digest is
+// calculated from the given artifact, and compared to the digest in the
+// envelope's statement.
+func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
+	return func(p *PolicyConfig) error {
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
+		}
+
+		if p.weDoNotExpectAnArtifact {
+			return errors.New("can't use WithArtifacts while using WithoutArtifactUnsafe")
+		}
+
+		p.verifyArtifacts = true
+		p.artifacts = artifacts
 		return nil
 	}
 }
@@ -474,17 +508,42 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 // compared to the digest in the envelope's statement.
 func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.verifyArtifact || p.verifyArtifactDigest {
-			return errors.New("only one invocation of WithArtifact/WithArtifactDigest is allowed")
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
 		}
 
 		if p.weDoNotExpectAnArtifact {
 			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
 		}
 
-		p.verifyArtifactDigest = true
-		p.artifactDigestAlgorithm = algorithm
-		p.artifactDigest = artifactDigest
+		p.verifyArtifactDigests = true
+		p.artifactDigests = []ArtifactDigest{{
+			Algorithm: algorithm,
+			Digest:    artifactDigest,
+		}}
+		return nil
+	}
+}
+
+// WithArtifactDigests allows the caller of Verify to enforce that the
+// SignedEntity being verified was created for a given array of artifact digests.
+//
+// If the SignedEntity contains a DSSE envelope, then the artifact digests
+// are compared to the digests in the envelope's statement.
+//
+// If the SignedEntity does not contain a DSSE envelope, verification fails.
+func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
+	return func(p *PolicyConfig) error {
+		if err := p.withVerifyAlreadyConfigured(); err != nil {
+			return err
+		}
+
+		if p.weDoNotExpectAnArtifact {
+			return errors.New("can't use WithArtifactDigests while using WithoutArtifactUnsafe")
+		}
+
+		p.verifyArtifactDigests = true
+		p.artifactDigests = digests
 		return nil
 	}
 }
@@ -602,10 +661,10 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 	if policy.WeExpectAnArtifact() {
 		switch {
-		case policy.verifyArtifact:
-			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
-		case policy.verifyArtifactDigest:
-			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
+		case policy.verifyArtifacts:
+			err = VerifySignatureWithArtifacts(sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
+		case policy.verifyArtifactDigests:
+			err = VerifySignatureWithArtifactDigests(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
 		default:
 			// should never happen, but just in case:
 			err = errors.New("no artifact or artifact digest provided")

@@ -17,9 +17,12 @@ package verify_test
 import (
 	"bytes"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
@@ -152,7 +155,7 @@ func TestTooManyDigests(t *testing.T) {
 	tooManyDigestsStatement := in_toto.Statement{}
 	tooManyDigestsStatement.Subject = []in_toto.Subject{
 		{
-			Name:   fmt.Sprintf("subject"),
+			Name:   "subject",
 			Digest: make(common.DigestSet),
 		},
 	}
@@ -173,4 +176,77 @@ func TestTooManyDigests(t *testing.T) {
 	artifact := "Hi, I am an artifact!" //nolint:goconst
 	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.ErrorContains(t, err, "too many digests")
+}
+
+func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	subjects := make([]in_toto.Subject, 10)
+	artifacts := make([]io.Reader, 10)
+	artifactDigests := make([]verify.ArtifactDigest, 10)
+	// Create ten test subjects
+	for i := range 10 {
+		s := in_toto.Subject{
+			Name: fmt.Sprintf("subject-%d", i),
+		}
+		subjectBody := fmt.Sprintf("Hi, I am a subject! #%d", i)
+		artifacts[i] = strings.NewReader(subjectBody)
+		// alternate between sha256 and sha512 when creating the digests
+		// so that we can test that the verifier can handle digests created
+		// with different algorithms
+		if i%2 == 0 {
+			digest256 := sha256.Sum256([]byte(subjectBody))
+			digest := digest256[:]
+			s.Digest = common.DigestSet{
+				"sha256": hex.EncodeToString(digest),
+			}
+			a := verify.ArtifactDigest{
+				Algorithm: "sha256",
+				Digest:    digest,
+			}
+			artifactDigests[i] = a
+		} else {
+			digest512 := sha512.Sum512([]byte(subjectBody))
+			digest := digest512[:]
+			s.Digest = common.DigestSet{
+				"sha512": hex.EncodeToString(digest),
+			}
+			a := verify.ArtifactDigest{
+				Algorithm: "sha512",
+				Digest:    digest,
+			}
+			artifactDigests[i] = a
+		}
+		subjects[i] = s
+	}
+
+	jsonSubjects, err := json.Marshal(subjects)
+	assert.NoError(t, err)
+
+	statement := []byte(fmt.Sprintf(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":%s,"predicate":{}}`, string(jsonSubjects)))
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
+	assert.NoError(t, err)
+
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(artifacts), verify.WithoutIdentitiesUnsafe()))
+	assert.NoError(t, err)
+
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(artifactDigests), verify.WithoutIdentitiesUnsafe()))
+	assert.NoError(t, err)
+
+	noMatchingArtifacts := []io.Reader{strings.NewReader("some other artifact")}
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(noMatchingArtifacts), verify.WithoutIdentitiesUnsafe()))
+	assert.Error(t, err)
+
+	noMatchingArtifactDigests := []verify.ArtifactDigest{
+		{
+			Algorithm: "sha256",
+			Digest:    []byte("some other artifact"),
+		},
+	}
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(noMatchingArtifactDigests), verify.WithoutIdentitiesUnsafe()))
+	assert.Error(t, err)
 }
