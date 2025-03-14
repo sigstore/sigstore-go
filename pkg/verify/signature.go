@@ -57,63 +57,28 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	return fmt.Errorf("signature content has neither an envelope or a message")
 }
 
-func VerifySignatureWithArtifact(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifact io.Reader) error { // nolint: revive
-	var verifier signature.Verifier
-	var err error
-
-	verifier, err = getSignatureVerifier(verificationContent, trustedMaterial)
-	if err != nil {
-		return fmt.Errorf("could not load signature verifier: %w", err)
-	}
-
-	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		artifacts := []io.Reader{artifact}
-		return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
-	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		return verifyMessageSignature(verifier, msg, artifact)
-	}
-
-	// handle an invalid signature content message
-	return fmt.Errorf("signature content has neither an envelope or a message")
-}
-
 func VerifySignatureWithArtifacts(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifacts []io.Reader) error { // nolint: revive
 	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
 
-	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
+	envelope := sigContent.EnvelopeContent()
+	msg := sigContent.MessageSignatureContent()
+	if envelope == nil && msg == nil {
+		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
-
-	// handle an invalid signature content message
-	return fmt.Errorf("signature content does not have an envelope")
-}
-
-func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifactDigest []byte, artifactDigestAlgorithm string) error { // nolint: revive
-	var verifier signature.Verifier
-	var err error
-
-	verifier, err = getSignatureVerifier(verificationContent, trustedMaterial)
-	if err != nil {
-		return fmt.Errorf("could not load signature verifier: %w", err)
-	}
-
-	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		ad := ArtifactDigest{
-			Algorithm: artifactDigestAlgorithm,
-			Digest:    artifactDigest,
+	// If there is only one artifact and no envelope,
+	// attempt to verify the message signature with the artifact.
+	if envelope == nil {
+		if len(artifacts) != 1 {
+			return fmt.Errorf("only one artifact can be verified with a message signature")
 		}
-		artifactDigests := []ArtifactDigest{ad}
-
-		return verifyEnvelopeWithArtifactDigests(verifier, envelope, artifactDigests)
-	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
-		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
+		return verifyMessageSignature(verifier, msg, artifacts[0])
 	}
 
-	// handle an invalid signature content message
-	return fmt.Errorf("signature content has neither an envelope or a message")
+	// Otherwise, verify the envelope with the provided artifacts
+	return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
 }
 
 func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, digests []ArtifactDigest) error { // nolint: revive
@@ -122,12 +87,23 @@ func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificatio
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
 
-	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		return verifyEnvelopeWithArtifactDigests(verifier, envelope, digests)
+	envelope := sigContent.EnvelopeContent()
+	// If there is only one artifact and no envelope,
+	// attempt to verify the message signature with the artifact.
+	if len(digests) == 1 && envelope == nil {
+		if msg := sigContent.MessageSignatureContent(); msg != nil {
+			return verifyMessageSignatureWithArtifactDigest(verifier, msg, digests[0].Digest)
+		}
+		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
 
-	// handle an invalid signature content message
-	return fmt.Errorf("signature content does not have an envelope")
+	// If there is no envelope, return an error.
+	if envelope == nil {
+		// handle an invalid signature content message
+		return fmt.Errorf("signature content does not have an envelope")
+	}
+
+	return verifyEnvelopeWithArtifactDigests(verifier, envelope, digests)
 }
 
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {

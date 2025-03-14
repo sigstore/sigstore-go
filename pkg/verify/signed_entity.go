@@ -299,19 +299,14 @@ type PolicyConfig struct {
 	weDoNotExpectIdentities bool
 	weExpectSigningKey      bool
 	certificateIdentities   CertificateIdentities
-	verifyArtifact          bool
 	verifyArtifacts         bool
-	artifact                io.Reader
 	artifacts               []io.Reader
-	verifyArtifactDigest    bool
 	verifyArtifactDigests   bool
 	artifactDigests         []ArtifactDigest
-	artifactDigest          []byte
-	artifactDigestAlgorithm string
 }
 
 func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
-	if p.verifyArtifact || p.verifyArtifacts || p.verifyArtifactDigest || p.verifyArtifactDigests {
+	if p.verifyArtifacts || p.verifyArtifactDigests {
 		return errors.New("only one invocation of WithArtifact/WithArtifacts/WithArtifactDigest/WithArtifactDigests is allowed")
 	}
 
@@ -474,8 +469,8 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
 		}
 
-		p.verifyArtifact = true
-		p.artifact = artifact
+		p.verifyArtifacts = true
+		p.artifacts = []io.Reader{artifact}
 		return nil
 	}
 }
@@ -521,9 +516,11 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
 		}
 
-		p.verifyArtifactDigest = true
-		p.artifactDigestAlgorithm = algorithm
-		p.artifactDigest = artifactDigest
+		p.verifyArtifactDigests = true
+		p.artifactDigests = []ArtifactDigest{{
+			Algorithm: algorithm,
+			Digest:    artifactDigest,
+		}}
 		return nil
 	}
 }
@@ -664,12 +661,8 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 	if policy.WeExpectAnArtifact() {
 		switch {
-		case policy.verifyArtifact:
-			err = VerifySignatureWithArtifact(sigContent, verificationContent, v.trustedMaterial, policy.artifact)
 		case policy.verifyArtifacts:
 			err = VerifySignatureWithArtifacts(sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
-		case policy.verifyArtifactDigest:
-			err = VerifySignatureWithArtifactDigest(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigest, policy.artifactDigestAlgorithm)
 		case policy.verifyArtifactDigests:
 			err = VerifySignatureWithArtifactDigests(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
 		default:
