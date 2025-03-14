@@ -266,7 +266,7 @@ type PolicyBuilder struct {
 	policyOptions  []PolicyOption
 }
 
-func (pc PolicyBuilder) Options() []PolicyOption {
+func (pc PolicyBuilder) options() []PolicyOption {
 	arr := []PolicyOption{PolicyOption(pc.artifactPolicy)}
 	return append(arr, pc.policyOptions...)
 }
@@ -275,14 +275,14 @@ func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
 	var err error
 
 	policy := &PolicyConfig{}
-	for _, applyOption := range pc.Options() {
+	for _, applyOption := range pc.options() {
 		err = applyOption(policy)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if err := policy.Validate(); err != nil {
+	if err := policy.validate(); err != nil {
 		return nil, err
 	}
 
@@ -295,14 +295,14 @@ type ArtifactDigest struct {
 }
 
 type PolicyConfig struct {
-	weDoNotExpectAnArtifact bool
-	weDoNotExpectIdentities bool
-	weExpectSigningKey      bool
-	certificateIdentities   CertificateIdentities
-	verifyArtifacts         bool
-	artifacts               []io.Reader
-	verifyArtifactDigests   bool
-	artifactDigests         []ArtifactDigest
+	ignoreArtifact        bool
+	ignoreIdentities      bool
+	requireSigningKey     bool
+	certificateIdentities CertificateIdentities
+	verifyArtifacts       bool
+	artifacts             []io.Reader
+	verifyArtifactDigests bool
+	artifactDigests       []ArtifactDigest
 }
 
 func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
@@ -313,48 +313,47 @@ func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
 	return nil
 }
 
-func (p *PolicyConfig) Validate() error {
-	if p.WeExpectIdentities() && len(p.certificateIdentities) == 0 {
+func (p *PolicyConfig) validate() error {
+	if p.RequireIdentities() && len(p.certificateIdentities) == 0 {
 		return errors.New("can't verify identities without providing at least one identity")
 	}
 
 	return nil
 }
 
-// WeExpectAnArtifact returns true if the Verify algorithm should perform
+// RequireArtifact returns true if the Verify algorithm should perform
 // signature verification with an an artifact provided by either the
 // WithArtifact or the WithArtifactDigest functions.
 //
 // By default, unless explicitly turned off, we should always expect to verify
 // a SignedEntity's signature using an artifact. Bools are initialized to false,
-// so this behaviour is therefore controlled by the weDoNotExpectAnArtifact
-// field.
+// so this behaviour is therefore controlled by the ignoreArtifact field.
 //
 // Double negatives are confusing, though. To aid with comprehension of the
 // main Verify loop, this function therefore just wraps the double negative.
-func (p *PolicyConfig) WeExpectAnArtifact() bool {
-	return !p.weDoNotExpectAnArtifact
+func (p *PolicyConfig) RequireArtifact() bool {
+	return !p.ignoreArtifact
 }
 
-// WeExpectIdentities returns true if the Verify algorithm should check
+// RequireIdentities returns true if the Verify algorithm should check
 // whether the SignedEntity's certificate was created by one of the identities
 // provided by the WithCertificateIdentity function.
 //
 // By default, unless explicitly turned off, we should always expect to enforce
 // that a SignedEntity's certificate was created by an Identity we trust. Bools
 // are initialized to false, so this behaviour is therefore controlled by the
-// weDoNotExpectIdentities field.
+// ignoreIdentities field.
 //
 // Double negatives are confusing, though. To aid with comprehension of the
 // main Verify loop, this function therefore just wraps the double negative.
-func (p *PolicyConfig) WeExpectIdentities() bool {
-	return !p.weDoNotExpectIdentities
+func (p *PolicyConfig) RequireIdentities() bool {
+	return !p.ignoreIdentities
 }
 
-// WeExpectSigningKey returns true if we expect the SignedEntity to be signed
+// RequireSigningKey returns true if we expect the SignedEntity to be signed
 // with a key and not a certificate.
-func (p *PolicyConfig) WeExpectSigningKey() bool {
-	return p.weExpectSigningKey
+func (p *PolicyConfig) RequireSigningKey() bool {
+	return p.requireSigningKey
 }
 
 func NewPolicy(artifactOpt ArtifactPolicyOption, options ...PolicyOption) PolicyBuilder {
@@ -377,7 +376,7 @@ func WithoutIdentitiesUnsafe() PolicyOption {
 			return errors.New("can't use WithoutIdentitiesUnsafe while specifying CertificateIdentities")
 		}
 
-		p.weDoNotExpectIdentities = true
+		p.ignoreIdentities = true
 		return nil
 	}
 }
@@ -402,10 +401,10 @@ func WithoutIdentitiesUnsafe() PolicyOption {
 // For convenience, consult the NewShortCertificateIdentity function.
 func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 	return func(p *PolicyConfig) error {
-		if p.weDoNotExpectIdentities {
+		if p.ignoreIdentities {
 			return errors.New("can't use WithCertificateIdentity while using WithoutIdentitiesUnsafe")
 		}
-		if p.weExpectSigningKey {
+		if p.requireSigningKey {
 			return errors.New("can't use WithCertificateIdentity while using WithKey")
 		}
 
@@ -422,8 +421,8 @@ func WithKey() PolicyOption {
 			return errors.New("can't use WithKey while using WithCertificateIdentity")
 		}
 
-		p.weExpectSigningKey = true
-		p.weDoNotExpectIdentities = true
+		p.requireSigningKey = true
+		p.ignoreIdentities = true
 		return nil
 	}
 }
@@ -448,7 +447,7 @@ func WithoutArtifactUnsafe() ArtifactPolicyOption {
 			return err
 		}
 
-		p.weDoNotExpectAnArtifact = true
+		p.ignoreArtifact = true
 		return nil
 	}
 }
@@ -465,7 +464,7 @@ func WithArtifact(artifact io.Reader) ArtifactPolicyOption {
 			return err
 		}
 
-		if p.weDoNotExpectAnArtifact {
+		if p.ignoreArtifact {
 			return errors.New("can't use WithArtifact while using WithoutArtifactUnsafe")
 		}
 
@@ -487,7 +486,7 @@ func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
 			return err
 		}
 
-		if p.weDoNotExpectAnArtifact {
+		if p.ignoreArtifact {
 			return errors.New("can't use WithArtifacts while using WithoutArtifactUnsafe")
 		}
 
@@ -512,7 +511,7 @@ func WithArtifactDigest(algorithm string, artifactDigest []byte) ArtifactPolicyO
 			return err
 		}
 
-		if p.weDoNotExpectAnArtifact {
+		if p.ignoreArtifact {
 			return errors.New("can't use WithArtifactDigest while using WithoutArtifactUnsafe")
 		}
 
@@ -538,7 +537,7 @@ func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 			return err
 		}
 
-		if p.weDoNotExpectAnArtifact {
+		if p.ignoreArtifact {
 			return errors.New("can't use WithArtifactDigests while using WithoutArtifactUnsafe")
 		}
 
@@ -599,7 +598,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	// If the bundle was signed with a long-lived key, and does not have a Fulcio certificate,
 	// then skip the certificate verification steps
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
-		if policy.WeExpectSigningKey() {
+		if policy.RequireSigningKey() {
 			return nil, errors.New("expected key signature, not certificate")
 		}
 
@@ -659,7 +658,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
-	if policy.WeExpectAnArtifact() {
+	if policy.RequireArtifact() {
 		switch {
 		case policy.verifyArtifacts:
 			err = VerifySignatureWithArtifacts(sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
@@ -708,7 +707,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 
 	// From ## Certificate section,
 	// >The Verifier MUST then check the certificate against the verification policy. Details on how to do this depend on the verification policy, but the Verifier SHOULD check the Issuer X.509 extension (OID 1.3.6.1.4.1.57264.1.1) at a minimum, and will in most cases check the SubjectAlternativeName as well. See  Spec: Fulcio §TODO for example checks on the certificate.
-	if policy.WeExpectIdentities() {
+	if policy.RequireIdentities() {
 		if !signedWithCertificate {
 			// We got asked to verify identities, but the entity was not signed with
 			// a certificate. That's a problem!

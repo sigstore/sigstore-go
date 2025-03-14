@@ -112,7 +112,7 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 	}
 
 	if response.StatusCode != 200 && response.StatusCode != 201 {
-		return nil, fmt.Errorf("Timestamp authority returned %d: %s", response.StatusCode, string(body))
+		return nil, fmt.Errorf("timestamp authority returned %d: %s", response.StatusCode, string(body))
 	}
 
 	_, err = timestamp.ParseResponse(body)
