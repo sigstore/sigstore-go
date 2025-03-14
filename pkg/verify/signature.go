@@ -67,7 +67,8 @@ func VerifySignatureWithArtifact(sigContent SignatureContent, verificationConten
 	}
 
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		return verifyEnvelopeWithArtifact(verifier, envelope, artifact)
+		artifacts := []io.Reader{artifact}
+		return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return verifyMessageSignature(verifier, msg, artifact)
 	}
@@ -100,7 +101,13 @@ func VerifySignatureWithArtifactDigest(sigContent SignatureContent, verification
 	}
 
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
-		return verifyEnvelopeWithArtifactDigest(verifier, envelope, artifactDigest, artifactDigestAlgorithm)
+		ad := ArtifactDigest{
+			Algorithm: artifactDigestAlgorithm,
+			Digest:    artifactDigest,
+		}
+		artifactDigests := []ArtifactDigest{ad}
+
+		return verifyEnvelopeWithArtifactDigests(verifier, envelope, artifactDigests)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
 		return verifyMessageSignatureWithArtifactDigest(verifier, msg, artifactDigest)
 	}
@@ -161,11 +168,6 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 	}
 
 	return nil
-}
-
-func verifyEnvelopeWithArtifact(verifier signature.Verifier, envelope EnvelopeContent, artifact io.Reader) error {
-	artifacts := []io.Reader{artifact}
-	return verifyEnvelopeWithArtifacts(verifier, envelope, artifacts)
 }
 
 func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeContent, artifacts []io.Reader) error {
@@ -245,15 +247,6 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 	}
 
 	return nil
-}
-
-func verifyEnvelopeWithArtifactDigest(verifier signature.Verifier, envelope EnvelopeContent, artifactDigest []byte, artifactDigestAlgorithm string) error {
-	ad := ArtifactDigest{
-		Algorithm: artifactDigestAlgorithm,
-		Digest:    artifactDigest,
-	}
-	artifactDigests := []ArtifactDigest{ad}
-	return verifyEnvelopeWithArtifactDigests(verifier, envelope, artifactDigests)
 }
 
 func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope EnvelopeContent, digests []ArtifactDigest) error {
