@@ -266,7 +266,7 @@ type PolicyBuilder struct {
 	policyOptions  []PolicyOption
 }
 
-func (pc PolicyBuilder) Options() []PolicyOption {
+func (pc PolicyBuilder) options() []PolicyOption {
 	arr := []PolicyOption{PolicyOption(pc.artifactPolicy)}
 	return append(arr, pc.policyOptions...)
 }
@@ -275,14 +275,14 @@ func (pc PolicyBuilder) BuildConfig() (*PolicyConfig, error) {
 	var err error
 
 	policy := &PolicyConfig{}
-	for _, applyOption := range pc.Options() {
+	for _, applyOption := range pc.options() {
 		err = applyOption(policy)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if err := policy.Validate(); err != nil {
+	if err := policy.validate(); err != nil {
 		return nil, err
 	}
 
@@ -295,14 +295,14 @@ type ArtifactDigest struct {
 }
 
 type PolicyConfig struct {
-	ignoreArtifact          bool
-	ignoreIdentities        bool
-	requireSigningKey       bool
-	certificateIdentities   CertificateIdentities
-	verifyArtifacts         bool
-	artifacts               []io.Reader
-	verifyArtifactDigests   bool
-	artifactDigests         []ArtifactDigest
+	ignoreArtifact        bool
+	ignoreIdentities      bool
+	requireSigningKey     bool
+	certificateIdentities CertificateIdentities
+	verifyArtifacts       bool
+	artifacts             []io.Reader
+	verifyArtifactDigests bool
+	artifactDigests       []ArtifactDigest
 }
 
 func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
@@ -313,7 +313,7 @@ func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
 	return nil
 }
 
-func (p *PolicyConfig) Validate() error {
+func (p *PolicyConfig) validate() error {
 	if p.RequireIdentities() && len(p.certificateIdentities) == 0 {
 		return errors.New("can't verify identities without providing at least one identity")
 	}
@@ -486,7 +486,7 @@ func WithArtifacts(artifacts []io.Reader) ArtifactPolicyOption {
 			return err
 		}
 
-		if p.weDoNotExpectAnArtifact {
+		if p.ignoreArtifact {
 			return errors.New("can't use WithArtifacts while using WithoutArtifactUnsafe")
 		}
 
@@ -537,7 +537,7 @@ func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 			return err
 		}
 
-		if p.weDoNotExpectAnArtifact {
+		if p.ignoreArtifact {
 			return errors.New("can't use WithArtifactDigests while using WithoutArtifactUnsafe")
 		}
 
