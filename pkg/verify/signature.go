@@ -88,19 +88,17 @@ func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificatio
 	}
 
 	envelope := sigContent.EnvelopeContent()
-	// If there is only one artifact and no envelope,
-	// attempt to verify the message signature with the artifact.
-	if len(digests) == 1 && envelope == nil {
-		if msg := sigContent.MessageSignatureContent(); msg != nil {
-			return verifyMessageSignatureWithArtifactDigest(verifier, msg, digests[0].Digest)
-		}
+	msg := sigContent.MessageSignatureContent()
+	if envelope == nil && msg == nil {
 		return fmt.Errorf("signature content has neither an envelope or a message")
 	}
-
-	// If there is no envelope, return an error.
+	// If there is only one artifact and no envelope,
+	// attempt to verify the message signature with the artifact.
 	if envelope == nil {
-		// handle an invalid signature content message
-		return fmt.Errorf("signature content does not have an envelope")
+		if len(digests) != 1 {
+			return fmt.Errorf("only one artifact can be verified with a message signature")
+		}
+		return verifyMessageSignatureWithArtifactDigest(verifier, msg, digests[0].Digest)
 	}
 
 	return verifyEnvelopeWithArtifactDigests(verifier, envelope, digests)
