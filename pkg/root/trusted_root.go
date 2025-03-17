@@ -453,22 +453,19 @@ func NewLiveTrustedRoot(opts *tuf.Options) (*LiveTrustedRoot, error) {
 	}
 	ticker := time.NewTicker(time.Hour * 24)
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				client, err = tuf.New(opts)
-				if err != nil {
-					log.Printf("error creating TUF client: %v", err)
-				}
-				newTr, err := GetTrustedRoot(client)
-				if err != nil {
-					log.Printf("error fetching trusted root: %v", err)
-					continue
-				}
-				ltr.mu.Lock()
-				ltr.TrustedRoot = newTr
-				ltr.mu.Unlock()
+		for range ticker.C {
+			client, err = tuf.New(opts)
+			if err != nil {
+				log.Printf("error creating TUF client: %v", err)
 			}
+			newTr, err := GetTrustedRoot(client)
+			if err != nil {
+				log.Printf("error fetching trusted root: %v", err)
+				continue
+			}
+			ltr.mu.Lock()
+			ltr.TrustedRoot = newTr
+			ltr.mu.Unlock()
 		}
 	}()
 	return ltr, nil

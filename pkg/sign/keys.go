@@ -109,7 +109,7 @@ func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
 		return crypto.Hash(crypto.SHA512), nil
 	default:
 		var hash crypto.Hash
-		return hash, errors.New("Unsupported hash algorithm")
+		return hash, errors.New("unsupported hash algorithm")
 	}
 }
 

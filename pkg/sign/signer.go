@@ -54,7 +54,7 @@ type BundleOptions struct {
 
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
 	if keypair == nil {
-		return nil, errors.New("Must provide a keypair for signing, like EphemeralKeypair")
+		return nil, errors.New("must provide a keypair for signing, like EphemeralKeypair")
 	}
 
 	if opts.Context == nil {

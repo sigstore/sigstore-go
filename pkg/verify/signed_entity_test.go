@@ -249,8 +249,8 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, p)
 
-	assert.False(t, p.WeExpectAnArtifact())
-	assert.True(t, p.WeExpectIdentities())
+	assert.False(t, p.RequireArtifact())
+	assert.True(t, p.RequireIdentities())
 
 	// ---
 
@@ -259,8 +259,8 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, p)
 
-	assert.False(t, p.WeExpectAnArtifact())
-	assert.False(t, p.WeExpectIdentities())
+	assert.False(t, p.RequireArtifact())
+	assert.False(t, p.RequireIdentities())
 
 	// ---
 
@@ -269,8 +269,8 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, p)
 
-	assert.True(t, p.WeExpectAnArtifact())
-	assert.False(t, p.WeExpectIdentities())
+	assert.True(t, p.RequireArtifact())
+	assert.False(t, p.RequireIdentities())
 
 	// ---
 
@@ -279,8 +279,8 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, p)
 
-	assert.True(t, p.WeExpectSigningKey())
-	assert.False(t, p.WeExpectIdentities())
+	assert.True(t, p.RequireSigningKey())
+	assert.False(t, p.RequireIdentities())
 
 	// let's exercise the different error cases!
 	// 1. can't combine WithoutArtifactUnsafe with other Artifact options
