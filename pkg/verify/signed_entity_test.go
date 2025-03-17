@@ -15,6 +15,7 @@
 package verify_test
 
 import (
+	"crypto/x509"
 	"errors"
 	"strings"
 	"testing"
@@ -473,4 +474,97 @@ func TestStatementSerializesToValidInTotoStatement(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, result.MediaType, result2.MediaType)
 	assert.Equal(t, result.Statement, result2.Statement)
+}
+
+func TestCertificateSignedEntityWithSCTsRequiredVerifiesSuccessfully(t *testing.T) {
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
+
+	v, err := verify.NewSignedEntityVerifier(
+		tr,
+		verify.WithTransparencyLog(1),
+		verify.WithObserverTimestamps(1),
+		verify.WithSignedCertificateTimestamps(1),
+	)
+	assert.NoError(t, err)
+
+	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.NotNil(t, res.Signature)
+	assert.NotNil(t, res.Signature.Certificate)
+}
+
+func TestForcedKeySignedEntityWithSCTsRequiredFails(t *testing.T) {
+	tr := data.TrustedRoot(t, "public-good.json")
+	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
+
+	v, err := verify.NewSignedEntityVerifier(
+		tr,
+		verify.WithTransparencyLog(1),
+		verify.WithObserverTimestamps(1),
+		verify.WithSignedCertificateTimestamps(1),
+	)
+	assert.NoError(t, err)
+
+	// Wrap existing data to force key-signed behavior as current data is signed by a certificate
+	keySignedEntity := &keySignedEntityWrapper{
+		SignedEntity: entity,
+		forceKey:     true,
+	}
+
+	res, err := v.Verify(keySignedEntity, SkipArtifactAndIdentitiesPolicy)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Equal(t,
+		"SCTs required but bundle is signed with a public key, which cannot contain SCTs",
+		err.Error(),
+	)
+}
+
+type keySignedEntityWrapper struct {
+	verify.SignedEntity
+	forceKey bool
+}
+
+func (w *keySignedEntityWrapper) VerificationContent() (verify.VerificationContent, error) {
+	vc, err := w.SignedEntity.VerificationContent()
+	if err != nil {
+		return nil, err
+	}
+	return &keySignedVerificationContent{
+		VerificationContent: vc,
+		forceKey:            w.forceKey,
+	}, nil
+}
+
+type keySignedVerificationContent struct {
+	verify.VerificationContent
+	forceKey bool
+}
+
+func (k *keySignedVerificationContent) PublicKey() verify.PublicKeyProvider {
+	if k.forceKey {
+		return &mockPublicKeyProvider{keyBytes: []byte("mock-public-key")}
+	}
+	return k.VerificationContent.PublicKey()
+}
+
+func (k *keySignedVerificationContent) Certificate() *x509.Certificate {
+	if k.forceKey {
+		return nil
+	}
+	return k.VerificationContent.Certificate()
+}
+
+type mockPublicKeyProvider struct {
+	keyBytes []byte
+}
+
+func (p *mockPublicKeyProvider) PublicKey() ([]byte, error) {
+	return p.keyBytes, nil
+}
+
+func (p *mockPublicKeyProvider) Hint() string {
+	return "mock"
 }
