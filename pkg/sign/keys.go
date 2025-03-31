@@ -15,6 +15,7 @@
 package sign
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -34,7 +35,7 @@ type Keypair interface {
 	GetHint() []byte
 	GetKeyAlgorithm() string
 	GetPublicKeyPem() (string, error)
-	SignData(data []byte) ([]byte, []byte, error)
+	SignData(ctx context.Context, data []byte) ([]byte, []byte, error)
 }
 
 type EphemeralKeypairOptions struct {
@@ -108,11 +109,11 @@ func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
 		return crypto.Hash(crypto.SHA512), nil
 	default:
 		var hash crypto.Hash
-		return hash, errors.New("Unsupported hash algorithm")
+		return hash, errors.New("unsupported hash algorithm")
 	}
 }
 
-func (e *EphemeralKeypair) SignData(data []byte) ([]byte, []byte, error) {
+func (e *EphemeralKeypair) SignData(_ context.Context, data []byte) ([]byte, []byte, error) {
 	hashFunc, err := getHashFunc(e.hashAlgorithm)
 	if err != nil {
 		return nil, nil, err

@@ -107,7 +107,7 @@ func NewFulcio(opts *FulcioOptions) *Fulcio {
 // Returns DER-encoded code signing certificate
 func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *CertificateProviderOptions) ([]byte, error) {
 	if opts.IDToken == "" {
-		return nil, errors.New("Fulcio requires IDToken to be set")
+		return nil, errors.New("fetching certificate from Fulcio requires IDToken to be set")
 	}
 
 	// Get JWT from identity token
@@ -116,7 +116,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 	// the token verification.
 	tokenParts := strings.Split(opts.IDToken, ".")
 	if len(tokenParts) < 2 {
-		return nil, errors.New("Unable to get subject from identity token")
+		return nil, errors.New("unable to get subject from identity token")
 	}
 
 	jwtString, err := base64.RawURLEncoding.DecodeString(tokenParts[1])
@@ -130,7 +130,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 	}
 
 	// Sign JWT subject for proof of possession
-	subjectSignature, _, err := keypair.SignData([]byte(subject))
+	subjectSignature, _, err := keypair.SignData(ctx, []byte(subject))
 	if err != nil {
 		return nil, err
 	}

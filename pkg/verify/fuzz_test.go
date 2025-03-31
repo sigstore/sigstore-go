@@ -16,6 +16,7 @@ package verify_test
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -189,12 +190,12 @@ func FuzzVerifySignatureWithArtifactWithoutDigest(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		artifact := bytes.NewReader(artifactBytes)
+		artifacts := []io.Reader{bytes.NewReader(artifactBytes)}
 		//nolint:errcheck
-		verify.VerifySignatureWithArtifact(sigContent,
+		verify.VerifySignatureWithArtifacts(sigContent,
 			verificationContent,
 			virtualSigstore,
-			artifact)
+			artifacts)
 	})
 }
 
@@ -225,11 +226,14 @@ func FuzzVerifySignatureWithArtifactDigest(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		artifactDigests := []verify.ArtifactDigest{{
+			Algorithm: artifactDigestAlgorithm,
+			Digest:    artifactDigest,
+		}}
 		//nolint:errcheck
-		verify.VerifySignatureWithArtifactDigest(sigContent,
+		verify.VerifySignatureWithArtifactDigests(sigContent,
 			verificationContent,
 			virtualSigstore,
-			artifactDigest,
-			artifactDigestAlgorithm)
+			artifactDigests)
 	})
 }
