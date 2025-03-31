@@ -99,3 +99,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
+
+replace github.com/sigstore/protobuf-specs => /Users/ret2libc/projects/sigstore/protobuf-specs
+
+replace github.com/sigstore/sigstore => /Users/ret2libc/projects/sigstore/sigstore
