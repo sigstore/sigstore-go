@@ -18,15 +18,20 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
 	"io"
+	"os"
 	"slices"
 
 	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
@@ -104,15 +109,84 @@ func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificatio
 	return verifyEnvelopeWithArtifactDigests(verifier, envelope, digests)
 }
 
+// compatVerifier is a signature.Verifier that tries multiple verifiers
+// and returns nil if any of them verify the signature. This is used to
+// verify signatures that were generated with old clients that used SHA256
+// for ECDSA P384/P521 keys.
+type compatVerifier struct {
+	verifiers []signature.Verifier
+}
+
+func (v *compatVerifier) VerifySignature(signature, message io.Reader, opts ...signature.VerifyOption) error {
+	for idx, verifier := range v.verifiers {
+		if idx != 0 {
+			fmt.Fprint(os.Stderr, "Failed to verify signature with default verifier, trying compatibility verifier\n")
+			// Reset the signature and message readers to the beginning so they can be reused
+			seeker, ok := signature.(io.Seeker)
+			if ok {
+				seeker.Seek(0, 0)
+			}
+			seeker, ok = message.(io.Seeker)
+			if ok {
+				seeker.Seek(0, 0)
+			}
+		}
+		err := verifier.VerifySignature(signature, message, opts...)
+		if err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("no compatible verifier found")
+}
+
+func (v *compatVerifier) PublicKey(opts ...signature.PublicKeyOption) (crypto.PublicKey, error) {
+	return v.verifiers[0].PublicKey(opts...)
+}
+
+func compatSignatureVerifier(leafCert *x509.Certificate) (signature.Verifier, error) {
+	// LoadDefaultSigner/Verifier functions accept a few options to select
+	// the default signer/verifier when there are ambiguities, like for
+	// ED25519 keys, which could be used with PureEd25519 or Ed25519ph.
+	//
+	// Pass `WithED25519ph()` to select Ed25519ph by default, when ED25519
+	// key is found, because for hashedrekord entries this is the only option.
+	defaultOpts := []signature.LoadOption{options.WithED25519ph()}
+
+	verifiers := make([]signature.Verifier, 0)
+	verifier, err := signature.LoadDefaultVerifier(leafCert.PublicKey, defaultOpts...)
+	if err != nil {
+		return nil, err
+	}
+	verifiers = append(verifiers, verifier)
+
+	// Add a compatibility verifier for ECDSA P384/P521, because we still want
+	// to verify signatures generated with old clients that used SHA256
+	switch leafCert.PublicKey.(type) {
+	case *ecdsa.PublicKey:
+		var algorithmDetails signature.AlgorithmDetails
+		switch leafCert.PublicKey.(*ecdsa.PublicKey).Curve {
+		case elliptic.P384():
+			algorithmDetails, err = signature.GetAlgorithmDetails(v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256)
+		case elliptic.P521():
+			algorithmDetails, err = signature.GetAlgorithmDetails(v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_256)
+		default:
+			return verifier, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		verifier, err = signature.LoadVerifierFromAlgorithmDetails(leafCert.PublicKey, algorithmDetails, defaultOpts...)
+		if err != nil {
+			return nil, err
+		}
+		verifiers = append(verifiers, verifier)
+	}
+	return &compatVerifier{verifiers: verifiers}, nil
+}
+
 func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
-		// LoadDefaultSigner/Verifier functions accept a few options to select
-		// the default signer/verifier when there are ambiguities, like for
-		// ED25519 keys, which could be used with PureEd25519 or Ed25519ph.
-		//
-		// Pass `WithED25519ph()` to select Ed25519ph by default, when ED25519
-		// key is found, because for hashedrekord entries this is the only option.
-		return signature.LoadDefaultVerifier(leafCert.PublicKey, options.WithED25519ph())
+		return compatSignatureVerifier(leafCert)
 	} else if pk := verificationContent.PublicKey(); pk != nil {
 		return tm.PublicKeyVerifier(pk.Hint())
 	}
