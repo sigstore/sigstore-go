@@ -100,6 +100,6 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
 
-replace github.com/sigstore/protobuf-specs => /Users/ret2libc/projects/sigstore/protobuf-specs
+replace github.com/sigstore/protobuf-specs => github.com/trail-of-forks/protobuf-specs v0.3.3-0.20250331162432-e5e775cafa56
 
-replace github.com/sigstore/sigstore => /Users/ret2libc/projects/sigstore/sigstore
+replace github.com/sigstore/sigstore => github.com/trail-of-forks/sigstore v0.0.0-20250331165513-1846a6ef19c9
