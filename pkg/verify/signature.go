@@ -124,11 +124,17 @@ func (v *compatVerifier) VerifySignature(signature, message io.Reader, opts ...s
 			// Reset the signature and message readers to the beginning so they can be reused
 			seeker, ok := signature.(io.Seeker)
 			if ok {
-				seeker.Seek(0, 0)
+				_, err := seeker.Seek(0, 0)
+				if err != nil {
+					return fmt.Errorf("failed to reset signature reader: %w", err)
+				}
 			}
 			seeker, ok = message.(io.Seeker)
 			if ok {
-				seeker.Seek(0, 0)
+				_, err := seeker.Seek(0, 0)
+				if err != nil {
+					return fmt.Errorf("failed to reset message reader: %w", err)
+				}
 			}
 		}
 		err := verifier.VerifySignature(signature, message, opts...)
@@ -161,13 +167,14 @@ func compatSignatureVerifier(leafCert *x509.Certificate) (signature.Verifier, er
 
 	// Add a compatibility verifier for ECDSA P384/P521, because we still want
 	// to verify signatures generated with old clients that used SHA256
-	switch leafCert.PublicKey.(type) {
-	case *ecdsa.PublicKey:
+	if ecdsaPubKey, ok := leafCert.PublicKey.(*ecdsa.PublicKey); ok {
 		var algorithmDetails signature.AlgorithmDetails
-		switch leafCert.PublicKey.(*ecdsa.PublicKey).Curve {
+		switch ecdsaPubKey.Curve {
 		case elliptic.P384():
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
 			algorithmDetails, err = signature.GetAlgorithmDetails(v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256)
 		case elliptic.P521():
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
 			algorithmDetails, err = signature.GetAlgorithmDetails(v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_256)
 		default:
 			return verifier, nil
