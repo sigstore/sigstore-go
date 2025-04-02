@@ -52,7 +52,7 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 	return verifySignatureWithVerifier(verifier, sigContent, verificationContent, trustedMaterial)
 }
 
-func verifySignatureWithVerifier(verifier signature.Verifier, sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error {
+func verifySignatureWithVerifier(verifier signature.Verifier, sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
 		return verifyEnvelope(verifier, envelope)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
