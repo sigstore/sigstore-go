@@ -275,12 +275,14 @@ func TestCompatibilityAlgorithms(t *testing.T) {
 			noCompatSucceed: true,
 		},
 		{
-			hash:            crypto.SHA256,
+			hash: crypto.SHA256,
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
 			pkDetails:       v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256,
 			noCompatSucceed: false,
 		},
 		{
-			hash:            crypto.SHA256,
+			hash: crypto.SHA256,
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
 			pkDetails:       v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_256,
 			noCompatSucceed: false,
 		},

@@ -287,7 +287,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 	return &TestEntity{
 		certChain:        []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
 		timestamps:       [][]byte{tsr},
-		messageSignature: bundle.NewMessageSignature(digest[:], digestString, sig),
+		messageSignature: bundle.NewMessageSignature(digest, digestString, sig),
 		tlogEntries:      []*tlog.Entry{entry},
 	}, nil
 }
@@ -435,7 +435,7 @@ func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBy
 		hasher.Write(blobBytes)
 		blobHash := hasher.Sum(nil)
 
-		props.ArtifactHash = strings.ToLower(hex.EncodeToString(blobHash[:]))
+		props.ArtifactHash = strings.ToLower(hex.EncodeToString(blobHash))
 		props.SignatureBytes = sigBytes
 	default:
 		return nil, fmt.Errorf("unexpected entry kind: %s", kind)
