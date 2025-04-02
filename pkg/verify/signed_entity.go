@@ -674,8 +674,15 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	switch entityVersion {
 	case "v0.1":
 		fallthrough
+	case "0.1":
+		fallthrough
 	case "v0.2":
+		fallthrough
+	case "0.2":
+		fallthrough
 	case "v0.3":
+		fallthrough
+	case "0.3":
 		enableCompat = true
 	}
 	verifier, err := getSignatureVerifier(verificationContent, v.trustedMaterial, enableCompat)
