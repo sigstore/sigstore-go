@@ -44,14 +44,15 @@ const maxAllowedSubjectDigests = 32
 var ErrDSSEInvalidSignatureCount = errors.New("exactly one signature is required")
 
 func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
-	var verifier signature.Verifier
-	var err error
-
-	verifier, err = getSignatureVerifier(verificationContent, trustedMaterial)
+	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial, false)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
 
+	return verifySignatureWithVerifier(verifier, sigContent, verificationContent, trustedMaterial)
+}
+
+func verifySignatureWithVerifier(verifier signature.Verifier, sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error {
 	if envelope := sigContent.EnvelopeContent(); envelope != nil {
 		return verifyEnvelope(verifier, envelope)
 	} else if msg := sigContent.MessageSignatureContent(); msg != nil {
@@ -63,11 +64,14 @@ func VerifySignature(sigContent SignatureContent, verificationContent Verificati
 }
 
 func VerifySignatureWithArtifacts(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifacts []io.Reader) error { // nolint: revive
-	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial)
+	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial, false)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
+	return verifySignatureWithVerifierAndArtifacts(verifier, sigContent, verificationContent, trustedMaterial, artifacts)
+}
 
+func verifySignatureWithVerifierAndArtifacts(verifier signature.Verifier, sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifacts []io.Reader) error { // nolint: revive
 	envelope := sigContent.EnvelopeContent()
 	msg := sigContent.MessageSignatureContent()
 	if envelope == nil && msg == nil {
@@ -87,11 +91,14 @@ func VerifySignatureWithArtifacts(sigContent SignatureContent, verificationConte
 }
 
 func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, digests []ArtifactDigest) error { // nolint: revive
-	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial)
+	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial, false)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
+	return verifySignatureWithVerifierAndArtifactDigests(verifier, sigContent, verificationContent, trustedMaterial, digests)
+}
 
+func verifySignatureWithVerifierAndArtifactDigests(verifier signature.Verifier, sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, digests []ArtifactDigest) error { // nolint: revive
 	envelope := sigContent.EnvelopeContent()
 	msg := sigContent.MessageSignatureContent()
 	if envelope == nil && msg == nil {
@@ -118,26 +125,27 @@ type compatVerifier struct {
 }
 
 func (v *compatVerifier) VerifySignature(signature, message io.Reader, opts ...signature.VerifyOption) error {
+	// Create a buffer to store the signature bytes
+	sigBuf := &bytes.Buffer{}
+	sigTee := io.TeeReader(signature, sigBuf)
+	sigBytes, err := io.ReadAll(sigTee)
+	if err != nil {
+		return fmt.Errorf("failed to read signature: %w", err)
+	}
+
+	// Create a buffer to store the message bytes
+	msgBuf := &bytes.Buffer{}
+	msgTee := io.TeeReader(message, msgBuf)
+	msgBytes, err := io.ReadAll(msgTee)
+	if err != nil {
+		return fmt.Errorf("failed to read message: %w", err)
+	}
+
 	for idx, verifier := range v.verifiers {
 		if idx != 0 {
 			fmt.Fprint(os.Stderr, "Failed to verify signature with default verifier, trying compatibility verifier\n")
-			// Reset the signature and message readers to the beginning so they can be reused
-			seeker, ok := signature.(io.Seeker)
-			if ok {
-				_, err := seeker.Seek(0, 0)
-				if err != nil {
-					return fmt.Errorf("failed to reset signature reader: %w", err)
-				}
-			}
-			seeker, ok = message.(io.Seeker)
-			if ok {
-				_, err := seeker.Seek(0, 0)
-				if err != nil {
-					return fmt.Errorf("failed to reset message reader: %w", err)
-				}
-			}
 		}
-		err := verifier.VerifySignature(signature, message, opts...)
+		err := verifier.VerifySignature(bytes.NewReader(sigBytes), bytes.NewReader(msgBytes), opts...)
 		if err == nil {
 			return nil
 		}
@@ -149,7 +157,7 @@ func (v *compatVerifier) PublicKey(opts ...signature.PublicKeyOption) (crypto.Pu
 	return v.verifiers[0].PublicKey(opts...)
 }
 
-func compatSignatureVerifier(leafCert *x509.Certificate) (signature.Verifier, error) {
+func compatSignatureVerifier(leafCert *x509.Certificate, enableCompat bool) (signature.Verifier, error) {
 	// LoadDefaultSigner/Verifier functions accept a few options to select
 	// the default signer/verifier when there are ambiguities, like for
 	// ED25519 keys, which could be used with PureEd25519 or Ed25519ph.
@@ -163,13 +171,17 @@ func compatSignatureVerifier(leafCert *x509.Certificate) (signature.Verifier, er
 	if err != nil {
 		return nil, err
 	}
+	// If compatibility is not enabled, return only the default verifier
+	if !enableCompat {
+		return verifier, nil
+	}
 	verifiers = append(verifiers, verifier)
 
 	// Add a compatibility verifier for ECDSA P384/P521, because we still want
 	// to verify signatures generated with old clients that used SHA256
-	if ecdsaPubKey, ok := leafCert.PublicKey.(*ecdsa.PublicKey); ok {
-		var algorithmDetails signature.AlgorithmDetails
-		switch ecdsaPubKey.Curve {
+	var algorithmDetails signature.AlgorithmDetails
+	if pubKey, ok := leafCert.PublicKey.(*ecdsa.PublicKey); ok {
+		switch pubKey.Curve {
 		case elliptic.P384():
 			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
 			algorithmDetails, err = signature.GetAlgorithmDetails(v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256)
@@ -183,17 +195,17 @@ func compatSignatureVerifier(leafCert *x509.Certificate) (signature.Verifier, er
 			return nil, err
 		}
 		verifier, err = signature.LoadVerifierFromAlgorithmDetails(leafCert.PublicKey, algorithmDetails, defaultOpts...)
-		if err != nil {
-			return nil, err
-		}
-		verifiers = append(verifiers, verifier)
 	}
+	if err != nil {
+		return nil, err
+	}
+	verifiers = append(verifiers, verifier)
 	return &compatVerifier{verifiers: verifiers}, nil
 }
 
-func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial) (signature.Verifier, error) {
+func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial, enableCompat bool) (signature.Verifier, error) {
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
-		return compatSignatureVerifier(leafCert)
+		return compatSignatureVerifier(leafCert, enableCompat)
 	} else if pk := verificationContent.PublicKey(); pk != nil {
 		return tm.PublicKeyVerifier(pk.Hint())
 	}

@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -38,6 +39,7 @@ import (
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/swag"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
 	"github.com/sigstore/rekor/pkg/types"
@@ -56,16 +58,17 @@ import (
 )
 
 type VirtualSigstore struct {
-	fulcioCA              *root.FulcioCertificateAuthority
-	fulcioIntermediateKey *ecdsa.PrivateKey
-	tsaCA                 *root.SigstoreTimestampingAuthority
-	tsaLeafKey            *ecdsa.PrivateKey
-	rekorKey              *ecdsa.PrivateKey
-	ctlogKey              *ecdsa.PrivateKey
-	publicKeyVerifier     map[string]root.TimeConstrainedVerifier
+	fulcioCA                *root.FulcioCertificateAuthority
+	fulcioIntermediateKey   *ecdsa.PrivateKey
+	tsaCA                   *root.SigstoreTimestampingAuthority
+	tsaLeafKey              *ecdsa.PrivateKey
+	rekorKey                *ecdsa.PrivateKey
+	ctlogKey                *ecdsa.PrivateKey
+	publicKeyVerifier       map[string]root.TimeConstrainedVerifier
+	signingAlgorithmDetails signature.AlgorithmDetails
 }
 
-func NewVirtualSigstore() (*VirtualSigstore, error) {
+func NewVirtualSigstoreCustom(signingKeyDetails v1.PublicKeyDetails) (*VirtualSigstore, error) {
 	ss := &VirtualSigstore{fulcioCA: &root.FulcioCertificateAuthority{}, tsaCA: &root.SigstoreTimestampingAuthority{}}
 
 	rootCert, rootKey, err := GenerateRootCa()
@@ -109,8 +112,16 @@ func NewVirtualSigstore() (*VirtualSigstore, error) {
 	if err != nil {
 		return nil, err
 	}
+	ss.signingAlgorithmDetails, err = signature.GetAlgorithmDetails(signingKeyDetails)
+	if err != nil {
+		return nil, err
+	}
 
 	return ss, nil
+}
+
+func NewVirtualSigstore() (*VirtualSigstore, error) {
+	return NewVirtualSigstoreCustom(v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256)
 }
 
 // getLogID calculates the digest of a PKIX-encoded public key
@@ -147,8 +158,25 @@ func (ca *VirtualSigstore) RekorSignPayload(payload tlog.RekorPayload) ([]byte, 
 	return bundleSig, nil
 }
 
-func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Certificate, crypto.PrivateKey, error) {
+	var privKey crypto.PrivateKey
+	var err error
+	switch ca.signingAlgorithmDetails.GetKeyType() {
+	case signature.ECDSA:
+		var curve *elliptic.Curve
+		curve, err = ca.signingAlgorithmDetails.GetECDSACurve()
+		if err != nil {
+			return nil, nil, err
+		}
+		privKey, err = ecdsa.GenerateKey(*curve, rand.Reader)
+	case signature.RSA:
+		var keySize signature.RSAKeySize
+		keySize, err = ca.signingAlgorithmDetails.GetRSAKeySize()
+		if err != nil {
+			return nil, nil, err
+		}
+		privKey, err = rsa.GenerateKey(rand.Reader, int(keySize))
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -171,7 +199,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	signer, err := signature.LoadECDSASignerVerifier(leafPrivKey, crypto.SHA256)
+	signer, err := signature.LoadSignerFromAlgorithmDetails(leafPrivKey, ca.signingAlgorithmDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -222,12 +250,25 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 		return nil, err
 	}
 
-	signer, err := signature.LoadECDSASignerVerifier(leafPrivKey, crypto.SHA256)
+	signer, err := signature.LoadSignerFromAlgorithmDetails(leafPrivKey, ca.signingAlgorithmDetails)
 	if err != nil {
 		return nil, err
 	}
 
-	digest := sha256.Sum256(artifact)
+	hashType := ca.signingAlgorithmDetails.GetHashType()
+	hasher := hashType.New()
+	hasher.Write(artifact)
+	digest := hasher.Sum(nil)
+
+	var digestString string
+	switch hashType {
+	case crypto.SHA256:
+		digestString = "SHA2_256"
+	case crypto.SHA384:
+		digestString = "SHA2_384"
+	case crypto.SHA512:
+		digestString = "SHA2_512"
+	}
 	sig, err := signer.SignMessage(bytes.NewReader(artifact))
 	if err != nil {
 		return nil, err
@@ -246,7 +287,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 	return &TestEntity{
 		certChain:        []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
 		timestamps:       [][]byte{tsr},
-		messageSignature: bundle.NewMessageSignature(digest[:], "SHA2_256", sig),
+		messageSignature: bundle.NewMessageSignature(digest[:], digestString, sig),
 		tlogEntries:      []*tlog.Entry{entry},
 	}, nil
 }
@@ -262,7 +303,7 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 		return nil, err
 	}
 
-	rekorBody, err := generateRekorEntry(intoto.KIND, intoto.New().DefaultVersion(), envelopeBytes, leafCertPem, sig)
+	rekorBody, err := generateRekorEntry(intoto.KIND, intoto.New().DefaultVersion(), envelopeBytes, leafCertPem, sig, ca.signingAlgorithmDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +368,7 @@ func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certific
 		return nil, err
 	}
 
-	rekorBody, err := generateRekorEntry(hashedrekord.KIND, hashedrekord.New().DefaultVersion(), artifact, leafCertPem, sig)
+	rekorBody, err := generateRekorEntry(hashedrekord.KIND, hashedrekord.New().DefaultVersion(), artifact, leafCertPem, sig, ca.signingAlgorithmDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -366,9 +407,9 @@ func (ca *VirtualSigstore) PublicKeyVerifier(keyID string) (root.TimeConstrained
 	return v, nil
 }
 
-func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte) (string, error) {
+func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte, algorithmDetails signature.AlgorithmDetails) (string, error) {
 	// Generate the Rekor Entry
-	entryImpl, err := createEntry(context.Background(), kind, version, artifact, cert, sig)
+	entryImpl, err := createEntry(context.Background(), kind, version, artifact, cert, sig, algorithmDetails)
 	if err != nil {
 		return "", err
 	}
@@ -379,7 +420,7 @@ func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig 
 	return base64.StdEncoding.EncodeToString(entryBytes), nil
 }
 
-func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBytes, sigBytes []byte) (types.EntryImpl, error) {
+func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBytes, sigBytes []byte, algorithmDetails signature.AlgorithmDetails) (types.EntryImpl, error) {
 	props := types.ArtifactProperties{
 		PublicKeyBytes: [][]byte{certBytes},
 		PKIFormat:      string(pki.X509),
@@ -389,7 +430,11 @@ func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBy
 		props.ArtifactBytes = blobBytes
 		props.SignatureBytes = sigBytes
 	case hashedrekord.KIND:
-		blobHash := sha256.Sum256(blobBytes)
+		hashType := algorithmDetails.GetHashType()
+		hasher := hashType.New()
+		hasher.Write(blobBytes)
+		blobHash := hasher.Sum(nil)
+
 		props.ArtifactHash = strings.ToLower(hex.EncodeToString(blobHash[:]))
 		props.SignatureBytes = sigBytes
 	default:
@@ -645,7 +690,7 @@ func GenerateTSAIntermediate(rootTemplate *x509.Certificate, rootPriv crypto.Sig
 	return cert, priv, nil
 }
 
-func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, priv *ecdsa.PrivateKey,
+func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, priv crypto.PrivateKey,
 	parentTemplate *x509.Certificate, parentPriv crypto.Signer) (*x509.Certificate, error) {
 	certTemplate := &x509.Certificate{
 		SerialNumber:   big.NewInt(1),
@@ -664,7 +709,12 @@ func GenerateLeafCert(subject string, oidcIssuer string, expiration time.Time, p
 		},
 	}
 
-	cert, err := createCertificate(certTemplate, parentTemplate, &priv.PublicKey, parentPriv)
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		return nil, fmt.Errorf("private key does not implement crypto.Signer")
+	}
+
+	cert, err := createCertificate(certTemplate, parentTemplate, signer.Public(), parentPriv)
 	if err != nil {
 		return nil, err
 	}

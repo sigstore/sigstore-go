@@ -295,14 +295,15 @@ type ArtifactDigest struct {
 }
 
 type PolicyConfig struct {
-	ignoreArtifact        bool
-	ignoreIdentities      bool
-	requireSigningKey     bool
-	certificateIdentities CertificateIdentities
-	verifyArtifacts       bool
-	artifacts             []io.Reader
-	verifyArtifactDigests bool
-	artifactDigests       []ArtifactDigest
+	ignoreArtifact               bool
+	ignoreIdentities             bool
+	requireSigningKey            bool
+	certificateIdentities        CertificateIdentities
+	verifyArtifacts              bool
+	artifacts                    []io.Reader
+	verifyArtifactDigests        bool
+	artifactDigests              []ArtifactDigest
+	allowCompatibilityAlgorithms bool
 }
 
 func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
@@ -377,6 +378,25 @@ func WithoutIdentitiesUnsafe() PolicyOption {
 		}
 
 		p.ignoreIdentities = true
+		return nil
+	}
+}
+
+// WithCompatibilityAlgorithms allows the caller of Verify to allow
+// compatibility algorithms to be used when verifying signatures.
+//
+// This is necessary because newer Sigstore Clients use a predefined set of
+// algorithms/hashes (see AlgorithmRegistry in sigstore/sigstore), instead of
+// assuming SHA-256 everywhere, like the old clients did. With this flag, the
+// verifier will fallback to the deprecated/compatibility algorithm if the
+// default algorithm does not work. In particular, this is relevant for ECDSA
+// P-384/P-521, which were using SHA-256 in old clients but should now use
+// SHA-384/SHA-512 respectively.
+//
+// By default, compatibility algorithms are not allowed.
+func WithCompatibilityAlgorithms() PolicyOption {
+	return func(p *PolicyConfig) error {
+		p.allowCompatibilityAlgorithms = true
 		return nil
 	}
 }
@@ -665,12 +685,17 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
+	verifier, err := getSignatureVerifier(verificationContent, v.trustedMaterial, policy.allowCompatibilityAlgorithms)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signature verifier: %w", err)
+	}
+
 	if policy.RequireArtifact() {
 		switch {
 		case policy.verifyArtifacts:
-			err = VerifySignatureWithArtifacts(sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
+			err = verifySignatureWithVerifierAndArtifacts(verifier, sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
 		case policy.verifyArtifactDigests:
-			err = VerifySignatureWithArtifactDigests(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
+			err = verifySignatureWithVerifierAndArtifactDigests(verifier, sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
 		default:
 			// should never happen, but just in case:
 			err = errors.New("no artifact or artifact digest provided")
@@ -678,7 +703,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	} else {
 		// verifying with artifact has been explicitly turned off, so just check
 		// the signature on the dsse envelope:
-		err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
+		err = verifySignatureWithVerifier(verifier, sigContent, verificationContent, v.trustedMaterial)
 	}
 
 	if err != nil {

@@ -80,7 +80,7 @@ func NewProtobufBundle(b *protobundle.Bundle) (*ProtobufBundle, error) {
 }
 
 func (b *Bundle) validate() error {
-	bundleVersion, err := getBundleVersion(b.Bundle.MediaType)
+	bundleVersion, err := b.GetBundleVersion()
 	if err != nil {
 		return fmt.Errorf("error getting bundle version: %w", err)
 	}
@@ -150,6 +150,10 @@ func MediaTypeString(version string) (string, error) {
 	}
 
 	return mtString, nil
+}
+
+func (b *Bundle) GetBundleVersion() (string, error) {
+	return getBundleVersion(b.Bundle.MediaType)
 }
 
 func getBundleVersion(mediaType string) (string, error) {
@@ -369,7 +373,7 @@ func (b *Bundle) Timestamps() ([][]byte, error) {
 
 // MinVersion returns true if the bundle version is greater than or equal to the expected version.
 func (b *Bundle) MinVersion(expectVersion string) bool {
-	version, err := getBundleVersion(b.Bundle.MediaType)
+	version, err := b.GetBundleVersion()
 	if err != nil {
 		return false
 	}
