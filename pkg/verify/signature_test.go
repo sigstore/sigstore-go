@@ -255,41 +255,61 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 
 func TestCompatibilityAlgorithms(t *testing.T) {
 	tts := []struct {
-		hash            crypto.Hash
-		pkDetails       v1.PublicKeyDetails
-		noCompatSucceed bool
+		hash      crypto.Hash
+		pkDetails v1.PublicKeyDetails
+		version   string
+		success   bool
 	}{
 		{
-			hash:            crypto.SHA256,
-			pkDetails:       v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
-			noCompatSucceed: true,
+			hash:      crypto.SHA256,
+			pkDetails: v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
+			version:   "v0.3",
+			success:   true,
 		},
 		{
-			hash:            crypto.SHA256,
-			pkDetails:       v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256,
-			noCompatSucceed: true,
+			hash:      crypto.SHA256,
+			pkDetails: v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256,
+			version:   "v0.3",
+			success:   true,
 		},
 		{
-			hash:            crypto.SHA384,
-			pkDetails:       v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
-			noCompatSucceed: true,
-		},
-		{
-			hash: crypto.SHA256,
-			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
-			pkDetails:       v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256,
-			noCompatSucceed: false,
+			hash:      crypto.SHA384,
+			pkDetails: v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
+			version:   "v0.3",
+			success:   true,
 		},
 		{
 			hash: crypto.SHA256,
 			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
-			pkDetails:       v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_256,
-			noCompatSucceed: false,
+			pkDetails: v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256,
+			version:   "v0.3",
+			success:   true,
+		},
+		{
+			hash: crypto.SHA256,
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
+			pkDetails: v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_256,
+			version:   "v0.3",
+			success:   true,
+		},
+		{
+			hash: crypto.SHA256,
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
+			pkDetails: v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_256,
+			version:   "v0.4",
+			success:   false,
+		},
+		{
+			hash: crypto.SHA256,
+			//nolint:staticcheck // Need to use deprecated field for backwards compatibility
+			pkDetails: v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_256,
+			version:   "v0.4",
+			success:   false,
 		},
 	}
 
 	for _, tt := range tts {
-		t.Run(tt.pkDetails.String(), func(t *testing.T) {
+		t.Run(tt.version+" "+tt.pkDetails.String(), func(t *testing.T) {
 			virtualSigstore, err := ca.NewVirtualSigstoreCustom(tt.pkDetails)
 			assert.NoError(t, err)
 
@@ -309,34 +329,34 @@ func TestCompatibilityAlgorithms(t *testing.T) {
 			}
 
 			// Create a message signature with SHA-256 (older client behavior)
-			entity, err := virtualSigstore.Sign("foo@example.com", "issuer", []byte(artifact))
+			entity, err := virtualSigstore.SignWithVersion("foo@example.com", "issuer", []byte(artifact), tt.version)
 			assert.NoError(t, err)
 
 			verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 			assert.NoError(t, err)
 
-			// First try without compatibility algorithms
+			// Test with full artifact
 			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
-			if tt.noCompatSucceed {
+			if tt.success {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
 			}
 
-			// Now try with compatibility algorithms enabled - should succeed
-			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe(), verify.WithCompatibilityAlgorithms()))
-			assert.NoError(t, err)
-
 			// Test with artifact digest instead of full artifact
-			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest(digestString, digest), verify.WithoutIdentitiesUnsafe(), verify.WithCompatibilityAlgorithms()))
-			assert.NoError(t, err)
+			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest(digestString, digest), verify.WithoutIdentitiesUnsafe()))
+			if tt.success {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
 
 			// Test with wrong digest - should fail even with compatibility algorithms
-			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest(digestString, []byte("wrong")), verify.WithoutIdentitiesUnsafe(), verify.WithCompatibilityAlgorithms()))
+			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest(digestString, []byte("wrong")), verify.WithoutIdentitiesUnsafe()))
 			assert.Error(t, err)
 
 			// Test with wrong artifact - should fail even with compatibility algorithms
-			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString("wrong artifact")), verify.WithoutIdentitiesUnsafe(), verify.WithCompatibilityAlgorithms()))
+			_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString("wrong artifact")), verify.WithoutIdentitiesUnsafe()))
 			assert.Error(t, err)
 		})
 	}

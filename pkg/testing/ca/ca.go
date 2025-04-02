@@ -241,10 +241,18 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 }
 
 func (ca *VirtualSigstore) Sign(identity, issuer string, artifact []byte) (*TestEntity, error) {
-	return ca.SignAtTime(identity, issuer, artifact, time.Now().Add(5*time.Minute))
+	return ca.SignAtTimeWithVersion(identity, issuer, artifact, time.Now().Add(5*time.Minute), "v0.3")
+}
+
+func (ca *VirtualSigstore) SignWithVersion(identity, issuer string, artifact []byte, version string) (*TestEntity, error) {
+	return ca.SignAtTimeWithVersion(identity, issuer, artifact, time.Now().Add(5*time.Minute), version)
 }
 
 func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, integratedTime time.Time) (*TestEntity, error) {
+	return ca.SignAtTimeWithVersion(identity, issuer, artifact, integratedTime, "v0.3")
+}
+
+func (ca *VirtualSigstore) SignAtTimeWithVersion(identity, issuer string, artifact []byte, integratedTime time.Time, version string) (*TestEntity, error) {
 	leafCert, leafPrivKey, err := ca.GenerateLeafCert(identity, issuer)
 	if err != nil {
 		return nil, err
@@ -289,6 +297,7 @@ func (ca *VirtualSigstore) SignAtTime(identity, issuer string, artifact []byte, 
 		timestamps:       [][]byte{tsr},
 		messageSignature: bundle.NewMessageSignature(digest, digestString, sig),
 		tlogEntries:      []*tlog.Entry{entry},
+		version:          version,
 	}, nil
 }
 
@@ -558,6 +567,7 @@ type TestEntity struct {
 	messageSignature *bundle.MessageSignature
 	timestamps       [][]byte
 	tlogEntries      []*tlog.Entry
+	version          string
 }
 
 func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
@@ -566,6 +576,10 @@ func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
 
 func (e *TestEntity) HasInclusionPromise() bool {
 	return true
+}
+
+func (e *TestEntity) Version() (string, error) {
+	return e.version, nil
 }
 
 func (e *TestEntity) HasInclusionProof() bool {

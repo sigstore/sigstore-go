@@ -295,15 +295,14 @@ type ArtifactDigest struct {
 }
 
 type PolicyConfig struct {
-	ignoreArtifact               bool
-	ignoreIdentities             bool
-	requireSigningKey            bool
-	certificateIdentities        CertificateIdentities
-	verifyArtifacts              bool
-	artifacts                    []io.Reader
-	verifyArtifactDigests        bool
-	artifactDigests              []ArtifactDigest
-	allowCompatibilityAlgorithms bool
+	ignoreArtifact        bool
+	ignoreIdentities      bool
+	requireSigningKey     bool
+	certificateIdentities CertificateIdentities
+	verifyArtifacts       bool
+	artifacts             []io.Reader
+	verifyArtifactDigests bool
+	artifactDigests       []ArtifactDigest
 }
 
 func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
@@ -378,25 +377,6 @@ func WithoutIdentitiesUnsafe() PolicyOption {
 		}
 
 		p.ignoreIdentities = true
-		return nil
-	}
-}
-
-// WithCompatibilityAlgorithms allows the caller of Verify to allow
-// compatibility algorithms to be used when verifying signatures.
-//
-// This is necessary because newer Sigstore Clients use a predefined set of
-// algorithms/hashes (see AlgorithmRegistry in sigstore/sigstore), instead of
-// assuming SHA-256 everywhere, like the old clients did. With this flag, the
-// verifier will fallback to the deprecated/compatibility algorithm if the
-// default algorithm does not work. In particular, this is relevant for ECDSA
-// P-384/P-521, which were using SHA-256 in old clients but should now use
-// SHA-384/SHA-512 respectively.
-//
-// By default, compatibility algorithms are not allowed.
-func WithCompatibilityAlgorithms() PolicyOption {
-	return func(p *PolicyConfig) error {
-		p.allowCompatibilityAlgorithms = true
 		return nil
 	}
 }
@@ -685,7 +665,20 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
-	verifier, err := getSignatureVerifier(verificationContent, v.trustedMaterial, policy.allowCompatibilityAlgorithms)
+	entityVersion, err := entity.Version()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch entity version: %w", err)
+	}
+
+	var enableCompat bool
+	switch entityVersion {
+	case "v0.1":
+		fallthrough
+	case "v0.2":
+	case "v0.3":
+		enableCompat = true
+	}
+	verifier, err := getSignatureVerifier(verificationContent, v.trustedMaterial, enableCompat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature verifier: %w", err)
 	}
