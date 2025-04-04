@@ -12,26 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-run:
-  timeout: 10m
+version: "2"
 linters:
   enable:
-    - revive
-    - gofmt
+    - errorlint
     - goconst
+    - gocritic
+    - gosec
+    - misspell
+    - revive
     - tagliatelle
     - whitespace
-    - gosec
-    - gocritic
-    - misspell
-    - errcheck
-    - errorlint
-    - unused
-    - staticcheck
-    # - wrapcheck
-  presets:
-    - format
   disable:
-    - gofumpt
-    - gci
     - tagalign
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

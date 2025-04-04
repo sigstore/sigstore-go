@@ -90,7 +90,7 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 			return nil, err
 		}
 
-		if !((response.StatusCode >= 500 && response.StatusCode < 600) || response.StatusCode == 429) {
+		if (response.StatusCode < 500 || response.StatusCode >= 600) && response.StatusCode != 429 {
 			// Not a retryable HTTP status code, so don't retry
 			break
 		}

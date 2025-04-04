@@ -157,12 +157,12 @@ func main() {
 	opts.TrustedRoot = trustedRoot
 
 	if *idToken != "" {
-		fulcioUrl, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
+		fulcioURL, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
 		if err != nil {
 			log.Fatal(err)
 		}
 		fulcioOpts := &sign.FulcioOptions{
-			BaseURL: fulcioUrl,
+			BaseURL: fulcioURL,
 			Timeout: time.Duration(30 * time.Second),
 			Retries: 1,
 		}
