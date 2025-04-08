@@ -8,8 +8,8 @@ replace github.com/sigstore/sigstore-go => ../../
 
 require (
 	github.com/google/go-containerregistry v0.20.3
-	github.com/sigstore/protobuf-specs v0.4.1-0.20250313180955-4752ba2fcab1
-	github.com/sigstore/sigstore v1.9.1
+	github.com/sigstore/protobuf-specs v0.4.1
+	github.com/sigstore/sigstore v1.9.2-0.20250408060058-404e5b5549bc
 	github.com/sigstore/sigstore-go v0.6.2
 )
 
@@ -88,7 +88,7 @@ require (
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8 // indirect
 	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
@@ -99,7 +99,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
-
-replace github.com/sigstore/protobuf-specs => github.com/trail-of-forks/protobuf-specs v0.3.3-0.20250331162432-e5e775cafa56
-
-replace github.com/sigstore/sigstore => github.com/trail-of-forks/sigstore v0.0.0-20250331165513-1846a6ef19c9
