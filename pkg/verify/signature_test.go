@@ -310,7 +310,7 @@ func TestCompatibilityAlgorithms(t *testing.T) {
 
 	for _, tt := range tts {
 		t.Run(tt.version+" "+tt.pkDetails.String(), func(t *testing.T) {
-			virtualSigstore, err := ca.NewVirtualSigstoreCustom(tt.pkDetails)
+			virtualSigstore, err := ca.NewVirtualSigstoreWithSigningAlg(tt.pkDetails)
 			assert.NoError(t, err)
 
 			// Create a test artifact

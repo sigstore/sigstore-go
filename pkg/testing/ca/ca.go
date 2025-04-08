@@ -68,7 +68,7 @@ type VirtualSigstore struct {
 	signingAlgorithmDetails signature.AlgorithmDetails
 }
 
-func NewVirtualSigstoreCustom(signingKeyDetails v1.PublicKeyDetails) (*VirtualSigstore, error) {
+func NewVirtualSigstoreWithSigningAlg(signingKeyDetails v1.PublicKeyDetails) (*VirtualSigstore, error) {
 	ss := &VirtualSigstore{fulcioCA: &root.FulcioCertificateAuthority{}, tsaCA: &root.SigstoreTimestampingAuthority{}}
 
 	rootCert, rootKey, err := GenerateRootCa()
@@ -121,7 +121,7 @@ func NewVirtualSigstoreCustom(signingKeyDetails v1.PublicKeyDetails) (*VirtualSi
 }
 
 func NewVirtualSigstore() (*VirtualSigstore, error) {
-	return NewVirtualSigstoreCustom(v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256)
+	return NewVirtualSigstoreWithSigningAlg(v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256)
 }
 
 // getLogID calculates the digest of a PKIX-encoded public key
