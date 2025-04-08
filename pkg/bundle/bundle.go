@@ -153,7 +153,7 @@ func MediaTypeString(version string) (string, error) {
 }
 
 func (b *Bundle) Version() (string, error) {
-	return getBundleVersion(b.Bundle.MediaType)
+	return getBundleVersion(b.MediaType)
 }
 
 func getBundleVersion(mediaType string) (string, error) {
