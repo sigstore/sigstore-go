@@ -92,6 +92,13 @@ func TestTrustedMaterialCollectionECDSA(t *testing.T) {
 	verifier2, err := trustedMaterialCollection.PublicKeyVerifier("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, verifier, verifier2)
+
+	// verify that a JSON round trip works
+	jsonBytes, err := json.Marshal(trustedRoot)
+	assert.NoError(t, err)
+
+	_, err = NewTrustedRootFromJSON(jsonBytes)
+	assert.NoError(t, err)
 }
 
 func TestTrustedMaterialCollectionED25519(t *testing.T) {
@@ -131,6 +138,13 @@ func TestTrustedMaterialCollectionED25519(t *testing.T) {
 	verifier2, err := trustedMaterialCollection.PublicKeyVerifier("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, verifier, verifier2)
+
+	// verify that a JSON round trip works
+	jsonBytes, err := json.Marshal(trustedRoot)
+	assert.NoError(t, err)
+
+	_, err = NewTrustedRootFromJSON(jsonBytes)
+	assert.NoError(t, err)
 }
 
 func TestTrustedMaterialCollectionRSA(t *testing.T) {
@@ -166,6 +180,13 @@ func TestTrustedMaterialCollectionRSA(t *testing.T) {
 	verifier2, err := trustedMaterialCollection.PublicKeyVerifier("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, verifier, verifier2)
+
+	// verify that a JSON round trip works
+	jsonBytes, err := json.Marshal(trustedRoot)
+	assert.NoError(t, err)
+
+	_, err = NewTrustedRootFromJSON(jsonBytes)
+	assert.NoError(t, err)
 }
 
 func TestFromJSONToJSON(t *testing.T) {
