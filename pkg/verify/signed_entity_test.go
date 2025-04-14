@@ -15,6 +15,7 @@
 package verify_test
 
 import (
+	"context"
 	"crypto/x509"
 	"errors"
 	"strings"
@@ -81,13 +82,14 @@ func TestSignedEntityVerifierInitRequiresTimestamp(t *testing.T) {
 // - zero tsa entries
 
 func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
+	ctx := context.TODO()
 	tr := data.TrustedRoot(t, "public-good.json")
 	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(ctx, entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
@@ -102,7 +104,7 @@ func TestEntitySignedByPublicGoodWithTlogVerifiesSuccessfully(t *testing.T) {
 	// verifies with integrated timestamp threshold too
 	v, err = verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
-	res, err = v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err = v.Verify(ctx, entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -114,7 +116,7 @@ func TestEntitySignedByPublicGoodWithoutTimestampsVerifiesSuccessfully(t *testin
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -126,7 +128,7 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(2), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	if !strings.Contains(err.Error(), "not enough verified log entries from transparency log") {
@@ -135,13 +137,14 @@ func TestEntitySignedByPublicGoodWithHighTlogThresholdFails(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithoutVerifyingLogEntryFails(t *testing.T) {
+	ctx := context.TODO()
 	tr := data.TrustedRoot(t, "public-good.json")
 	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(ctx, entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	if !strings.Contains(err.Error(), "threshold not met for verified signed & log entry integrated timestamps") {
@@ -151,7 +154,7 @@ func TestEntitySignedByPublicGoodWithoutVerifyingLogEntryFails(t *testing.T) {
 	// also fails trying to use integrated timestamps without verifying the log
 	v, err = verify.NewSignedEntityVerifier(tr, verify.WithIntegratedTimestamps(1))
 	assert.NoError(t, err)
-	res, err = v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err = v.Verify(ctx, entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	if !strings.Contains(err.Error(), "threshold not met for verified log entry integrated timestamps") {
@@ -166,7 +169,7 @@ func TestEntitySignedByPublicGoodWithHighLogTimestampThresholdFails(t *testing.T
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(2))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	if !strings.Contains(err.Error(), "threshold not met for verified log entry integrated timestamps") {
@@ -181,7 +184,7 @@ func TestEntitySignedByPublicGoodExpectingTSAFails(t *testing.T) {
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	if !strings.Contains(err.Error(), "threshold not met for verified signed timestamps") {
@@ -196,7 +199,7 @@ func TestEntitySignedByPublicGoodWithHighObserverTimestampThresholdFails(t *test
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(2))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	if !strings.Contains(err.Error(), "threshold not met for verified signed & log entry integrated timestamps") {
@@ -205,6 +208,7 @@ func TestEntitySignedByPublicGoodWithHighObserverTimestampThresholdFails(t *test
 }
 
 func TestEntityWithOthernameSan(t *testing.T) {
+	ctx := context.TODO()
 	tr := data.TrustedRoot(t, "scaffolding.json")
 	entity := data.Bundle(t, "othername.sigstore.json")
 
@@ -216,7 +220,7 @@ func TestEntityWithOthernameSan(t *testing.T) {
 
 	certID, err := verify.NewShortCertificateIdentity("http://oidc.local:8080", "", "foo!oidc.local", "")
 	assert.NoError(t, err)
-	res, err := v.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
+	res, err := v.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
@@ -226,13 +230,14 @@ func TestEntityWithOthernameSan(t *testing.T) {
 	// an email address doesn't verify
 	certID, err = verify.NewShortCertificateIdentity("http://oidc.local:8080", "", "foo@oidc.local", "")
 	assert.NoError(t, err)
-	_, err = v.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
+	_, err = v.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithCertificateIdentity(certID)))
 	assert.Error(t, err)
 }
 
 // Now we test policy:
 
 func TestVerifyPolicyOptionErors(t *testing.T) {
+	ctx := context.TODO()
 	tr := data.TrustedRoot(t, "public-good.json")
 	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
@@ -292,7 +297,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// imho good to check that the verify func also fails
-	_, err = verifier.Verify(entity, badArtifactComboPolicy1)
+	_, err = verifier.Verify(ctx, entity, badArtifactComboPolicy1)
 	assert.NotNil(t, err)
 
 	// 2. can't combine several artifact policies
@@ -301,7 +306,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	_, err = badArtifactComboPolicy2.BuildConfig()
 	assert.NotNil(t, err)
 
-	_, err = verifier.Verify(entity, badArtifactComboPolicy2)
+	_, err = verifier.Verify(ctx, entity, badArtifactComboPolicy2)
 	assert.NotNil(t, err)
 
 	// 3. always have to provide _an_ identity option, even tho it will compile:
@@ -309,7 +314,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	_, err = badIdentityPolicyOpts.BuildConfig()
 	assert.NotNil(t, err)
 
-	_, err = verifier.Verify(entity, badIdentityPolicyOpts)
+	_, err = verifier.Verify(ctx, entity, badIdentityPolicyOpts)
 	assert.NotNil(t, err)
 
 	// 4. can't combine incompatible identity options
@@ -317,7 +322,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 	_, err = badIdentityPolicyCombo.BuildConfig()
 	assert.NotNil(t, err)
 
-	_, err = verifier.Verify(entity, badIdentityPolicyCombo)
+	_, err = verifier.Verify(ctx, entity, badIdentityPolicyCombo)
 	assert.NotNil(t, err)
 
 	// 5. can't expect certificate and key signature
@@ -327,6 +332,7 @@ func TestVerifyPolicyOptionErors(t *testing.T) {
 }
 
 func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *testing.T) {
+	ctx := context.TODO()
 	tr := data.TrustedRoot(t, "public-good.json")
 	entity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
 
@@ -340,7 +346,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	digest, err := hex.DecodeString("46d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
 	assert.Nil(t, err)
 
-	res, err := verifier.Verify(entity,
+	res, err := verifier.Verify(ctx, entity,
 		verify.NewPolicy(verify.WithArtifactDigest("sha512", digest),
 			verify.WithCertificateIdentity(badCI),
 			verify.WithCertificateIdentity(goodCI)))
@@ -349,7 +355,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	assert.Equal(t, res.VerifiedIdentity.Issuer.Issuer, verify.ActionsIssuerValue)
 
 	// but if only pass in the bad CI, it will fail:
-	res, err = verifier.Verify(entity,
+	res, err = verifier.Verify(ctx, entity,
 		verify.NewPolicy(
 			verify.WithArtifactDigest("sha512", digest),
 			verify.WithCertificateIdentity(badCI)))
@@ -360,7 +366,7 @@ func TestEntitySignedByPublicGoodWithCertificateIdentityVerifiesSuccessfully(t *
 	badDigest, err := hex.DecodeString("56d4e2f74c4877316640000a6fdf8a8b59f1e0847667973e9859f774dd31b8f1e0937813b777fb66a2ac67d50540fe34640966eee9fc2ccca387082b4c85cd3c")
 	assert.Nil(t, err)
 
-	res, err = verifier.Verify(entity,
+	res, err = verifier.Verify(ctx, entity,
 		verify.NewPolicy(
 			verify.WithArtifactDigest("sha512", badDigest),
 			verify.WithCertificateIdentity(goodCI)))
@@ -384,7 +390,7 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.Nil(t, err)
 
-	res, err := verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := verifier.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.Nil(t, err)
 
 	rawJSON, err := json.Marshal(res)
@@ -421,7 +427,7 @@ func TestSigstoreBundle2Sig(t *testing.T) {
 	v, err := verify.NewSignedEntityVerifier(tr, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.True(t, errors.Is(err, verify.ErrDSSEInvalidSignatureCount))
 	assert.Nil(t, res)
 }
@@ -488,7 +494,7 @@ func TestCertificateSignedEntityWithSCTsRequiredVerifiesSuccessfully(t *testing.
 	)
 	assert.NoError(t, err)
 
-	res, err := v.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.NotNil(t, res.Signature)
@@ -513,7 +519,7 @@ func TestForcedKeySignedEntityWithSCTsRequiredFails(t *testing.T) {
 		forceKey:     true,
 	}
 
-	res, err := v.Verify(keySignedEntity, SkipArtifactAndIdentitiesPolicy)
+	res, err := v.Verify(context.TODO(), keySignedEntity, SkipArtifactAndIdentitiesPolicy)
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.Equal(t,

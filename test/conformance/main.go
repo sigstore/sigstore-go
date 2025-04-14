@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -253,7 +254,7 @@ func main() {
 		}
 
 		// Verify bundle
-		_, err = sev.Verify(b, verify.NewPolicy(artifactPolicyOption, identityPolicies...))
+		_, err = sev.Verify(context.TODO(), b, verify.NewPolicy(artifactPolicyOption, identityPolicies...))
 		if err != nil {
 			log.Fatal(err)
 		}

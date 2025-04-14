@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/x509"
@@ -212,7 +213,7 @@ func run() error {
 		fmt.Fprintf(os.Stderr, "No artifact provided, skipping artifact verification. This is unsafe!\n")
 	}
 
-	res, err := sev.Verify(b, verify.NewPolicy(artifactPolicy, identityPolicies...))
+	res, err := sev.Verify(context.TODO(), b, verify.NewPolicy(artifactPolicy, identityPolicies...))
 	if err != nil {
 		return err
 	}

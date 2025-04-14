@@ -16,6 +16,7 @@ package verify_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
@@ -63,6 +64,7 @@ func TestSignatureVerifier(t *testing.T) {
 }
 
 func TestEnvelopeSubject(t *testing.T) {
+	ctx := context.TODO()
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
@@ -78,25 +80,26 @@ func TestEnvelopeSubject(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
+	_, err = verifier.Verify(ctx, entity, SkipArtifactAndIdentitiesPolicy)
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(subjectBody)), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(subjectBody)), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifactDigest("sha256", digest), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
 	// Error: incorrect artifact
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString("Hi, I am a different subject!")), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString("Hi, I am a different subject!")), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 
 	// Error: incorrect digest algorithm
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 }
 
 func TestSignatureVerifierMessageSignature(t *testing.T) {
+	ctx := context.TODO()
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
@@ -107,7 +110,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	result, err := verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
 	assert.Equal(t, result.Signature.Certificate.SubjectAlternativeName, "foo@example.com")
@@ -115,7 +118,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 
 	// should fail to verify with a different artifact
 	artifact2 := "Hi, I am a different artifact!"
-	result, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact2)), verify.WithoutIdentitiesUnsafe()))
+	result, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact2)), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 	assert.Nil(t, result)
 }
@@ -144,7 +147,7 @@ func TestTooManySubjects(t *testing.T) {
 	assert.NoError(t, err)
 
 	artifact := "Hi, I am an artifact!" //nolint:goconst
-	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(context.TODO(), tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.ErrorContains(t, err, "too many subjects")
 }
 
@@ -174,11 +177,12 @@ func TestTooManyDigests(t *testing.T) {
 	assert.NoError(t, err)
 
 	artifact := "Hi, I am an artifact!" //nolint:goconst
-	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(context.TODO(), tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.ErrorContains(t, err, "too many digests")
 }
 
 func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
+	ctx := context.TODO()
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
@@ -231,14 +235,14 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(artifacts), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifacts(artifacts), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(artifactDigests), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifactDigests(artifactDigests), verify.WithoutIdentitiesUnsafe()))
 	assert.NoError(t, err)
 
 	noMatchingArtifacts := []io.Reader{strings.NewReader("some other artifact")}
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(noMatchingArtifacts), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifacts(noMatchingArtifacts), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 
 	noMatchingArtifactDigests := []verify.ArtifactDigest{
@@ -247,6 +251,6 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 			Digest:    []byte("some other artifact"),
 		},
 	}
-	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(noMatchingArtifactDigests), verify.WithoutIdentitiesUnsafe()))
+	_, err = verifier.Verify(ctx, entity, verify.NewPolicy(verify.WithArtifactDigests(noMatchingArtifactDigests), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
 }

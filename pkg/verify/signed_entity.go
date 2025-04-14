@@ -15,6 +15,7 @@
 package verify
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/json"
@@ -567,7 +568,7 @@ func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 //     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
-func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationResult, error) {
+func (v *SignedEntityVerifier) Verify(_ context.Context, entity SignedEntity, pb PolicyBuilder) (*VerificationResult, error) {
 	policy, err := pb.BuildConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build policy: %w", err)

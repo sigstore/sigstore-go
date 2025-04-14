@@ -104,7 +104,7 @@ Then, we load the bundle and perform the verification:
 		panic(err)
 	}
 
-	result, err := sev.Verify(b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithCertificateIdentity(certID)))
+	result, err := sev.Verify(context.TODO(), b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithCertificateIdentity(certID)))
 	if err != nil {
 		panic(err)
 	}
@@ -180,6 +180,7 @@ Putting it together, the following script will verify the example bundle and pri
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -222,7 +223,7 @@ func main() {
 		panic(err)
 	}
 
-	result, err := sev.Verify(b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithCertificateIdentity(certID)))
+	result, err := sev.Verify(context.TODO(), b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithCertificateIdentity(certID)))
 	if err != nil {
 		panic(err)
 	}
@@ -241,6 +242,7 @@ And here is a complete example of verifying a bundle signed with a key:
 package main
 
 import (
+	"context"
 	"crypto"
 	_ "crypto/sha256"
 	"crypto/x509"
@@ -318,7 +320,7 @@ func main() {
 		panic(err)
 	}
 
-	result, err := sev.Verify(b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithKey()))
+	result, err := sev.Verify(context.TODO(), b, verify.NewPolicy(verify.WithArtifactDigest("sha512", digest), verify.WithKey()))
 	if err != nil {
 		panic(err)
 	}

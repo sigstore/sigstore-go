@@ -159,7 +159,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		}
 
 		policy := verify.NewPolicy(artifactOpts, verify.WithoutIdentitiesUnsafe())
-		_, err = sev.Verify(protobundle, policy)
+		_, err = sev.Verify(opts.Context, protobundle, policy)
 		if err != nil {
 			return nil, err
 		}

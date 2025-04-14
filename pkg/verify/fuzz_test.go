@@ -16,6 +16,7 @@ package verify_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -109,6 +110,7 @@ Tests Verify with an entity that contains a randomized
 email and statement and a randomized root
 */
 func FuzzSignedEntityVerifier(f *testing.F) {
+	ctx := context.TODO()
 	f.Fuzz(func(t *testing.T, trustedrootJSON,
 		bundleBytes []byte) {
 		trustedRoot, err := root.NewTrustedRootFromJSON(trustedrootJSON)
@@ -131,7 +133,7 @@ func FuzzSignedEntityVerifier(f *testing.F) {
 			t.Fatal(err)
 		}
 		//nolint:errcheck
-		v.Verify(entity, FuzzSkipArtifactAndIdentitiesPolicy)
+		v.Verify(ctx, entity, FuzzSkipArtifactAndIdentitiesPolicy)
 	})
 }
 
