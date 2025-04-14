@@ -9,7 +9,7 @@ replace github.com/sigstore/sigstore-go => ../../
 require (
 	github.com/google/go-containerregistry v0.20.3
 	github.com/sigstore/protobuf-specs v0.4.1
-	github.com/sigstore/sigstore v1.9.1
+	github.com/sigstore/sigstore v1.9.3
 	github.com/sigstore/sigstore-go v0.6.2
 )
 
@@ -61,7 +61,7 @@ require (
 	github.com/sassoftware/relic v7.2.1+incompatible // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/rekor v1.3.9 // indirect
+	github.com/sigstore/rekor v1.3.10 // indirect
 	github.com/sigstore/timestamp-authority v1.2.5 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
@@ -84,7 +84,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8 // indirect
+	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
