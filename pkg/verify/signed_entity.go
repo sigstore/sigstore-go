@@ -665,12 +665,37 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 		return nil, fmt.Errorf("failed to fetch signature content: %w", err)
 	}
 
+	entityVersion, err := entity.Version()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch entity version: %w", err)
+	}
+
+	var enableCompat bool
+	switch entityVersion {
+	case "v0.1":
+		fallthrough
+	case "0.1":
+		fallthrough
+	case "v0.2":
+		fallthrough
+	case "0.2":
+		fallthrough
+	case "v0.3":
+		fallthrough
+	case "0.3":
+		enableCompat = true
+	}
+	verifier, err := getSignatureVerifier(sigContent, verificationContent, v.trustedMaterial, enableCompat)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signature verifier: %w", err)
+	}
+
 	if policy.RequireArtifact() {
 		switch {
 		case policy.verifyArtifacts:
-			err = VerifySignatureWithArtifacts(sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
+			err = verifySignatureWithVerifierAndArtifacts(verifier, sigContent, verificationContent, v.trustedMaterial, policy.artifacts)
 		case policy.verifyArtifactDigests:
-			err = VerifySignatureWithArtifactDigests(sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
+			err = verifySignatureWithVerifierAndArtifactDigests(verifier, sigContent, verificationContent, v.trustedMaterial, policy.artifactDigests)
 		default:
 			// should never happen, but just in case:
 			err = errors.New("no artifact or artifact digest provided")
@@ -678,7 +703,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	} else {
 		// verifying with artifact has been explicitly turned off, so just check
 		// the signature on the dsse envelope:
-		err = VerifySignature(sigContent, verificationContent, v.trustedMaterial)
+		err = verifySignatureWithVerifier(verifier, sigContent, verificationContent, v.trustedMaterial)
 	}
 
 	if err != nil {
