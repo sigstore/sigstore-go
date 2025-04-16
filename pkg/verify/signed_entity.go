@@ -685,7 +685,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 	case "0.3":
 		enableCompat = true
 	}
-	verifier, err := getSignatureVerifier(verificationContent, v.trustedMaterial, enableCompat)
+	verifier, err := getSignatureVerifier(sigContent, verificationContent, v.trustedMaterial, enableCompat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature verifier: %w", err)
 	}

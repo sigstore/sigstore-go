@@ -44,7 +44,7 @@ const maxAllowedSubjectDigests = 32
 var ErrDSSEInvalidSignatureCount = errors.New("exactly one signature is required")
 
 func VerifySignature(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial) error { // nolint: revive
-	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial, false)
+	verifier, err := getSignatureVerifier(sigContent, verificationContent, trustedMaterial, false)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
@@ -64,7 +64,7 @@ func verifySignatureWithVerifier(verifier signature.Verifier, sigContent Signatu
 }
 
 func VerifySignatureWithArtifacts(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, artifacts []io.Reader) error { // nolint: revive
-	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial, false)
+	verifier, err := getSignatureVerifier(sigContent, verificationContent, trustedMaterial, false)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
@@ -91,7 +91,7 @@ func verifySignatureWithVerifierAndArtifacts(verifier signature.Verifier, sigCon
 }
 
 func VerifySignatureWithArtifactDigests(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, digests []ArtifactDigest) error { // nolint: revive
-	verifier, err := getSignatureVerifier(verificationContent, trustedMaterial, false)
+	verifier, err := getSignatureVerifier(sigContent, verificationContent, trustedMaterial, false)
 	if err != nil {
 		return fmt.Errorf("could not load signature verifier: %w", err)
 	}
@@ -157,14 +157,18 @@ func (v *compatVerifier) PublicKey(opts ...signature.PublicKeyOption) (crypto.Pu
 	return v.verifiers[0].PublicKey(opts...)
 }
 
-func compatSignatureVerifier(leafCert *x509.Certificate, enableCompat bool) (signature.Verifier, error) {
+func compatSignatureVerifier(leafCert *x509.Certificate, enableCompat bool, isDSSE bool) (signature.Verifier, error) {
 	// LoadDefaultSigner/Verifier functions accept a few options to select
 	// the default signer/verifier when there are ambiguities, like for
 	// ED25519 keys, which could be used with PureEd25519 or Ed25519ph.
 	//
-	// Pass `WithED25519ph()` to select Ed25519ph by default, when ED25519
-	// key is found, because for hashedrekord entries this is the only option.
-	defaultOpts := []signature.LoadOption{options.WithED25519ph()}
+	// When dealing with DSSE, use ED25519, but when we are working with
+	// hashedrekord entries, use ED25519ph by default, because this is the
+	// only option.
+	var defaultOpts []signature.LoadOption
+	if !isDSSE {
+		defaultOpts = []signature.LoadOption{options.WithED25519ph()}
+	}
 
 	verifiers := make([]signature.Verifier, 0)
 	verifier, err := signature.LoadDefaultVerifier(leafCert.PublicKey, defaultOpts...)
@@ -203,9 +207,10 @@ func compatSignatureVerifier(leafCert *x509.Certificate, enableCompat bool) (sig
 	return &compatVerifier{verifiers: verifiers}, nil
 }
 
-func getSignatureVerifier(verificationContent VerificationContent, tm root.TrustedMaterial, enableCompat bool) (signature.Verifier, error) {
+func getSignatureVerifier(sigContent SignatureContent, verificationContent VerificationContent, tm root.TrustedMaterial, enableCompat bool) (signature.Verifier, error) {
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
-		return compatSignatureVerifier(leafCert, enableCompat)
+		isDSSE := sigContent.EnvelopeContent() != nil
+		return compatSignatureVerifier(leafCert, enableCompat, isDSSE)
 	} else if pk := verificationContent.PublicKey(); pk != nil {
 		return tm.PublicKeyVerifier(pk.Hint())
 	}
