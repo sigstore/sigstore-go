@@ -119,10 +119,10 @@ func mapFunc[T, V any](ts []T, fn func(T) V) []V {
 }
 
 func (s Service) ValidAtTime(t time.Time) bool {
-	if !s.ValidityPeriodStart.IsZero() && t.Before(s.ValidityPeriodStart) {
+	if !s.ValidityPeriodStart.Equal(time.Unix(0, 0)) && t.Before(s.ValidityPeriodStart) {
 		return false
 	}
-	if !s.ValidityPeriodEnd.IsZero() && t.After(s.ValidityPeriodEnd) {
+	if !s.ValidityPeriodEnd.Equal(time.Unix(0, 0)) && t.After(s.ValidityPeriodEnd) {
 		return false
 	}
 	return true
