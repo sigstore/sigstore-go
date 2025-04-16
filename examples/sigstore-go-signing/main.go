@@ -34,12 +34,15 @@ var idToken *string
 var intoto *bool
 var tsa *bool
 var rekor *bool
+var signingconfigJSONpath *string
 
 func init() {
 	idToken = flag.String("id-token", "", "OIDC token to send to Fulcio")
 	intoto = flag.Bool("in-toto", false, "Content to sign is in-toto document")
 	tsa = flag.Bool("tsa", false, "Include signed timestamp from timestamp authority")
 	rekor = flag.Bool("rekor", false, "Including transparency log entry from Rekor")
+	signingconfigJSONpath = flag.String("signingconfigJSONpath", "", "Path to signingconfig JSON file")
+
 	flag.Parse()
 	if flag.NArg() == 0 {
 		usage()
@@ -83,78 +86,86 @@ func main() {
 
 	opts := sign.BundleOptions{}
 
-	// Get trusted_root.json
-	fetcher := fetcher.DefaultFetcher{}
-	fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
+	var signingConfig *root.SigningConfig
 
-	tufOptions := &tuf.Options{
-		Root:              tuf.StagingRoot(),
-		RepositoryBaseURL: tuf.StagingMirror,
-		Fetcher:           &fetcher,
-	}
-	tufClient, err := tuf.New(tufOptions)
-	if err != nil {
-		log.Fatal(err)
-	}
+	if *signingconfigJSONpath != "" {
+		signingConfig, err = root.NewSigningConfigFromPath(*signingconfigJSONpath)
+		// NOTE: trusted root is not set here (could be taken with another flag)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		// Get staging trusted_root.json
+		fetcher := fetcher.DefaultFetcher{}
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
 
-	trustedRoot, err := root.GetTrustedRoot(tufClient)
-	if err != nil {
-		log.Fatal(err)
-	}
+		tufOptions := &tuf.Options{
+			Root:              tuf.StagingRoot(),
+			RepositoryBaseURL: tuf.StagingMirror,
+			Fetcher:           &fetcher,
+		}
+		tufClient, err := tuf.New(tufOptions)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	// TODO: Uncomment once an updated v0.2 SigningConfig is distributed
-	// via TUF
-	// signingConfigPGI, err := root.GetSigningConfig(tufClient)
+		trustedRoot, err := root.GetTrustedRoot(tufClient)
+		if err != nil {
+			log.Fatal(err)
+		}
+		opts.TrustedRoot = trustedRoot
 
-	signingConfig, err := root.NewSigningConfig(
-		root.SigningConfigMediaType02,
-		// Fulcio URLs
-		[]root.Service{
-			{
-				URL:                 "https://fulcio.sigstage.dev",
-				MajorAPIVersion:     1,
-				ValidityPeriodStart: time.Now().Add(-time.Hour),
-				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+		// TODO: Uncomment once an updated v0.2 SigningConfig is distributed
+		// via TUF
+		// signingConfigPGI, err := root.GetSigningConfig(tufClient)
+		signingConfig, err = root.NewSigningConfig(
+			root.SigningConfigMediaType02,
+			// Fulcio URLs
+			[]root.Service{
+				{
+					URL:                 "https://fulcio.sigstage.dev",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: time.Now().Add(-time.Hour),
+					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+				},
 			},
-		},
-		// OIDC Provider URLs
-		[]root.Service{
-			{
-				URL:                 "https://oauth2.sigstage.dev/auth",
-				MajorAPIVersion:     1,
-				ValidityPeriodStart: time.Now().Add(-time.Hour),
-				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			// OIDC Provider URLs
+			[]root.Service{
+				{
+					URL:                 "https://oauth2.sigstage.dev/auth",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: time.Now().Add(-time.Hour),
+					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+				},
 			},
-		},
-		// Rekor URLs
-		[]root.Service{
-			{
-				URL:                 "https://rekor.sigstage.dev",
-				MajorAPIVersion:     1,
-				ValidityPeriodStart: time.Now().Add(-time.Hour),
-				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			// Rekor URLs
+			[]root.Service{
+				{
+					URL:                 "https://rekor.sigstage.dev",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: time.Now().Add(-time.Hour),
+					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+				},
 			},
-		},
-		root.ServiceConfiguration{
-			Selector: v1.ServiceSelector_ANY,
-		},
-		[]root.Service{
-			{
-				URL:                 "https://timestamp.githubapp.com/api/v1/timestamp",
-				MajorAPIVersion:     1,
-				ValidityPeriodStart: time.Now().Add(-time.Hour),
-				ValidityPeriodEnd:   time.Now().Add(time.Hour),
+			root.ServiceConfiguration{
+				Selector: v1.ServiceSelector_ANY,
 			},
-		},
-		root.ServiceConfiguration{
-			Selector: v1.ServiceSelector_ANY,
-		},
-	)
-	if err != nil {
-		log.Fatal(err)
+			[]root.Service{
+				{
+					URL:                 "https://timestamp.sigstage.dev/api/v1/timestamp",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: time.Now().Add(-time.Hour),
+					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+				},
+			},
+			root.ServiceConfiguration{
+				Selector: v1.ServiceSelector_ANY,
+			},
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-
-	opts.TrustedRoot = trustedRoot
 
 	if *idToken != "" {
 		fulcioURL, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
