@@ -79,7 +79,7 @@ func TestSelectService(t *testing.T) {
 			URL:                 "url_no_end",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: farFuture,
-			ValidityPeriodEnd:   time.Time{},
+			ValidityPeriodEnd:   time.Unix(0, 0),
 		},
 	}
 
