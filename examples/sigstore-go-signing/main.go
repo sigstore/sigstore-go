@@ -34,14 +34,20 @@ var idToken *string
 var intoto *bool
 var tsa *bool
 var rekor *bool
-var signingconfigJSONpath *string
+var signingconfigJSONpath string
+var trustedrootJSONpath string
 
 func init() {
 	idToken = flag.String("id-token", "", "OIDC token to send to Fulcio")
 	intoto = flag.Bool("in-toto", false, "Content to sign is in-toto document")
 	tsa = flag.Bool("tsa", false, "Include signed timestamp from timestamp authority")
 	rekor = flag.Bool("rekor", false, "Including transparency log entry from Rekor")
-	signingconfigJSONpath = flag.String("signingconfigJSONpath", "", "Path to signingconfig JSON file")
+
+	flag.StringVar(&signingconfigJSONpath, "signing-config", "", "Path to signingconfig JSON file")
+	flag.StringVar(&signingconfigJSONpath, "s", "", "Path to signingconfig JSON file")
+
+	flag.StringVar(&trustedrootJSONpath, "trusted-root", "", "Path to trusted root JSON file")
+	flag.StringVar(&trustedrootJSONpath, "t", "", "Path to trusted root JSON file")
 
 	flag.Parse()
 	if flag.NArg() == 0 {
@@ -88,14 +94,16 @@ func main() {
 
 	var signingConfig *root.SigningConfig
 
-	if *signingconfigJSONpath != "" {
-		signingConfig, err = root.NewSigningConfigFromPath(*signingconfigJSONpath)
-		// NOTE: trusted root is not set here (could be taken with another flag)
+	// A trusted root is not required but we will load one if
+	// * it is given as argument or
+	// * we are using default signing config (as in that case we know which trusted root to use)
+	if trustedrootJSONpath != "" {
+		opts.TrustedRoot, err = root.NewTrustedRootFromPath(trustedrootJSONpath)
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else {
-		// Get staging trusted_root.json
+	} else if signingconfigJSONpath == "" {
+		// Get staging trusted_root.json by default
 		fetcher := fetcher.DefaultFetcher{}
 		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
 
@@ -108,16 +116,23 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		trustedRoot, err := root.GetTrustedRoot(tufClient)
+		opts.TrustedRoot, err = root.GetTrustedRoot(tufClient)
 		if err != nil {
 			log.Fatal(err)
 		}
-		opts.TrustedRoot = trustedRoot
+	}
 
+	if signingconfigJSONpath != "" {
+		signingConfig, err = root.NewSigningConfigFromPath(signingconfigJSONpath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
 		// TODO: Uncomment once an updated v0.2 SigningConfig is distributed
 		// via TUF
 		// signingConfigPGI, err := root.GetSigningConfig(tufClient)
+
+		// for now we hard code the staging services here
 		signingConfig, err = root.NewSigningConfig(
 			root.SigningConfigMediaType02,
 			// Fulcio URLs
