@@ -34,8 +34,8 @@ var idToken *string
 var intoto *bool
 var tsa *bool
 var rekor *bool
-var signingconfigJSONpath string
-var trustedrootJSONpath string
+var signingconfigPath string
+var trustedrootPath string
 
 func init() {
 	idToken = flag.String("id-token", "", "OIDC token to send to Fulcio")
@@ -43,11 +43,11 @@ func init() {
 	tsa = flag.Bool("tsa", false, "Include signed timestamp from timestamp authority")
 	rekor = flag.Bool("rekor", false, "Including transparency log entry from Rekor")
 
-	flag.StringVar(&signingconfigJSONpath, "signing-config", "", "Path to signingconfig JSON file")
-	flag.StringVar(&signingconfigJSONpath, "s", "", "Path to signingconfig JSON file")
+	flag.StringVar(&signingconfigPath, "signing-config", "", "Path to signingconfig JSON file")
+	flag.StringVar(&signingconfigPath, "s", "", "Path to signingconfig JSON file")
 
-	flag.StringVar(&trustedrootJSONpath, "trusted-root", "", "Path to trusted root JSON file")
-	flag.StringVar(&trustedrootJSONpath, "t", "", "Path to trusted root JSON file")
+	flag.StringVar(&trustedrootPath, "trusted-root", "", "Path to trusted root JSON file")
+	flag.StringVar(&trustedrootPath, "t", "", "Path to trusted root JSON file")
 
 	flag.Parse()
 	if flag.NArg() == 0 {
@@ -97,12 +97,12 @@ func main() {
 	// A trusted root is not required but we will load one if
 	// * it is given as argument or
 	// * we are using default signing config (as in that case we know which trusted root to use)
-	if trustedrootJSONpath != "" {
-		opts.TrustedRoot, err = root.NewTrustedRootFromPath(trustedrootJSONpath)
+	if trustedrootPath != "" {
+		opts.TrustedRoot, err = root.NewTrustedRootFromPath(trustedrootPath)
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else if signingconfigJSONpath == "" {
+	} else if signingconfigPath == "" {
 		// Get staging trusted_root.json by default
 		fetcher := fetcher.DefaultFetcher{}
 		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
@@ -122,8 +122,8 @@ func main() {
 		}
 	}
 
-	if signingconfigJSONpath != "" {
-		signingConfig, err = root.NewSigningConfigFromPath(signingconfigJSONpath)
+	if signingconfigPath != "" {
+		signingConfig, err = root.NewSigningConfigFromPath(signingconfigPath)
 		if err != nil {
 			log.Fatal(err)
 		}
