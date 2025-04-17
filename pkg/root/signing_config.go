@@ -38,7 +38,7 @@ type Service struct {
 	URL                 string
 	MajorAPIVersion     uint32
 	ValidityPeriodStart time.Time
-	ValidityPeriodEnd   time.Time
+	ValidityPeriodEnd   *time.Time
 }
 
 type ServiceConfiguration struct {
@@ -119,22 +119,28 @@ func mapFunc[T, V any](ts []T, fn func(T) V) []V {
 }
 
 func (s Service) ValidAtTime(t time.Time) bool {
-	if !s.ValidityPeriodStart.Equal(time.Unix(0, 0)) && t.Before(s.ValidityPeriodStart) {
+	if t.Before(s.ValidityPeriodStart) {
 		return false
 	}
-	if !s.ValidityPeriodEnd.Equal(time.Unix(0, 0)) && t.After(s.ValidityPeriodEnd) {
+	if s.ValidityPeriodEnd != nil && t.After(*s.ValidityPeriodEnd) {
 		return false
 	}
 	return true
 }
 
 func (s Service) ToServiceProtobuf() *prototrustroot.Service {
+	var end *timestamppb.Timestamp
+	if s.ValidityPeriodEnd != nil {
+		end = timestamppb.New(*s.ValidityPeriodEnd)
+	} else {
+		end = nil
+	}
 	return &prototrustroot.Service{
 		Url:             s.URL,
 		MajorApiVersion: s.MajorAPIVersion,
 		ValidFor: &v1.TimeRange{
 			Start: timestamppb.New(s.ValidityPeriodStart),
-			End:   timestamppb.New(s.ValidityPeriodEnd),
+			End:   end,
 		},
 	}
 }
@@ -146,6 +152,14 @@ func (sc ServiceConfiguration) ToConfigProtobuf() *prototrustroot.ServiceConfigu
 	}
 }
 
+func getOptionalTime(t *timestamppb.Timestamp) *time.Time {
+	if t == nil {
+		return nil
+	}
+	timevar := t.AsTime()
+	return &timevar
+}
+
 func (sc *SigningConfig) FulcioCertificateAuthorityURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetCaUrls() {
@@ -153,7 +167,7 @@ func (sc *SigningConfig) FulcioCertificateAuthorityURLs() []Service {
 			URL:                 s.GetUrl(),
 			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
+			ValidityPeriodEnd:   getOptionalTime(s.GetValidFor().GetEnd()),
 		})
 	}
 	return services
@@ -166,7 +180,7 @@ func (sc *SigningConfig) OIDCProviderURLs() []Service {
 			URL:                 s.GetUrl(),
 			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
+			ValidityPeriodEnd:   getOptionalTime(s.GetValidFor().GetEnd()),
 		})
 	}
 	return services
@@ -179,7 +193,7 @@ func (sc *SigningConfig) RekorLogURLs() []Service {
 			URL:                 s.GetUrl(),
 			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
+			ValidityPeriodEnd:   getOptionalTime(s.GetValidFor().GetEnd()),
 		})
 	}
 	return services
@@ -200,7 +214,7 @@ func (sc *SigningConfig) TimestampAuthorityURLs() []Service {
 			URL:                 s.GetUrl(),
 			MajorAPIVersion:     s.GetMajorApiVersion(),
 			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
+			ValidityPeriodEnd:   getOptionalTime(s.GetValidFor().GetEnd()),
 		})
 	}
 	return services
@@ -217,12 +231,19 @@ func (sc *SigningConfig) TimestampAuthorityURLsConfig() ServiceConfiguration {
 func (sc *SigningConfig) WithFulcioCertificateAuthorityURLs(fulcioURLs ...Service) *SigningConfig {
 	var services []*prototrustroot.Service
 	for _, u := range fulcioURLs {
+		var end *timestamppb.Timestamp
+		if u.ValidityPeriodEnd != nil {
+			end = timestamppb.New(*u.ValidityPeriodEnd)
+		} else {
+			end = nil
+		}
+
 		services = append(services, &prototrustroot.Service{
 			Url:             u.URL,
 			MajorApiVersion: u.MajorAPIVersion,
 			ValidFor: &v1.TimeRange{
 				Start: timestamppb.New(u.ValidityPeriodStart),
-				End:   timestamppb.New(u.ValidityPeriodEnd),
+				End:   end,
 			},
 		})
 	}

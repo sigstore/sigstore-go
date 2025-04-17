@@ -126,7 +126,7 @@ func main() {
 					URL:                 "https://fulcio.sigstage.dev",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					ValidityPeriodEnd:   nil,
 				},
 			},
 			// OIDC Provider URLs
@@ -135,7 +135,7 @@ func main() {
 					URL:                 "https://oauth2.sigstage.dev/auth",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					ValidityPeriodEnd:   nil,
 				},
 			},
 			// Rekor URLs
@@ -144,7 +144,7 @@ func main() {
 					URL:                 "https://rekor.sigstage.dev",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					ValidityPeriodEnd:   nil,
 				},
 			},
 			root.ServiceConfiguration{
@@ -155,7 +155,7 @@ func main() {
 					URL:                 "https://timestamp.sigstage.dev/api/v1/timestamp",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					ValidityPeriodEnd:   nil,
 				},
 			},
 			root.ServiceConfiguration{

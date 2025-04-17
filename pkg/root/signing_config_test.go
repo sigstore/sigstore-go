@@ -32,9 +32,12 @@ func servicesEqual(got []Service, want []Service) bool {
 	}
 	for i, g := range got {
 		w := want[i]
+
+		endEqual := (g.ValidityPeriodEnd == nil && w.ValidityPeriodEnd == nil) || (g.ValidityPeriodEnd != nil && w.ValidityPeriodEnd != nil && g.ValidityPeriodEnd.Equal(*w.ValidityPeriodEnd))
+
 		if g.URL != w.URL || g.MajorAPIVersion != w.MajorAPIVersion ||
 			!g.ValidityPeriodStart.Equal(w.ValidityPeriodStart) ||
-			!g.ValidityPeriodEnd.Equal(w.ValidityPeriodEnd) {
+			!endEqual {
 			return false
 		}
 	}
@@ -46,7 +49,7 @@ func newService(url string, now time.Time) Service {
 		URL:                 url,
 		MajorAPIVersion:     1,
 		ValidityPeriodStart: now.Add(-time.Hour),
-		ValidityPeriodEnd:   now.Add(time.Hour),
+		ValidityPeriodEnd:   nil,
 	}
 }
 
@@ -61,25 +64,25 @@ func TestSelectService(t *testing.T) {
 			URL:                 "url1",
 			MajorAPIVersion:     1,
 			ValidityPeriodStart: past,
-			ValidityPeriodEnd:   future,
+			ValidityPeriodEnd:   &future,
 		},
 		{
 			URL:                 "url2",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: past,
-			ValidityPeriodEnd:   future,
+			ValidityPeriodEnd:   &future,
 		},
 		{
 			URL:                 "url3_new",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: now,
-			ValidityPeriodEnd:   future,
+			ValidityPeriodEnd:   &future,
 		},
 		{
 			URL:                 "url_no_end",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: farFuture,
-			ValidityPeriodEnd:   time.Unix(0, 0),
+			ValidityPeriodEnd:   nil,
 		},
 	}
 
@@ -170,19 +173,19 @@ func TestSelectServices(t *testing.T) {
 			URL:                 "url1",
 			MajorAPIVersion:     1,
 			ValidityPeriodStart: past,
-			ValidityPeriodEnd:   future,
+			ValidityPeriodEnd:   &future,
 		},
 		{
 			URL:                 "url2",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: past,
-			ValidityPeriodEnd:   future,
+			ValidityPeriodEnd:   &future,
 		},
 		{
 			URL:                 "url3",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: past,
-			ValidityPeriodEnd:   future,
+			ValidityPeriodEnd:   &future,
 		},
 	}
 
@@ -503,7 +506,7 @@ func TestSigningConfig_FulcioCertificateAuthorityURLs(t *testing.T) {
 					URL:                 "https://fulcio.sigstore.dev",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
-					ValidityPeriodEnd:   now,
+					ValidityPeriodEnd:   &now,
 				},
 			},
 		},
@@ -550,7 +553,7 @@ func TestSigningConfig_OIDCProviderURLs(t *testing.T) {
 					URL:                 "https://oauth2.sigstore.dev/auth",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
-					ValidityPeriodEnd:   now,
+					ValidityPeriodEnd:   &now,
 				},
 			},
 		},
@@ -597,7 +600,7 @@ func TestSigningConfig_RekorLogURLs(t *testing.T) {
 					URL:                 "https://rekor.sigstore.dev",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
-					ValidityPeriodEnd:   now,
+					ValidityPeriodEnd:   &now,
 				},
 			},
 		},
@@ -681,7 +684,7 @@ func TestSigningConfig_TimestampAuthorityURLs(t *testing.T) {
 					URL:                 "https://timestamp.sigstore.dev",
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
-					ValidityPeriodEnd:   now,
+					ValidityPeriodEnd:   &now,
 				},
 			},
 		},
@@ -762,20 +765,20 @@ func TestNewSigningConfig(t *testing.T) {
 			name: "valid",
 			args: args{
 				mediaType:                    SigningConfigMediaType02,
-				fulcioCertificateAuthorities: []Service{{URL: "https://fulcio.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				oidcProviders:                []Service{{URL: "https://oauth2.sigstore.dev/auth", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				rekorLogs:                    []Service{{URL: "https://rekor.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				timestampAuthorities:         []Service{{URL: "https://timestamp.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
+				fulcioCertificateAuthorities: []Service{{URL: "https://fulcio.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
+				oidcProviders:                []Service{{URL: "https://oauth2.sigstore.dev/auth", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
+				rekorLogs:                    []Service{{URL: "https://rekor.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
+				timestampAuthorities:         []Service{{URL: "https://timestamp.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
 				config:                       ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
 			},
 			want: &SigningConfig{
 				signingConfig: &prototrustroot.SigningConfig{
 					MediaType:       SigningConfigMediaType02,
-					CaUrls:          []*prototrustroot.Service{{Url: "https://fulcio.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
-					OidcUrls:        []*prototrustroot.Service{{Url: "https://oauth2.sigstore.dev/auth", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
-					RekorTlogUrls:   []*prototrustroot.Service{{Url: "https://rekor.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
+					CaUrls:          []*prototrustroot.Service{{Url: "https://fulcio.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: nil}}},
+					OidcUrls:        []*prototrustroot.Service{{Url: "https://oauth2.sigstore.dev/auth", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: nil}}},
+					RekorTlogUrls:   []*prototrustroot.Service{{Url: "https://rekor.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: nil}}},
 					RekorTlogConfig: &prototrustroot.ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
-					TsaUrls:         []*prototrustroot.Service{{Url: "https://timestamp.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
+					TsaUrls:         []*prototrustroot.Service{{Url: "https://timestamp.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: nil}}},
 					TsaConfig:       &prototrustroot.ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
 				},
 			},
@@ -785,10 +788,10 @@ func TestNewSigningConfig(t *testing.T) {
 			name: "invalid media type",
 			args: args{
 				mediaType:                    "application/json",
-				fulcioCertificateAuthorities: []Service{{URL: "https://fulcio.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				oidcProviders:                []Service{{URL: "https://oauth2.sigstore.dev/auth", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				rekorLogs:                    []Service{{URL: "https://rekor.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				timestampAuthorities:         []Service{{URL: "https://timestamp.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
+				fulcioCertificateAuthorities: []Service{{URL: "https://fulcio.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
+				oidcProviders:                []Service{{URL: "https://oauth2.sigstore.dev/auth", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
+				rekorLogs:                    []Service{{URL: "https://rekor.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
+				timestampAuthorities:         []Service{{URL: "https://timestamp.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: nil}},
 				config:                       ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
 			},
 			want:    nil,
