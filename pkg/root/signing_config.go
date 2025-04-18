@@ -47,15 +47,27 @@ type ServiceConfiguration struct {
 }
 
 // SelectService returns which service endpoint should be used based on supported API versions
-// and current time. It will select the first service that matches the criteria. Services should
-// be sorted from newest to oldest validity period start time, to minimize how far clients
-// need to search to find a matching service.
+// and current time. It will select the first service with the highest API version that matches
+// the criteria. Services should be sorted from newest to oldest validity period start time, to
+// minimize how far clients need to search to find a matching service.
 func SelectService(services []Service, supportedAPIVersions []uint32, currentTime time.Time) (string, error) {
-	for _, s := range services {
-		if slices.Contains(supportedAPIVersions, s.MajorAPIVersion) && s.ValidAtTime(currentTime) {
-			return s.URL, nil
+	if len(supportedAPIVersions) == 0 {
+		return "", fmt.Errorf("no supported API versions")
+	}
+
+	sortedVersions := make([]uint32, len(supportedAPIVersions))
+	copy(sortedVersions, supportedAPIVersions)
+	slices.Sort(sortedVersions)
+	slices.Reverse(sortedVersions)
+
+	for _, version := range sortedVersions {
+		for _, s := range services {
+			if version == s.MajorAPIVersion && s.ValidAtTime(currentTime) {
+				return s.URL, nil
+			}
 		}
 	}
+
 	return "", fmt.Errorf("no matching service found for API versions %v and current time %v", supportedAPIVersions, currentTime)
 }
 
@@ -63,31 +75,49 @@ func SelectService(services []Service, supportedAPIVersions []uint32, currentTim
 // and current time. It will use the configuration's selector to pick a set of services.
 // ALL will return all service endpoints, ANY will return a random endpoint, and
 // EXACT will return a random selection of a specified number of endpoints.
+// It will select services from the highest supported API versions and will not select
+// services from different API versions.
 func SelectServices(services []Service, config ServiceConfiguration, supportedAPIVersions []uint32, currentTime time.Time) ([]string, error) {
-	var urls []string
+	if len(supportedAPIVersions) == 0 {
+		return nil, fmt.Errorf("no supported API versions")
+	}
+
+	urlsByVersion := make(map[uint32][]string)
 	for _, s := range services {
 		if slices.Contains(supportedAPIVersions, s.MajorAPIVersion) && s.ValidAtTime(currentTime) {
-			urls = append(urls, s.URL)
+			urlsByVersion[s.MajorAPIVersion] = append(urlsByVersion[s.MajorAPIVersion], s.URL)
 		}
 	}
-	if len(urls) == 0 {
-		return nil, fmt.Errorf("no matching services found for API versions %v and current time %v", supportedAPIVersions, currentTime)
-	}
-	switch config.Selector {
-	case prototrustroot.ServiceSelector_ALL:
-		return urls, nil
-	case prototrustroot.ServiceSelector_ANY:
-		i := rand.Intn(len(urls)) // #nosec G404
-		return []string{urls[i]}, nil
-	case prototrustroot.ServiceSelector_EXACT:
-		matchedUrls, err := selectExact(urls, config.Count)
-		if err != nil {
-			return nil, err
+
+	sortedVersions := make([]uint32, len(supportedAPIVersions))
+	copy(sortedVersions, supportedAPIVersions)
+	slices.Sort(sortedVersions)
+	slices.Reverse(sortedVersions)
+
+	// Select services from the highest supported API version
+	for _, version := range sortedVersions {
+		urls, ok := urlsByVersion[version]
+		if !ok {
+			continue
 		}
-		return matchedUrls, nil
-	default:
-		return nil, fmt.Errorf("invalid service selector")
+		switch config.Selector {
+		case prototrustroot.ServiceSelector_ALL:
+			return urls, nil
+		case prototrustroot.ServiceSelector_ANY:
+			i := rand.Intn(len(urls)) // #nosec G404
+			return []string{urls[i]}, nil
+		case prototrustroot.ServiceSelector_EXACT:
+			matchedUrls, err := selectExact(urls, config.Count)
+			if err != nil {
+				return nil, err
+			}
+			return matchedUrls, nil
+		default:
+			return nil, fmt.Errorf("invalid service selector")
+		}
 	}
+
+	return nil, fmt.Errorf("no matching services found for API versions %v and current time %v", supportedAPIVersions, currentTime)
 }
 
 func selectExact[T any](slice []T, count uint32) ([]T, error) {
