@@ -58,7 +58,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	}
 
 	if opts.Context == nil {
-		opts.Context = context.TODO()
+		opts.Context = context.Background()
 	}
 
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
@@ -129,7 +129,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	if len(opts.TransparencyLogs) > 0 {
 		for _, transparency := range opts.TransparencyLogs {
-			err = transparency.GetTransparencyLogEntry(verifierPEM, bundle)
+			err = transparency.GetTransparencyLogEntry(opts.Context, verifierPEM, bundle)
 			if err != nil {
 				return nil, err
 			}

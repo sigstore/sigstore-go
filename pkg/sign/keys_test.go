@@ -27,7 +27,7 @@ func Test_EphemeralKeypair(t *testing.T) {
 		Hint: []byte("asdf"),
 	}
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	ephemeralKeypair, err := NewEphemeralKeypair(opts)
 	assert.NotNil(t, ephemeralKeypair)
 	assert.Nil(t, err)

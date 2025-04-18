@@ -60,7 +60,7 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 		return nil, err
 	}
 
-	envelope, err := dsseSigner.SignPayload(context.TODO(), "application/vnd.in-toto+json", envelopeBody)
+	envelope, err := dsseSigner.SignPayload(context.Background(), "application/vnd.in-toto+json", envelopeBody)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 }
 
 func Test_GetTransparencyLogEntry(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	// First create a bundle with DSSE content
 	keypair, err := NewEphemeralKeypair(nil)
@@ -124,7 +124,7 @@ func Test_GetTransparencyLogEntry(t *testing.T) {
 	pubkey, err := keypair.GetPublicKeyPem()
 	assert.Nil(t, err)
 
-	err = rekor.GetTransparencyLogEntry([]byte(pubkey), bundle)
+	err = rekor.GetTransparencyLogEntry(ctx, []byte(pubkey), bundle)
 	assert.Nil(t, err)
 	assert.NotNil(t, bundle.VerificationMaterial.TlogEntries)
 }

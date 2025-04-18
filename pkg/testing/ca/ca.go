@@ -184,7 +184,7 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		return nil, err
 	}
 
-	envelope, err := dsseSigner.SignPayload(context.TODO(), "application/vnd.in-toto+json", envelopeBody)
+	envelope, err := dsseSigner.SignPayload(context.Background(), "application/vnd.in-toto+json", envelopeBody)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func (ca *VirtualSigstore) GetInclusionProof(rekorBodyRaw []byte) (*models.Inclu
 	}
 	rootHash := sha256.Sum256(append([]byte("\000"), rekorBodyRaw...))
 	encodedRootHash := hex.EncodeToString(rootHash[:])
-	scBytes, err := util.CreateAndSignCheckpoint(context.TODO(), "rekor.localhost", int64(123), uint64(42), rootHash[:], signer)
+	scBytes, err := util.CreateAndSignCheckpoint(context.Background(), "rekor.localhost", int64(123), uint64(42), rootHash[:], signer)
 	if err != nil {
 		return nil, err
 	}

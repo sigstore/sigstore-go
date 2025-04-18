@@ -116,7 +116,7 @@ func Test_GetCertificate(t *testing.T) {
 	opts := &FulcioOptions{Retries: 1, Transport: &mockFulcio{}}
 	fulcio := NewFulcio(opts)
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	keypair, err := NewEphemeralKeypair(nil)
 	assert.Nil(t, err)
 
