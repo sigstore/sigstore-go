@@ -79,7 +79,7 @@ func Test_GetTimestamp(t *testing.T) {
 	// Test happy path
 	opts := &TimestampAuthorityOptions{Retries: 1, Transport: &mockTSAClient{}}
 	tsa := NewTimestampAuthority(opts)
-	ctx := context.TODO()
+	ctx := context.Background()
 	signature := []byte("somestuff")
 	resp, err := tsa.GetTimestamp(ctx, signature)
 	assert.NotNil(t, resp)

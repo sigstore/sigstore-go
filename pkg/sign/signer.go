@@ -58,7 +58,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	}
 
 	if opts.Context == nil {
-		opts.Context = context.TODO()
+		opts.Context = context.Background()
 	}
 
 	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
