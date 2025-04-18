@@ -86,7 +86,7 @@ func TestSelectService(t *testing.T) {
 	tests := []struct {
 		name               string
 		services           []Service
-		supportedVersions  uint32
+		supportedVersions  []uint32
 		currentTime        time.Time
 		expectedURL        string
 		expectedErr        bool
@@ -95,7 +95,7 @@ func TestSelectService(t *testing.T) {
 		{
 			name:              "single matching service",
 			services:          services,
-			supportedVersions: 1,
+			supportedVersions: []uint32{1},
 			currentTime:       now,
 			expectedURL:       "url1",
 			expectedErr:       false,
@@ -103,7 +103,7 @@ func TestSelectService(t *testing.T) {
 		{
 			name:              "multiple matching service, first selected",
 			services:          services,
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       now,
 			expectedURL:       "url2",
 			expectedErr:       false,
@@ -111,7 +111,7 @@ func TestSelectService(t *testing.T) {
 		{
 			name:               "no matching version",
 			services:           services,
-			supportedVersions:  3,
+			supportedVersions:  []uint32{3},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "no matching service found for API versions [3] and current time",
@@ -119,7 +119,7 @@ func TestSelectService(t *testing.T) {
 		{
 			name:              "valid with no end time",
 			services:          services,
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       farFuture,
 			expectedURL:       "url_no_end",
 			expectedErr:       false,
@@ -127,7 +127,7 @@ func TestSelectService(t *testing.T) {
 		{
 			name:               "no matching service at all",
 			services:           []Service{},
-			supportedVersions:  1,
+			supportedVersions:  []uint32{1},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "no matching service found for API versions [1] and current time",
@@ -135,16 +135,43 @@ func TestSelectService(t *testing.T) {
 		{
 			name:              "first service selected when multiple match",
 			services:          services,
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       now.Add(time.Minute), // In the validity period of url3_new
 			expectedURL:       "url2",
 			expectedErr:       false,
+		},
+		{
+			name:              "match to highest API version with multiple supported versions",
+			services:          services,
+			supportedVersions: []uint32{1, 2},
+			currentTime:       now,
+			expectedURL:       "url2",
+			expectedErr:       false,
+		},
+		{
+			name: "match to highest API version with multiple supported versions, lower API version",
+			services: []Service{{URL: "url1",
+				MajorAPIVersion:     1,
+				ValidityPeriodStart: past,
+				ValidityPeriodEnd:   future}},
+			supportedVersions: []uint32{2, 1},
+			currentTime:       now,
+			expectedURL:       "url1",
+			expectedErr:       false,
+		},
+		{
+			name:               "no supported versions",
+			services:           services,
+			supportedVersions:  []uint32{},
+			currentTime:        now,
+			expectedErr:        true,
+			expectedErrMessage: "no supported API versions",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url, err := SelectService(tt.services, []uint32{tt.supportedVersions}, tt.currentTime)
+			url, err := SelectService(tt.services, tt.supportedVersions, tt.currentTime)
 			if (err != nil) != tt.expectedErr {
 				t.Errorf("SelectService() error = %v, expectedErr %v", err, tt.expectedErr)
 				return
@@ -190,7 +217,7 @@ func TestSelectServices(t *testing.T) {
 		name               string
 		services           []Service
 		config             ServiceConfiguration
-		supportedVersions  uint32
+		supportedVersions  []uint32
 		currentTime        time.Time
 		expectedURLs       []string
 		possibleURLs       [][]string
@@ -203,7 +230,7 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ALL,
 			},
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       now,
 			expectedURLs:      []string{"url2", "url3"},
 			expectedErr:       false,
@@ -214,7 +241,7 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ALL,
 			},
-			supportedVersions: 1,
+			supportedVersions: []uint32{1},
 			currentTime:       now,
 			expectedURLs:      []string{"url1"},
 			expectedErr:       false,
@@ -225,7 +252,7 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ALL,
 			},
-			supportedVersions:  3,
+			supportedVersions:  []uint32{3},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "no matching services found for API versions [3] and current time",
@@ -236,7 +263,7 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ANY,
 			},
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       now,
 			possibleURLs:      [][]string{{"url2"}, {"url3"}},
 			expectedErr:       false,
@@ -247,7 +274,7 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ANY,
 			},
-			supportedVersions: 1,
+			supportedVersions: []uint32{1},
 			currentTime:       now,
 			expectedURLs:      []string{"url1"},
 			expectedErr:       false,
@@ -258,7 +285,7 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ANY,
 			},
-			supportedVersions:  3,
+			supportedVersions:  []uint32{3},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "no matching services found for API versions [3] and current time",
@@ -270,7 +297,7 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    1,
 			},
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       now,
 			possibleURLs:      [][]string{{"url2"}, {"url3"}},
 			expectedErr:       false,
@@ -282,7 +309,7 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    2,
 			},
-			supportedVersions: 2,
+			supportedVersions: []uint32{2},
 			currentTime:       now,
 			possibleURLs:      [][]string{{"url2", "url3"}, {"url3", "url2"}},
 			expectedErr:       false,
@@ -294,7 +321,7 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    1,
 			},
-			supportedVersions: 1,
+			supportedVersions: []uint32{1},
 			currentTime:       now,
 			expectedURLs:      []string{"url1"},
 			expectedErr:       false,
@@ -306,7 +333,7 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    0,
 			},
-			supportedVersions:  2,
+			supportedVersions:  []uint32{2},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "service selector count must be greater than 0",
@@ -318,7 +345,19 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    3,
 			},
-			supportedVersions:  2,
+			supportedVersions:  []uint32{2},
+			currentTime:        now,
+			expectedErr:        true,
+			expectedErrMessage: "service selector count 3 must be less than or equal to the slice length 2",
+		},
+		{
+			name:     "EXACT selector, count greater than matches, multiple supported versions",
+			services: services,
+			config: ServiceConfiguration{
+				Selector: prototrustroot.ServiceSelector_EXACT,
+				Count:    3,
+			},
+			supportedVersions:  []uint32{1, 2},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "service selector count 3 must be less than or equal to the slice length 2",
@@ -330,7 +369,7 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    100,
 			},
-			supportedVersions:  2,
+			supportedVersions:  []uint32{2},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "service selector count 100 must be less than or equal to the slice length 2",
@@ -342,7 +381,7 @@ func TestSelectServices(t *testing.T) {
 				Selector: prototrustroot.ServiceSelector_EXACT,
 				Count:    1,
 			},
-			supportedVersions:  3,
+			supportedVersions:  []uint32{3},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "no matching services found for API versions [3] and current time",
@@ -353,16 +392,52 @@ func TestSelectServices(t *testing.T) {
 			config: ServiceConfiguration{
 				Selector: 99, // Invalid
 			},
-			supportedVersions:  2,
+			supportedVersions:  []uint32{2},
 			currentTime:        now,
 			expectedErr:        true,
 			expectedErrMessage: "invalid service selector",
+		},
+		{
+			name:     "match to highest API version with multiple supported versions",
+			services: services,
+			config: ServiceConfiguration{
+				Selector: prototrustroot.ServiceSelector_ALL,
+			},
+			supportedVersions: []uint32{1, 2},
+			currentTime:       now,
+			expectedURLs:      []string{"url2", "url3"},
+			expectedErr:       false,
+		},
+		{
+			name: "match to highest API version with multiple supported versions, lower API version",
+			services: []Service{{URL: "url1",
+				MajorAPIVersion:     1,
+				ValidityPeriodStart: past,
+				ValidityPeriodEnd:   future}},
+			config: ServiceConfiguration{
+				Selector: prototrustroot.ServiceSelector_ALL,
+			},
+			supportedVersions: []uint32{2, 1},
+			currentTime:       now,
+			expectedURLs:      []string{"url1"},
+			expectedErr:       false,
+		},
+		{
+			name:     "no supported versions",
+			services: services,
+			config: ServiceConfiguration{
+				Selector: prototrustroot.ServiceSelector_ALL,
+			},
+			supportedVersions:  []uint32{},
+			currentTime:        now,
+			expectedErr:        true,
+			expectedErrMessage: "no supported API versions",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			urls, err := SelectServices(tt.services, tt.config, []uint32{tt.supportedVersions}, tt.currentTime)
+			urls, err := SelectServices(tt.services, tt.config, tt.supportedVersions, tt.currentTime)
 			if (err != nil) != tt.expectedErr {
 				t.Errorf("SelectServices() error = %v, expectedErr %v", err, tt.expectedErr)
 				return
