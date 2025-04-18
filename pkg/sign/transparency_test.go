@@ -124,7 +124,7 @@ func Test_GetTransparencyLogEntry(t *testing.T) {
 	pubkey, err := keypair.GetPublicKeyPem()
 	assert.Nil(t, err)
 
-	err = rekor.GetTransparencyLogEntry([]byte(pubkey), bundle)
+	err = rekor.GetTransparencyLogEntry(ctx, []byte(pubkey), bundle)
 	assert.Nil(t, err)
 	assert.NotNil(t, bundle.VerificationMaterial.TlogEntries)
 }

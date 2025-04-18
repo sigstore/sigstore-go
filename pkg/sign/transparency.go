@@ -45,7 +45,7 @@ type RekorClient interface {
 }
 
 type Transparency interface {
-	GetTransparencyLogEntry([]byte, *protobundle.Bundle) error
+	GetTransparencyLogEntry(context.Context, []byte, *protobundle.Bundle) error
 }
 
 type Rekor struct {
@@ -67,7 +67,7 @@ func NewRekor(opts *RekorOptions) *Rekor {
 	return &Rekor{options: opts}
 }
 
-func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle) error {
+func (r *Rekor) GetTransparencyLogEntry(ctx context.Context, pubKeyPEM []byte, b *protobundle.Bundle) error {
 	artifactProperties := types.ArtifactProperties{
 		PublicKeyBytes: [][]byte{pubKeyPEM},
 	}
@@ -90,7 +90,7 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 
 		artifactProperties.ArtifactBytes = artifactBytes
 
-		proposedEntry, err = dsseType.CreateProposedEntry(context.TODO(), "", artifactProperties)
+		proposedEntry, err = dsseType.CreateProposedEntry(ctx, "", artifactProperties)
 		if err != nil {
 			return err
 		}
@@ -108,7 +108,7 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 		artifactProperties.ArtifactHash = rekorUtil.PrefixSHA(hexDigest)
 
 		var err error
-		proposedEntry, err = hashedrekordType.CreateProposedEntry(context.TODO(), "", artifactProperties)
+		proposedEntry, err = hashedrekordType.CreateProposedEntry(ctx, "", artifactProperties)
 		if err != nil {
 			return err
 		}
@@ -124,6 +124,7 @@ func (r *Rekor) GetTransparencyLogEntry(pubKeyPEM []byte, b *protobundle.Bundle)
 		params.SetTimeout(r.options.Timeout)
 	}
 	params.SetProposedEntry(proposedEntry)
+	params.SetContext(ctx)
 
 	if r.options.Client == nil {
 		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(util.ConstructUserAgent()), client.WithRetryCount(r.options.Retries))
