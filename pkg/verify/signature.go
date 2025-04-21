@@ -136,7 +136,7 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 		return fmt.Errorf("could not load envelope verifier: %w", err)
 	}
 
-	_, err = envVerifier.Verify(context.TODO(), dsseEnv)
+	_, err = envVerifier.Verify(context.Background(), dsseEnv)
 	if err != nil {
 		return fmt.Errorf("could not verify envelope: %w", err)
 	}
