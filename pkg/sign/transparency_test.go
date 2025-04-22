@@ -47,7 +47,7 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 		return nil, err
 	}
 
-	signer, err := signature.LoadECDSASignerVerifier(leafPrivKey, crypto.SHA256)
+	signer, err := signature.LoadSignerVerifier(leafPrivKey, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
