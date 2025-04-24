@@ -48,11 +48,22 @@ type ServiceConfiguration struct {
 
 func NewService(s *prototrustroot.Service) Service {
 	validFor := s.GetValidFor()
+
+	var start time.Time
+	if validFor.GetStart() != nil {
+		start = validFor.GetStart().AsTime()
+	}
+
+	var end time.Time
+	if validFor.GetEnd() != nil {
+		end = validFor.GetEnd().AsTime()
+	}
+
 	return Service{
 		URL:                 s.GetUrl(),
 		MajorAPIVersion:     s.GetMajorApiVersion(),
-		ValidityPeriodStart: validFor.GetStart().AsTime(),
-		ValidityPeriodEnd:   validFor.GetEnd().AsTime(),
+		ValidityPeriodStart: start,
+		ValidityPeriodEnd:   end,
 	}
 }
 
