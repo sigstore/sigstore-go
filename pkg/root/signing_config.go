@@ -46,6 +46,27 @@ type ServiceConfiguration struct {
 	Count    uint32
 }
 
+func NewService(s *prototrustroot.Service) Service {
+	validFor := s.GetValidFor()
+
+	var start time.Time
+	if validFor.GetStart() != nil {
+		start = validFor.GetStart().AsTime()
+	}
+
+	var end time.Time
+	if validFor.GetEnd() != nil {
+		end = validFor.GetEnd().AsTime()
+	}
+
+	return Service{
+		URL:                 s.GetUrl(),
+		MajorAPIVersion:     s.GetMajorApiVersion(),
+		ValidityPeriodStart: start,
+		ValidityPeriodEnd:   end,
+	}
+}
+
 // SelectService returns which service endpoint should be used based on supported API versions
 // and current time. It will select the first service with the highest API version that matches
 // the criteria. Services should be sorted from newest to oldest validity period start time, to
@@ -178,13 +199,9 @@ func (sc ServiceConfiguration) ToConfigProtobuf() *prototrustroot.ServiceConfigu
 
 func (sc *SigningConfig) FulcioCertificateAuthorityURLs() []Service {
 	var services []Service
+
 	for _, s := range sc.signingConfig.GetCaUrls() {
-		services = append(services, Service{
-			URL:                 s.GetUrl(),
-			MajorAPIVersion:     s.GetMajorApiVersion(),
-			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
-		})
+		services = append(services, NewService(s))
 	}
 	return services
 }
@@ -192,12 +209,7 @@ func (sc *SigningConfig) FulcioCertificateAuthorityURLs() []Service {
 func (sc *SigningConfig) OIDCProviderURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetOidcUrls() {
-		services = append(services, Service{
-			URL:                 s.GetUrl(),
-			MajorAPIVersion:     s.GetMajorApiVersion(),
-			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
-		})
+		services = append(services, NewService(s))
 	}
 	return services
 }
@@ -205,12 +217,7 @@ func (sc *SigningConfig) OIDCProviderURLs() []Service {
 func (sc *SigningConfig) RekorLogURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetRekorTlogUrls() {
-		services = append(services, Service{
-			URL:                 s.GetUrl(),
-			MajorAPIVersion:     s.GetMajorApiVersion(),
-			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
-		})
+		services = append(services, NewService(s))
 	}
 	return services
 }
@@ -226,12 +233,7 @@ func (sc *SigningConfig) RekorLogURLsConfig() ServiceConfiguration {
 func (sc *SigningConfig) TimestampAuthorityURLs() []Service {
 	var services []Service
 	for _, s := range sc.signingConfig.GetTsaUrls() {
-		services = append(services, Service{
-			URL:                 s.GetUrl(),
-			MajorAPIVersion:     s.GetMajorApiVersion(),
-			ValidityPeriodStart: s.GetValidFor().GetStart().AsTime(),
-			ValidityPeriodEnd:   s.GetValidFor().GetEnd().AsTime(),
-		})
+		services = append(services, NewService(s))
 	}
 	return services
 }
@@ -247,14 +249,7 @@ func (sc *SigningConfig) TimestampAuthorityURLsConfig() ServiceConfiguration {
 func (sc *SigningConfig) WithFulcioCertificateAuthorityURLs(fulcioURLs ...Service) *SigningConfig {
 	var services []*prototrustroot.Service
 	for _, u := range fulcioURLs {
-		services = append(services, &prototrustroot.Service{
-			Url:             u.URL,
-			MajorApiVersion: u.MajorAPIVersion,
-			ValidFor: &v1.TimeRange{
-				Start: timestamppb.New(u.ValidityPeriodStart),
-				End:   timestamppb.New(u.ValidityPeriodEnd),
-			},
-		})
+		services = append(services, u.ToServiceProtobuf())
 	}
 	sc.signingConfig.CaUrls = services
 	return sc

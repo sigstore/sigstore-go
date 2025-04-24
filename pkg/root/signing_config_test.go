@@ -761,6 +761,26 @@ func TestSigningConfig_TimestampAuthorityURLs(t *testing.T) {
 			},
 		},
 		{
+			name: "valid, unset end date",
+			signingConfig: &prototrustroot.SigningConfig{
+				TsaUrls: []*prototrustroot.Service{
+					{
+						Url:             "https://timestamp.sigstore.dev",
+						MajorApiVersion: 1,
+						ValidFor:        &v1.TimeRange{Start: timestamppb.New(now), End: nil},
+					},
+				},
+			},
+			want: []Service{
+				{
+					URL:                 "https://timestamp.sigstore.dev",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: now,
+					ValidityPeriodEnd:   time.Time{},
+				},
+			},
+		},
+		{
 			name: "empty",
 			signingConfig: &prototrustroot.SigningConfig{
 				TsaUrls: []*prototrustroot.Service{},
