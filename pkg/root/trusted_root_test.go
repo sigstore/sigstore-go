@@ -206,3 +206,17 @@ func TestFromJSONToJSON(t *testing.T) {
 
 	assert.JSONEq(t, trJSONTrimmedTime, string(jsonBytes))
 }
+
+func TestValidityPeriods(t *testing.T) {
+	trustedrootJSON, err := os.ReadFile("../../examples/trusted-root-public-good.json")
+	assert.NoError(t, err)
+
+	trustedRoot, err := NewTrustedRootFromJSON(trustedrootJSON)
+	assert.NoError(t, err)
+
+	// confirm that ValidityPeriodEnd.IsZero() is true for services without end validity date
+	assert.True(t, trustedRoot.ctLogs["dd3d306ac6c7113263191e1c99673702a24a5eb8de3cadff878a72802f29ee8e"].ValidityPeriodEnd.IsZero())
+	assert.True(t, trustedRoot.certificateAuthorities[1].(*FulcioCertificateAuthority).ValidityPeriodEnd.IsZero())
+	assert.True(t, trustedRoot.rekorLogs["c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"].ValidityPeriodEnd.IsZero())
+	assert.True(t, trustedRoot.timestampingAuthorities[0].(*SigstoreTimestampingAuthority).ValidityPeriodEnd.IsZero())
+}
