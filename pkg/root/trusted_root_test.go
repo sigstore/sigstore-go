@@ -73,6 +73,30 @@ func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
 	return true
 }
 
+func TestNewTrustedRoot(t *testing.T) {
+	trustedrootJSON, err := os.ReadFile("../../examples/trusted-root-public-good.json")
+	assert.NoError(t, err)
+
+	tr, err := NewTrustedRootFromJSON(trustedrootJSON)
+	assert.NoError(t, err)
+
+	tr2, err := NewTrustedRoot(
+		TrustedRootMediaType01,
+		tr.certificateAuthorities,
+		tr.ctLogs,
+		tr.timestampingAuthorities,
+		tr.rekorLogs,
+	)
+	assert.NoError(t, err)
+	// tr and tr2 are not "fully" equal because of the trustedRoot field
+	assert.Equal(t, tr.trustedRoot.MediaType, TrustedRootMediaType01)
+	assert.Equal(t, tr.BaseTrustedMaterial, tr2.BaseTrustedMaterial)
+	assert.Equal(t, tr.certificateAuthorities, tr2.certificateAuthorities)
+	assert.Equal(t, tr.ctLogs, tr2.ctLogs)
+	assert.Equal(t, tr.timestampingAuthorities, tr2.timestampingAuthorities)
+	assert.Equal(t, tr.rekorLogs, tr2.rekorLogs)
+}
+
 func TestTrustedMaterialCollectionECDSA(t *testing.T) {
 	trustedrootJSON, err := os.ReadFile("../../examples/trusted-root-public-good.json")
 	assert.NoError(t, err)
