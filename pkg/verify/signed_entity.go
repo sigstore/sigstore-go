@@ -815,15 +815,12 @@ func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, log
 
 	if v.config.requireObserverTimestamps {
 		verifiedSignedTimestamps, err := VerifyTimestampAuthority(entity, v.trustedMaterial)
-		if err != nil {
-			return nil, err
-		}
 
 		// check threshold for both RFC3161 and log timestamps
 		tsCount := len(verifiedSignedTimestamps) + len(logTimestamps)
 		if tsCount < v.config.observerTimestampThreshold {
-			return nil, fmt.Errorf("threshold not met for verified signed & log entry integrated timestamps: %d < %d",
-				tsCount, v.config.observerTimestampThreshold)
+			return nil, fmt.Errorf("threshold not met for verified signed & log entry integrated timestamps: %d < %d; error: %w",
+				tsCount, v.config.observerTimestampThreshold, err)
 		}
 
 		// append all timestamps

@@ -67,10 +67,13 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
 
-	if len(verifiedTimestamps) == 0 && len(errs) > 0 {
-		return nil, fmt.Errorf("no verified signed timestamps: %w", errors.Join(errs...))
+	// Return errors if there are any, even if there are verified timestamps.
+	// This allows the caller to handle errors if the threshold is not met.
+	err = nil
+	if len(errs) > 0 {
+		err = fmt.Errorf("verifying timestamps: %w", errors.Join(errs...))
 	}
-	return verifiedTimestamps, nil
+	return verifiedTimestamps, err
 }
 
 // VerifyTimestampAuthority verifies that the given entity has been timestamped
@@ -80,11 +83,8 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 // verified.
 func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) { //nolint:revive
 	verifiedTimestamps, err := VerifyTimestampAuthority(entity, trustedMaterial)
-	if err != nil {
-		return nil, err
-	}
 	if len(verifiedTimestamps) < threshold {
-		return nil, fmt.Errorf("threshold not met for verified signed timestamps: %d < %d", len(verifiedTimestamps), threshold)
+		return nil, fmt.Errorf("threshold not met for verified signed timestamps: %d < %d; error: %w", len(verifiedTimestamps), threshold, err)
 	}
 	return verifiedTimestamps, nil
 }

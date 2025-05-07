@@ -15,6 +15,7 @@
 package verify_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -67,10 +68,11 @@ func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, ts, 1)
 
-	// no failure, but also no verified timestamps
+	// wrong instance; expect no verified timestamps
 	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2)
-	assert.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, ts)
+	assert.ErrorContains(t, errors.Unwrap(err), "ECDSA verification failure")
 }
 
 type oneTrustedOneUntrustedTimestampEntity struct {
