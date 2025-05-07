@@ -150,7 +150,10 @@ func (c *Client) Refresh() error {
 	if err != nil {
 		return fmt.Errorf("tuf refresh failed: %w", err)
 	}
-
+	// If cache is disabled, we don't need to persist the last timestamp
+	if c.cfg.DisableLocalCache {
+		return nil
+	}
 	// Update config with last update
 	cfg, err := LoadConfig(c.configPath())
 	if err != nil {
