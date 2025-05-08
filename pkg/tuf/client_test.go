@@ -296,7 +296,7 @@ func (r *repo) SetTargets(name string, meta *metadata.Metadata[metadata.TargetsT
 }
 
 // New creates an empty repository instance
-func NewRepo() repo {
+func newRepo() repo {
 	return repo{
 		targets: map[string]*metadata.Metadata[metadata.TargetsType]{},
 	}
@@ -318,7 +318,7 @@ func newTestRepo(t *testing.T) *testRepo {
 	var err error
 	r := &testRepo{
 		keys:  make(map[string]ed25519.PrivateKey),
-		roles: NewRepo(),
+		roles: newRepo(),
 		t:     t,
 	}
 	tomorrow := time.Now().AddDate(0, 0, 1).UTC()
