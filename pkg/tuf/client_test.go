@@ -30,7 +30,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
-	"github.com/theupdateframework/go-tuf/v2/examples/repository"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -249,15 +248,58 @@ func TestExpiredTimestamp(t *testing.T) {
 // repo represents repositoryType from
 // github.com/theupdateframework/go-tuf/v2/examples/repository, which is
 // unexported.
-type repo interface {
-	Root() *metadata.Metadata[metadata.RootType]
-	SetRoot(meta *metadata.Metadata[metadata.RootType])
-	Snapshot() *metadata.Metadata[metadata.SnapshotType]
-	SetSnapshot(meta *metadata.Metadata[metadata.SnapshotType])
-	Timestamp() *metadata.Metadata[metadata.TimestampType]
-	SetTimestamp(meta *metadata.Metadata[metadata.TimestampType])
-	Targets(name string) *metadata.Metadata[metadata.TargetsType]
-	SetTargets(name string, meta *metadata.Metadata[metadata.TargetsType])
+type repo struct {
+	root      *metadata.Metadata[metadata.RootType]
+	snapshot  *metadata.Metadata[metadata.SnapshotType]
+	timestamp *metadata.Metadata[metadata.TimestampType]
+	targets   map[string]*metadata.Metadata[metadata.TargetsType]
+}
+
+// Root returns metadata of type Root
+func (r *repo) Root() *metadata.Metadata[metadata.RootType] {
+	return r.root
+}
+
+// SetRoot sets metadata of type Root
+func (r *repo) SetRoot(meta *metadata.Metadata[metadata.RootType]) {
+	r.root = meta
+}
+
+// Snapshot returns metadata of type Snapshot
+func (r *repo) Snapshot() *metadata.Metadata[metadata.SnapshotType] {
+	return r.snapshot
+}
+
+// SetSnapshot sets metadata of type Snapshot
+func (r *repo) SetSnapshot(meta *metadata.Metadata[metadata.SnapshotType]) {
+	r.snapshot = meta
+}
+
+// Timestamp returns metadata of type Timestamp
+func (r *repo) Timestamp() *metadata.Metadata[metadata.TimestampType] {
+	return r.timestamp
+}
+
+// SetTimestamp sets metadata of type Timestamp
+func (r *repo) SetTimestamp(meta *metadata.Metadata[metadata.TimestampType]) {
+	r.timestamp = meta
+}
+
+// Targets returns metadata of type Targets
+func (r *repo) Targets(name string) *metadata.Metadata[metadata.TargetsType] {
+	return r.targets[name]
+}
+
+// SetTargets sets metadata of type Targets
+func (r *repo) SetTargets(name string, meta *metadata.Metadata[metadata.TargetsType]) {
+	r.targets[name] = meta
+}
+
+// New creates an empty repository instance
+func NewRepo() repo {
+	return repo{
+		targets: map[string]*metadata.Metadata[metadata.TargetsType]{},
+	}
 }
 
 // testRepo is a basic implementation of a TUF repository for testing purposes.
@@ -276,7 +318,7 @@ func newTestRepo(t *testing.T) *testRepo {
 	var err error
 	r := &testRepo{
 		keys:  make(map[string]ed25519.PrivateKey),
-		roles: repository.New(),
+		roles: NewRepo(),
 		t:     t,
 	}
 	tomorrow := time.Now().AddDate(0, 0, 1).UTC()
