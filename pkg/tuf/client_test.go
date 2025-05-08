@@ -246,7 +246,7 @@ func TestExpiredTimestamp(t *testing.T) {
 }
 
 // repo represents repositoryType from
-// github.com/theupdateframework/go-tuf/v2/examples/repository, which is
+// github.com/theupdateframework/go-tuf/examples/repository, which is
 // unexported.
 type repo struct {
 	root      *metadata.Metadata[metadata.RootType]
