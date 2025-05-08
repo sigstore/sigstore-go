@@ -109,10 +109,10 @@ func NewVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierOption
 
 // TODO: Remove the following deprecated functions in a future release before sigstore-go 2.0.
 
-// deprecated: Use Verifier instead
+// Deprecated: Use Verifier instead
 type SignedEntityVerifier = Verifier
 
-// deprecated: Use NewVerifier instead
+// Deprecated: Use NewVerifier instead
 func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierOption) (*Verifier, error) {
 	return NewVerifier(trustedMaterial, options...)
 }
