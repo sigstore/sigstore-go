@@ -139,7 +139,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	}
 
 	if opts.TrustedRoot != nil && len(verifierOptions) > 0 {
-		sev, err := verify.NewSignedEntityVerifier(opts.TrustedRoot, verifierOptions...)
+		sev, err := verify.NewVerifier(opts.TrustedRoot, verifierOptions...)
 		if err != nil {
 			return nil, err
 		}

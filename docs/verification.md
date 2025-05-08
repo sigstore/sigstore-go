@@ -36,11 +36,11 @@ This library includes a few abstractions to support different use cases, testing
 
 ## Verifier
 
-The main entrypoint for verification is called `SignedEntityVerifier`, which takes a `TrustedMaterial` and a set of `VerifierOption`s to configure the verification process. A `SignedEntityVerifier` has a single method, `Verify`, which accepts a `SignedEntity` (generally, a Sigstore bundle) and a `Policy` and returns a `VerificationResult`.
+The main entrypoint for verification is called `Verifier`, which takes a `TrustedMaterial` and a set of `VerifierOption`s to configure the verification process. A `Verifier` has a single method, `Verify`, which accepts a `SignedEntity` (generally, a Sigstore bundle) and a `Policy` and returns a `VerificationResult`.
 
 As you can see, there are two places you can provide configuration for the verifier:
 
-- `NewSignedEntityVerifier` - "global options", such as the trusted material, and options for verifying the bundle's signatures, such as thresholds and whether to perform online verification, whether to check for SCTs, etc.
+- `NewVerifier` - "global options", such as the trusted material, and options for verifying the bundle's signatures, such as thresholds and whether to perform online verification, whether to check for SCTs, etc.
 - `Verify` - the bundle to be verified, and options for verifying the bundle's contents, such as asserting a specific subject digest or certificate issuer or SAN
 
 This is compatible with batch workflows where a single verifier is used to verify many bundles, and the bundles themselves may be verified against different identities/artifacts.
@@ -72,7 +72,7 @@ Going through this step-by-step, we'll start by loading the trusted root from th
 Next, we'll create a verifier with some options, which will enable SCT verification, ensure a single transparency log entry, and perform online verification:
 
 ```go
-	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	sev, err := verify.NewVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		panic(err)
 	}
@@ -202,7 +202,7 @@ func main() {
 		panic(err)
 	}
 
-	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	sev, err := verify.NewVerifier(trustedMaterial, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		panic(err)
 	}
@@ -308,7 +308,7 @@ func main() {
 		}),
 	}
 
-	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	sev, err := verify.NewVerifier(trustedMaterial, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		panic(err)
 	}
