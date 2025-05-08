@@ -112,8 +112,8 @@ func TestDuplicateTimestamps(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(&dupTimestampEntity{entity}, virtualSigstore, 1)
-	assert.ErrorContains(t, err, "duplicate timestamps found")
+	_, err = verify.VerifyTimestampAuthority(&dupTimestampEntity{entity}, virtualSigstore)
+	assert.ErrorContains(t, err, "duplicate timestamps from the same authority, ignoring https://virtual.tsa.sigstore.dev")
 }
 
 type badTSASignatureEntity struct {

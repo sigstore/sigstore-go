@@ -15,7 +15,6 @@
 package verify
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -36,16 +35,6 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 	if len(signedTimestamps) > maxAllowedTimestamps {
 		return nil, fmt.Errorf("too many signed timestamps: %d > %d", len(signedTimestamps), maxAllowedTimestamps)
 	}
-
-	// disallow duplicate timestamps, as a malicious actor could use duplicates to bypass the threshold
-	for i := 0; i < len(signedTimestamps); i++ {
-		for j := i + 1; j < len(signedTimestamps); j++ {
-			if bytes.Equal(signedTimestamps[i], signedTimestamps[j]) {
-				return nil, errors.New("duplicate timestamps found")
-			}
-		}
-	}
-
 	sigContent, err := entity.SignatureContent()
 	if err != nil {
 		return nil, err
@@ -56,16 +45,32 @@ func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedM
 	verifiedTimestamps := []*root.Timestamp{}
 	for _, timestamp := range signedTimestamps {
 		verifiedSignedTimestamp, err := verifySignedTimestamp(timestamp, signatureBytes, trustedMaterial)
-
-		// Timestamps from unknown source are okay, but don't count as verified
 		if err != nil {
 			continue
+		}
+		if isDuplicateTSA(verifiedTimestamps, verifiedSignedTimestamp) {
+			// TODO: add below error to `errs` when #325 is merged, and continue
+			// (https://github.com/sigstore/sigstore-go/issues/325)
+			return verifiedTimestamps, fmt.Errorf("duplicate timestamps from the same authority, ignoring %s", verifiedSignedTimestamp.URI)
 		}
 
 		verifiedTimestamps = append(verifiedTimestamps, verifiedSignedTimestamp)
 	}
 
 	return verifiedTimestamps, nil
+}
+
+// isDuplicateTSA checks if the given verified signed timestamp is a duplicate
+// of any of the verified timestamps.
+// This is used to prevent replay attacks and ensure a single compromised TSA
+// cannot meet the threshold.
+func isDuplicateTSA(verifiedTimestamps []*root.Timestamp, verifiedSignedTimestamp *root.Timestamp) bool {
+	for _, ts := range verifiedTimestamps {
+		if ts.URI == verifiedSignedTimestamp.URI {
+			return true
+		}
+	}
+	return false
 }
 
 // VerifyTimestampAuthority verifies that the given entity has been timestamped

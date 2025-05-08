@@ -69,7 +69,10 @@ type VirtualSigstore struct {
 }
 
 func NewVirtualSigstoreWithSigningAlg(signingKeyDetails v1.PublicKeyDetails) (*VirtualSigstore, error) {
-	ss := &VirtualSigstore{fulcioCA: &root.FulcioCertificateAuthority{}, tsaCA: &root.SigstoreTimestampingAuthority{}}
+	ss := &VirtualSigstore{
+		fulcioCA: &root.FulcioCertificateAuthority{URI: "https://virtual.fulcio.sigstore.dev"},
+		tsaCA:    &root.SigstoreTimestampingAuthority{URI: "https://virtual.tsa.sigstore.dev"},
+	}
 
 	rootCert, rootKey, err := GenerateRootCa()
 	if err != nil {
