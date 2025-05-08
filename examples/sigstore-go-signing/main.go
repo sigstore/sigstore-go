@@ -104,13 +104,13 @@ func main() {
 		}
 	} else if signingconfigPath == "" {
 		// Get staging trusted_root.json by default
-		fetcher := fetcher.DefaultFetcher{}
+		fetcher := fetcher.NewDefaultFetcher()
 		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
 
 		tufOptions := &tuf.Options{
 			Root:              tuf.StagingRoot(),
 			RepositoryBaseURL: tuf.StagingMirror,
-			Fetcher:           &fetcher,
+			Fetcher:           fetcher,
 		}
 		tufClient, err := tuf.New(tufOptions)
 		if err != nil {

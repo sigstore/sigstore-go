@@ -60,9 +60,9 @@ func New(opts *Options) (*Client, error) {
 	if opts.Fetcher != nil {
 		c.cfg.Fetcher = opts.Fetcher
 	} else {
-		fetcher := fetcher.DefaultFetcher{}
+		fetcher := fetcher.NewDefaultFetcher()
 		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
-		c.cfg.Fetcher = &fetcher
+		c.cfg.Fetcher = fetcher
 	}
 
 	// Upon client creation, we may not perform a full TUF update,
