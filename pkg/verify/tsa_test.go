@@ -63,14 +63,17 @@ func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
 	var ts []*root.Timestamp
 
 	// expect one verified timestamp
-	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore)
+	ts, verificationErrors, err := verify.VerifyTimestampAuthority(entity, virtualSigstore)
 	assert.NoError(t, err)
+	assert.Empty(t, verificationErrors)
 	assert.Len(t, ts, 1)
 
-	// no failure, but also no verified timestamps
-	ts, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2)
+	// wrong instance; expect no verified timestamps
+	ts, verificationErrors, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2)
 	assert.NoError(t, err)
 	assert.Empty(t, ts)
+	assert.Len(t, verificationErrors, 1)
+	assert.ErrorContains(t, verificationErrors[0], "ECDSA verification failure")
 }
 
 type oneTrustedOneUntrustedTimestampEntity struct {
@@ -112,8 +115,10 @@ func TestDuplicateTimestamps(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthority(&dupTimestampEntity{entity}, virtualSigstore)
-	assert.ErrorContains(t, err, "duplicate timestamps from the same authority, ignoring https://virtual.tsa.sigstore.dev")
+	timestamps, verificationErrors, err := verify.VerifyTimestampAuthority(&dupTimestampEntity{entity}, virtualSigstore)
+	assert.ErrorContains(t, verificationErrors[0], "duplicate timestamps from the same authority, ignoring https://virtual.tsa.sigstore.dev")
+	assert.NoError(t, err)
+	assert.Len(t, timestamps, 1)
 }
 
 type badTSASignatureEntity struct {
