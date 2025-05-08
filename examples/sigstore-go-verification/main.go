@@ -128,9 +128,9 @@ func run() error {
 	if *tufRootURL != "" {
 		opts := tuf.DefaultOptions()
 		opts.RepositoryBaseURL = *tufRootURL
-		fetcher := fetcher.DefaultFetcher{}
+		fetcher := fetcher.NewDefaultFetcher()
 		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
-		opts.Fetcher = &fetcher
+		opts.Fetcher = fetcher
 
 		// Load the tuf root.json if provided, if not use public good
 		if *tufTrustedRoot != "" {

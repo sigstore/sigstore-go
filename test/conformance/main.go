@@ -55,9 +55,9 @@ func getTrustedRoot(staging bool) root.TrustedMaterial {
 		trustedRootJSON, err = os.ReadFile(*trustedRootPath)
 	} else {
 		opts := tuf.DefaultOptions()
-		fetcher := fetcher.DefaultFetcher{}
+		fetcher := fetcher.NewDefaultFetcher()
 		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
-		opts.Fetcher = &fetcher
+		opts.Fetcher = fetcher
 
 		if staging {
 			opts.Root = tuf.StagingRoot()

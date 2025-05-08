@@ -19,7 +19,7 @@ require (
 	github.com/sigstore/sigstore v1.9.4
 	github.com/sigstore/timestamp-authority v1.2.6
 	github.com/stretchr/testify v1.10.0
-	github.com/theupdateframework/go-tuf/v2 v2.0.2
+	github.com/theupdateframework/go-tuf/v2 v2.1.0
 	golang.org/x/crypto v0.37.0
 	golang.org/x/mod v0.24.0
 	google.golang.org/protobuf v1.36.6
@@ -29,6 +29,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
+	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/coreos/go-oidc/v3 v3.14.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20230818184609-3a137a874352 // indirect
