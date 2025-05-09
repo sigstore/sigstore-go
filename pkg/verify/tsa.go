@@ -23,9 +23,9 @@ import (
 
 const maxAllowedTimestamps = 32
 
-// VerifyTimestampAuthority verifies that the given entity has been timestamped
+// VerifySignedTimestamp verifies that the given entity has been timestamped
 // by a trusted timestamp authority and that the timestamp is valid.
-func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]*root.Timestamp, []error, error) { //nolint:revive
+func VerifySignedTimestamp(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]*root.Timestamp, []error, error) { //nolint:revive
 	signedTimestamps, err := entity.Timestamps()
 	if err != nil {
 		return nil, nil, err
@@ -74,13 +74,13 @@ func isDuplicateTSA(verifiedTimestamps []*root.Timestamp, verifiedSignedTimestam
 	return false
 }
 
-// VerifyTimestampAuthority verifies that the given entity has been timestamped
+// VerifySignedTimestamp verifies that the given entity has been timestamped
 // by a trusted timestamp authority and that the timestamp is valid.
 //
 // The threshold parameter is the number of unique timestamps that must be
 // verified.
-func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) { //nolint:revive
-	verifiedTimestamps, verificationErrors, err := VerifyTimestampAuthority(entity, trustedMaterial)
+func VerifySignedTimestampWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) { //nolint:revive
+	verifiedTimestamps, verificationErrors, err := VerifySignedTimestamp(entity, trustedMaterial)
 	if err != nil {
 		return nil, err
 	}
@@ -105,4 +105,16 @@ func verifySignedTimestamp(signedTimestamp []byte, signatureBytes []byte, truste
 	}
 
 	return nil, fmt.Errorf("unable to verify signed timestamps: %w", errors.Join(errs...))
+}
+
+// TODO: remove below deprecated functions before 2.0
+
+// Deprecated: use VerifySignedTimestamp instead.
+func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]*root.Timestamp, []error, error) { //nolint:revive
+	return VerifySignedTimestamp(entity, trustedMaterial)
+}
+
+// Deprecated: use VerifySignedTimestampWithThreshold instead.
+func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) { //nolint:revive
+	return VerifySignedTimestampWithThreshold(entity, trustedMaterial, threshold)
 }

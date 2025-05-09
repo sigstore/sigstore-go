@@ -30,10 +30,10 @@ import (
 var FuzzSkipArtifactAndIdentitiesPolicy = verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe())
 
 /*
-Tests VerifyTimestampAuthority with an entity that contains
+Tests VerifySignedTimestamp with an entity that contains
 a randomized email and statement
 */
-func FuzzVerifyTimestampAuthorityWithoutThreshold(f *testing.F) {
+func FuzzVerifySignedTimestampWithoutThreshold(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string, statement []byte) {
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
@@ -46,16 +46,16 @@ func FuzzVerifyTimestampAuthorityWithoutThreshold(f *testing.F) {
 			t.Skip()
 		}
 		//nolint:errcheck
-		verify.VerifyTimestampAuthority(entity, virtualSigstore)
+		verify.VerifySignedTimestamp(entity, virtualSigstore)
 	})
 }
 
 /*
-Tests VerifyTimestampAuthorityWithThreshold with an entity
+Tests VerifySignedTimestampWithThreshold with an entity
 that contains a randomized email, statement and a randomized
 threshold
 */
-func FuzzVerifyTimestampAuthorityWithThreshold(f *testing.F) {
+func FuzzVerifySignedTimestampWithThreshold(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string,
 		statement []byte,
 		threshold int) {
@@ -70,18 +70,18 @@ func FuzzVerifyTimestampAuthorityWithThreshold(f *testing.F) {
 			t.Skip()
 		}
 		//nolint:errcheck
-		verify.VerifyTimestampAuthorityWithThreshold(entity,
+		verify.VerifySignedTimestampWithThreshold(entity,
 			virtualSigstore,
 			threshold)
 	})
 }
 
 /*
-Tests VerifyArtifactTransparencyLog with an entity
+Tests VerifyTlogEntry with an entity
 that contains a randomized email and statement and
 a randomized log threshold and integrated time
 */
-func FuzzVerifyArtifactTransparencyLog(f *testing.F) {
+func FuzzVerifyTlogEntry(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string,
 		statement []byte,
 		logThreshold int,
@@ -97,7 +97,7 @@ func FuzzVerifyArtifactTransparencyLog(f *testing.F) {
 			t.Skip()
 		}
 		//nolint:errcheck
-		verify.VerifyArtifactTransparencyLog(entity,
+		verify.VerifyTlogEntry(entity,
 			virtualSigstore,
 			logThreshold,
 			trustIntegratedTime)

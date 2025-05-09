@@ -780,7 +780,7 @@ func (v *Verifier) VerifyTransparencyLogInclusion(entity SignedEntity) ([]Timest
 
 	if v.config.requireTlogEntries {
 		// log timestamps should be verified if with WithIntegratedTimestamps or WithObserverTimestamps is used
-		verifiedTlogTimestamps, err := VerifyArtifactTransparencyLog(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
+		verifiedTlogTimestamps, err := VerifyTlogEntry(entity, v.trustedMaterial, v.config.tlogEntriesThreshold,
 			v.config.requireIntegratedTimestamps || v.config.requireObserverTimestamps)
 		if err != nil {
 			return nil, err
@@ -807,7 +807,7 @@ func (v *Verifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps [
 	// From spec:
 	// > … if verification or timestamp parsing fails, the Verifier MUST abort
 	if v.config.requireSignedTimestamps {
-		verifiedSignedTimestamps, err := VerifyTimestampAuthorityWithThreshold(entity, v.trustedMaterial, v.config.signedTimestampThreshold)
+		verifiedSignedTimestamps, err := VerifySignedTimestampWithThreshold(entity, v.trustedMaterial, v.config.signedTimestampThreshold)
 		if err != nil {
 			return nil, err
 		}
@@ -824,7 +824,7 @@ func (v *Verifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps [
 	}
 
 	if v.config.requireObserverTimestamps {
-		verifiedSignedTimestamps, verificationErrors, err := VerifyTimestampAuthority(entity, v.trustedMaterial)
+		verifiedSignedTimestamps, verificationErrors, err := VerifySignedTimestamp(entity, v.trustedMaterial)
 		if err != nil {
 			return nil, fmt.Errorf("failed to verify signed timestamps: %w", err)
 		}
