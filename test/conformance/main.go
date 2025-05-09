@@ -247,7 +247,7 @@ func main() {
 			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
 		}
 
-		sev, err := verify.NewSignedEntityVerifier(tr, verifierConfig...)
+		sev, err := verify.NewVerifier(tr, verifierConfig...)
 		if err != nil {
 			log.Fatal(err)
 		}

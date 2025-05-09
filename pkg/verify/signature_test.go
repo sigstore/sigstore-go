@@ -77,7 +77,7 @@ func TestEnvelopeSubject(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
+	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
 	_, err = verifier.Verify(entity, SkipArtifactAndIdentitiesPolicy)
@@ -106,7 +106,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	entity, err := virtualSigstore.Sign("foo@example.com", "issuer", []byte(artifact))
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
 	result, err := verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
@@ -142,7 +142,7 @@ func TestTooManySubjects(t *testing.T) {
 	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
 	artifact := "Hi, I am an artifact!" //nolint:goconst
@@ -172,7 +172,7 @@ func TestTooManyDigests(t *testing.T) {
 	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
 	artifact := "Hi, I am an artifact!" //nolint:goconst
@@ -230,7 +230,7 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
+	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 	assert.NoError(t, err)
 
 	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts(artifacts), verify.WithoutIdentitiesUnsafe()))
@@ -332,7 +332,7 @@ func TestCompatibilityAlgorithms(t *testing.T) {
 			entity, err := virtualSigstore.SignWithVersion("foo@example.com", "issuer", []byte(artifact), tt.version)
 			assert.NoError(t, err)
 
-			verifier, err := verify.NewSignedEntityVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
+			verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithSignedTimestamps(1))
 			assert.NoError(t, err)
 
 			// Test with full artifact

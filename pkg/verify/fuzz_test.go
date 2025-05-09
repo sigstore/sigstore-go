@@ -108,7 +108,7 @@ func FuzzVerifyArtifactTransparencyLog(f *testing.F) {
 Tests Verify with an entity that contains a randomized
 email and statement and a randomized root
 */
-func FuzzSignedEntityVerifier(f *testing.F) {
+func FuzzVerifier(f *testing.F) {
 	f.Fuzz(func(t *testing.T, trustedrootJSON,
 		bundleBytes []byte) {
 		trustedRoot, err := root.NewTrustedRootFromJSON(trustedrootJSON)
@@ -124,7 +124,7 @@ func FuzzSignedEntityVerifier(f *testing.F) {
 		if err != nil {
 			t.Skip()
 		}
-		v, err := verify.NewSignedEntityVerifier(trustedRoot,
+		v, err := verify.NewVerifier(trustedRoot,
 			verify.WithTransparencyLog(1),
 			verify.WithObserverTimestamps(1))
 		if err != nil {

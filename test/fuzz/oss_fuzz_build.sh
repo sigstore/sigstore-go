@@ -21,12 +21,12 @@ mkdir pkg/verify/fuzz && mv pkg/verify/fuzz_test.go pkg/verify/fuzz/
 compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifyTimestampAuthorityWithoutThreshold FuzzVerifyTimestampAuthorityWithoutThreshold
 compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifyTimestampAuthorityWithThreshold FuzzVerifyTimestampAuthorityWithThreshold
 compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifyArtifactTransparencyLog FuzzVerifyArtifactTransparencyLog
-compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzSignedEntityVerifier FuzzSignedEntityVerifier
+compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifier FuzzVerifier
 compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifySignatureWithoutArtifactOrDigest FuzzVerifySignatureWithoutArtifactOrDigest
 compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifySignatureWithArtifactWithoutDigest FuzzVerifySignatureWithArtifactWithoutDigest
 compile_native_go_fuzzer github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifySignatureWithArtifactDigest FuzzVerifySignatureWithArtifactDigest
 
-zip -j $OUT/FuzzSignedEntityVerifier_seed_corpus.zip examples/trusted-root-public-good.json
+zip -j $OUT/FuzzVerifier_seed_corpus.zip examples/trusted-root-public-good.json
 
 for fuzzer in FuzzVerifyTimestampAuthorityWithoutThreshold FuzzVerifyTimestampAuthorityWithThreshold FuzzVerifyArtifactTransparencyLog FuzzVerifySignatureWithoutArtifactOrDigest FuzzVerifySignatureWithArtifactWithoutDigest FuzzVerifySignatureWithArtifactDigest; do
   cp test/fuzz/dictionaries/intoto_json.dict $OUT/$fuzzer.dict

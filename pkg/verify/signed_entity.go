@@ -34,7 +34,7 @@ const (
 	VerificationResultMediaType01 = "application/vnd.dev.sigstore.verificationresult+json;version=0.1"
 )
 
-type SignedEntityVerifier struct {
+type Verifier struct {
 	trustedMaterial root.TrustedMaterial
 	config          VerifierConfig
 }
@@ -75,7 +75,7 @@ type VerifierConfig struct { // nolint: revive
 
 type VerifierOption func(*VerifierConfig) error
 
-// NewSignedEntityVerifier creates a new SignedEntityVerifier. It takes a
+// NewVerifier creates a new Verifier. It takes a
 // root.TrustedMaterial, which contains a set of trusted public keys and
 // certificates, and a set of VerifierConfigurators, which set the config
 // that determines the behaviour of the Verify function.
@@ -83,7 +83,7 @@ type VerifierOption func(*VerifierConfig) error
 // VerifierConfig's set of options should match the properties of a given
 // Sigstore deployment, i.e. whether to expect SCTs, Tlog entries, or signed
 // timestamps.
-func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierOption) (*SignedEntityVerifier, error) {
+func NewVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierOption) (*Verifier, error) {
 	var err error
 	c := VerifierConfig{}
 
@@ -99,7 +99,7 @@ func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...Ve
 		return nil, err
 	}
 
-	v := &SignedEntityVerifier{
+	v := &Verifier{
 		trustedMaterial: trustedMaterial,
 		config:          c,
 	}
@@ -107,7 +107,17 @@ func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...Ve
 	return v, nil
 }
 
-// WithSignedTimestamps configures the SignedEntityVerifier to expect RFC 3161
+// TODO: Remove the following deprecated functions in a future release before sigstore-go 2.0.
+
+// Deprecated: Use Verifier instead
+type SignedEntityVerifier = Verifier
+
+// Deprecated: Use NewVerifier instead
+func NewSignedEntityVerifier(trustedMaterial root.TrustedMaterial, options ...VerifierOption) (*Verifier, error) {
+	return NewVerifier(trustedMaterial, options...)
+}
+
+// WithSignedTimestamps configures the Verifier to expect RFC 3161
 // timestamps from a Timestamp Authority, verify them using the TrustedMaterial's
 // TimestampingAuthorities(), and, if it exists, use the resulting timestamp(s)
 // to verify the Fulcio certificate.
@@ -122,7 +132,7 @@ func WithSignedTimestamps(threshold int) VerifierOption {
 	}
 }
 
-// WithObserverTimestamps configures the SignedEntityVerifier to expect
+// WithObserverTimestamps configures the Verifier to expect
 // timestamps from either an RFC3161 timestamp authority or a log's
 // SignedEntryTimestamp. These are verified using the TrustedMaterial's
 // TimestampingAuthorities() or RekorLogs(), and used to verify
@@ -138,7 +148,7 @@ func WithObserverTimestamps(threshold int) VerifierOption {
 	}
 }
 
-// WithTransparencyLog configures the SignedEntityVerifier to expect
+// WithTransparencyLog configures the Verifier to expect
 // Transparency Log inclusion proofs or SignedEntryTimestamps, verifying them
 // using the TrustedMaterial's RekorLogs().
 func WithTransparencyLog(threshold int) VerifierOption {
@@ -152,7 +162,7 @@ func WithTransparencyLog(threshold int) VerifierOption {
 	}
 }
 
-// WithIntegratedTimestamps configures the SignedEntityVerifier to
+// WithIntegratedTimestamps configures the Verifier to
 // expect log entry integrated timestamps from either SignedEntryTimestamps
 // or live log lookups.
 func WithIntegratedTimestamps(threshold int) VerifierOption {
@@ -163,7 +173,7 @@ func WithIntegratedTimestamps(threshold int) VerifierOption {
 	}
 }
 
-// WithSignedCertificateTimestamps configures the SignedEntityVerifier to
+// WithSignedCertificateTimestamps configures the Verifier to
 // expect the Fulcio certificate to have a SignedCertificateTimestamp, and
 // verify it using the TrustedMaterial's CTLogAuthorities().
 func WithSignedCertificateTimestamps(threshold int) VerifierOption {
@@ -177,7 +187,7 @@ func WithSignedCertificateTimestamps(threshold int) VerifierOption {
 	}
 }
 
-// WithCurrentTime configures the SignedEntityVerifier to not expect
+// WithCurrentTime configures the Verifier to not expect
 // any timestamps from either a Timestamp Authority or a Transparency Log.
 // This option should not be enabled when verifying short-lived certificates,
 // as an observer timestamp is needed. This option is useful primarily for
@@ -191,7 +201,7 @@ func WithCurrentTime() VerifierOption {
 
 func (c *VerifierConfig) Validate() error {
 	if !c.requireObserverTimestamps && !c.requireSignedTimestamps && !c.requireIntegratedTimestamps && !c.useCurrentTime {
-		return errors.New("when initializing a new SignedEntityVerifier, you must specify at least one of " +
+		return errors.New("when initializing a new Verifier, you must specify at least one of " +
 			"WithObserverTimestamps(), WithSignedTimestamps(), or WithIntegratedTimestamps()")
 	}
 
@@ -548,7 +558,7 @@ func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 }
 
 // Verify checks the cryptographic integrity of a given SignedEntity according
-// to the options configured in the NewSignedEntityVerifier. Its purpose is to
+// to the options configured in the NewVerifier. Its purpose is to
 // determine whether the SignedEntity was created by a Sigstore deployment we
 // trust, as defined by keys in our TrustedMaterial.
 //
@@ -567,7 +577,7 @@ func WithArtifactDigests(digests []ArtifactDigest) ArtifactPolicyOption {
 //     expected value
 //   - (if the signed entity has a dsse envelope) verify that the envelope's
 //     statement's subject matches the artifact being verified
-func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationResult, error) {
+func (v *Verifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationResult, error) {
 	policy, err := pb.BuildConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build policy: %w", err)
@@ -765,7 +775,7 @@ func (v *SignedEntityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*V
 // a list of verified timestamps from the log integrated timestamps when verifying
 // with observer timestamps.
 // TODO: Return a different verification result for logs specifically (also for #48)
-func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntity) ([]TimestampVerificationResult, error) {
+func (v *Verifier) VerifyTransparencyLogInclusion(entity SignedEntity) ([]TimestampVerificationResult, error) {
 	verifiedTimestamps := []TimestampVerificationResult{}
 
 	if v.config.requireTlogEntries {
@@ -791,7 +801,7 @@ func (v *SignedEntityVerifier) VerifyTransparencyLogInclusion(entity SignedEntit
 // logTimestamps may be populated with verified log entry integrated timestamps
 // In order to be verifiable, a SignedEntity must have at least one verified
 // "observer timestamp".
-func (v *SignedEntityVerifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps []TimestampVerificationResult) ([]TimestampVerificationResult, error) {
+func (v *Verifier) VerifyObserverTimestamps(entity SignedEntity, logTimestamps []TimestampVerificationResult) ([]TimestampVerificationResult, error) {
 	verifiedTimestamps := []TimestampVerificationResult{}
 
 	// From spec:

@@ -186,7 +186,7 @@ func run() error {
 		return errors.New("no trusted material provided")
 	}
 
-	sev, err := verify.NewSignedEntityVerifier(trustedMaterial, verifierConfig...)
+	sev, err := verify.NewVerifier(trustedMaterial, verifierConfig...)
 	if err != nil {
 		return err
 	}
