@@ -31,22 +31,22 @@ func TestTimestampAuthorityVerifier(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, virtualSigstore, 1)
+	_, err = verify.VerifySignedTimestampWithThreshold(entity, virtualSigstore, 1)
 	assert.NoError(t, err)
 
 	virtualSigstore2, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, virtualSigstore2, 1)
+	_, err = verify.VerifySignedTimestampWithThreshold(entity, virtualSigstore2, 1)
 	assert.Error(t, err) // different sigstore instance should fail to verify
 
 	untrustedEntity, err := virtualSigstore2.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 1)
+	_, err = verify.VerifySignedTimestampWithThreshold(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 1)
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 2)
+	_, err = verify.VerifySignedTimestampWithThreshold(&oneTrustedOneUntrustedTimestampEntity{entity, untrustedEntity}, virtualSigstore, 2)
 	assert.Error(t, err) // only 1 trusted should not meet threshold of 2
 }
 
@@ -63,13 +63,13 @@ func TestTimestampAuthorityVerifierWithoutThreshold(t *testing.T) {
 	var ts []*root.Timestamp
 
 	// expect one verified timestamp
-	ts, verificationErrors, err := verify.VerifyTimestampAuthority(entity, virtualSigstore)
+	ts, verificationErrors, err := verify.VerifySignedTimestamp(entity, virtualSigstore)
 	assert.NoError(t, err)
 	assert.Empty(t, verificationErrors)
 	assert.Len(t, ts, 1)
 
 	// wrong instance; expect no verified timestamps
-	ts, verificationErrors, err = verify.VerifyTimestampAuthority(entity, virtualSigstore2)
+	ts, verificationErrors, err = verify.VerifySignedTimestamp(entity, virtualSigstore2)
 	assert.NoError(t, err)
 	assert.Empty(t, ts)
 	assert.Len(t, verificationErrors, 1)
@@ -115,7 +115,7 @@ func TestDuplicateTimestamps(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	timestamps, verificationErrors, err := verify.VerifyTimestampAuthority(&dupTimestampEntity{entity}, virtualSigstore)
+	timestamps, verificationErrors, err := verify.VerifySignedTimestamp(&dupTimestampEntity{entity}, virtualSigstore)
 	assert.ErrorContains(t, verificationErrors[0], "duplicate timestamps from the same authority, ignoring https://virtual.tsa.sigstore.dev")
 	assert.NoError(t, err)
 	assert.Len(t, timestamps, 1)
@@ -136,7 +136,7 @@ func TestBadTSASignature(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(&badTSASignatureEntity{entity}, virtualSigstore, 1)
+	_, err = verify.VerifySignedTimestampWithThreshold(&badTSASignatureEntity{entity}, virtualSigstore, 1)
 	assert.Error(t, err)
 }
 
@@ -169,7 +169,7 @@ func TestBadTSACertificateChain(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.TimestampingAuthority{badChain}}, 1)
+	_, err = verify.VerifySignedTimestampWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.TimestampingAuthority{badChain}}, 1)
 	assert.Error(t, err)
 }
 
@@ -219,7 +219,7 @@ func TestBadTSACertificateChainOutsideValidityPeriod(t *testing.T) {
 			entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 			assert.NoError(t, err)
 
-			_, err = verify.VerifyTimestampAuthorityWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.TimestampingAuthority{test.ca}}, 1)
+			_, err = verify.VerifySignedTimestampWithThreshold(entity, &customTSAChainTrustedMaterial{VirtualSigstore: virtualSigstore, tsaChain: []root.TimestampingAuthority{test.ca}}, 1)
 			if test.err {
 				assert.Error(t, err)
 			} else {
@@ -253,6 +253,6 @@ func TestTooManyTimestamps(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", []byte("statement"))
 	assert.NoError(t, err)
 
-	_, err = verify.VerifyTimestampAuthorityWithThreshold(&tooManyTimestampsEntity{entity}, virtualSigstore, 1)
+	_, err = verify.VerifySignedTimestampWithThreshold(&tooManyTimestampsEntity{entity}, virtualSigstore, 1)
 	assert.ErrorContains(t, err, "too many signed timestamps")
 }
