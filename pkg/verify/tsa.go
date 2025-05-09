@@ -110,11 +110,11 @@ func verifySignedTimestamp(signedTimestamp []byte, signatureBytes []byte, truste
 // TODO: remove below deprecated functions before 2.0
 
 // Deprecated: use VerifySignedTimestamp instead.
-func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]*root.Timestamp, []error, error) {
+func VerifyTimestampAuthority(entity SignedEntity, trustedMaterial root.TrustedMaterial) ([]*root.Timestamp, []error, error) { //nolint:revive
 	return VerifySignedTimestamp(entity, trustedMaterial)
 }
 
 // Deprecated: use VerifySignedTimestampWithThreshold instead.
-func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) {
+func VerifyTimestampAuthorityWithThreshold(entity SignedEntity, trustedMaterial root.TrustedMaterial, threshold int) ([]*root.Timestamp, error) { //nolint:revive
 	return VerifySignedTimestampWithThreshold(entity, trustedMaterial, threshold)
 }

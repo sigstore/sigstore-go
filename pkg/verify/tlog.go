@@ -150,6 +150,6 @@ func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.V
 // TODO: remove this deprecated function before 2.0
 
 // Deprecated: use VerifyTlogEntry instead
-func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime bool) ([]root.Timestamp, error) {
+func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime bool) ([]root.Timestamp, error) { //nolint:revive
 	return VerifyTlogEntry(entity, trustedMaterial, logThreshold, trustIntegratedTime)
 }
