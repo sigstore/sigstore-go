@@ -4,15 +4,16 @@ A client library for [Sigstore](https://www.sigstore.dev/), written in Go.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/sigstore/sigstore-go.svg)](https://pkg.go.dev/github.com/sigstore/sigstore-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sigstore/sigstore-go)](https://goreportcard.com/report/github.com/sigstore/sigstore-go)
-[![e2e-tests](https://github.com/sigstore/sigstore-go/actions/workflows/build.yml/badge.svg)](https://github.com/sigstore/sigstore-go/actions/workflows/build.yml)
+[![test results](https://github.com/sigstore/sigstore-go/actions/workflows/build.yml/badge.svg)](https://github.com/sigstore/sigstore-go/actions/workflows/build.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sigstore/sigstore-go/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sigstore/sigstore-go)
 
 Features:
 - Signing and verification of [Sigstore bundles](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto) compliant with Sigstore Client Spec
 - Verification of raw Sigstore signatures by creating bundles for them (see [conformance tests](test/conformance/main.go) for example)
 - Signing and verifying with a Timestamp Authority (TSA)
-- Signing and verifying (offline or online) with Rekor (Artifact Transparency Log)
+- Signing and verifying with Rekor (Artifact Transparency Log)
 - Structured verification results including certificate metadata
-- TUF support
+- TUF support for fetching trusted root certificates and log keys
 - Verification support for custom [trusted root](https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_trustroot.proto)
 - Examples for signing and verifying artifacts
 
@@ -24,7 +25,7 @@ Sigstore already has a canonical Go client implementation, [cosign](https://gith
 
 ## Status
 
-`sigstore-go` is currently beta, and may have minor API changes before the 1.0.0 release. It does however pass the [`sigstore-conformance`](https://github.com/sigstore/sigstore-conformance) signing and verification test suite, and correctness is taken very seriously.
+`sigstore-go` is considered stable and ready for production use. It passes the [`sigstore-conformance`](https://github.com/sigstore/sigstore-conformance) signing and verification test suite.
 
 ## Documentation and examples
 
@@ -36,10 +37,10 @@ Note that the CLI examples are to demonstrate how to use the library, and not in
 
 ## Requirements
 
-Tested with:
+[Tested](https://github.com/sigstore/sigstore-go/blob/main/.github/workflows/build.yml) with:
 
 - Unix-compatible OS and Windows
-- [Go 1.23](https://go.dev/doc/install)
+- [Go 1.23+](https://go.dev/doc/install)
 
 Note that we do not provide built versions of this library, but you can see what architectures your version of `go` supports with `go tool dist list`.
 
@@ -51,13 +52,12 @@ Tests are invoked using the standard Go testing framework. A helper exists in th
 $ make test
 ```
 
-## Example bundles
-
-### examples/bundle-provenance.json
-
-This came from https://www.npmjs.com/package/sigstore/v/1.3.0/provenance, with the outermost "bundle" key stripped off.
-
 ## Support
 
 Bug reports are welcome via issues and questions are welcome via discussion. Please refer to [SUPPORT.md](./SUPPORT.md) for details.
 This project is provided as-is.
+
+## Security
+
+Should you discover any security issues, please refer to sigstore's [security
+process](https://github.com/sigstore/.github/blob/main/SECURITY.md)
