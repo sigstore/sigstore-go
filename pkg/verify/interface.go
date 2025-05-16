@@ -55,7 +55,7 @@ type VersionProvider interface {
 	Version() (string, error)
 }
 
-type SignedEntity interface {
+type baseSignedEntity interface {
 	HasInclusionPromise
 	HasInclusionProof
 	SignatureProvider
@@ -63,6 +63,9 @@ type SignedEntity interface {
 	TlogEntryProvider
 	VerificationProvider
 	VersionProvider
+}
+type SignedEntity interface {
+	baseSignedEntity
 }
 
 type VerificationContent interface {

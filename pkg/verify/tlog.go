@@ -20,11 +20,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-
-	"github.com/sigstore/sigstore/pkg/signature"
+	"regexp"
+	"strings"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 const maxAllowedTlogEntries = 32
@@ -103,7 +104,13 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 				return nil, err
 			}
 
-			err = tlog.VerifyInclusion(entry, *verifier)
+			if hasSTH(entry) {
+				err = tlog.VerifyInclusion(entry, *verifier)
+			} else {
+				origin, _ := strings.CutPrefix(tlogVerifier.BaseURL, "https://")
+				origin, _ = strings.CutPrefix(origin, "http://")
+				err = tlog.VerifyCheckpointAndInclusion(entry, *verifier, origin)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -123,8 +130,10 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 		// TODO: if you have access to artifact, check that it matches body subject
 
 		// Check tlog entry time against bundle certificates
-		if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
-			return nil, errors.New("integrated time outside certificate validity")
+		if !entry.IntegratedTime().IsZero() {
+			if !verificationContent.ValidAtTime(entry.IntegratedTime(), trustedMaterial) {
+				return nil, errors.New("integrated time outside certificate validity")
+			}
 		}
 
 		// successful log entry verification
@@ -152,4 +161,16 @@ func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.V
 // Deprecated: use VerifyTlogEntry instead
 func VerifyArtifactTransparencyLog(entity SignedEntity, trustedMaterial root.TrustedMaterial, logThreshold int, trustIntegratedTime bool) ([]root.Timestamp, error) { //nolint:revive
 	return VerifyTlogEntry(entity, trustedMaterial, logThreshold, trustIntegratedTime)
+}
+
+var treeIDSuffixRegex = regexp.MustCompile(".* - [0-9]+$")
+
+func hasSTH(entry *tlog.Entry) bool {
+	tle := entry.TransparencyLogEntry()
+	checkpointBody := tle.GetInclusionProof().GetCheckpoint().GetEnvelope()
+	checkpointLines := strings.Split(checkpointBody, "\n")
+	if len(checkpointLines) < 4 {
+		return false
+	}
+	return treeIDSuffixRegex.MatchString(checkpointLines[0])
 }
