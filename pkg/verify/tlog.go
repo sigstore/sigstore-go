@@ -17,14 +17,17 @@ package verify
 import (
 	"bytes"
 	"crypto"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"fmt"
 
-	"github.com/sigstore/sigstore/pkg/signature"
-
+	rekortilespb "github.com/sigstore/rekor-tiles/pkg/generated/protobuf"
+	"github.com/sigstore/rekor-tiles/pkg/note"
+	"github.com/sigstore/rekor-tiles/pkg/verify"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 const maxAllowedTlogEntries = 32
@@ -70,7 +73,7 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 	logEntriesVerified := 0
 
 	for _, entry := range entries {
-		err := tlog.ValidateEntry(entry)
+		err := tlog.ValidateLogEntryBody(entry)
 		if err != nil {
 			return nil, err
 		}
@@ -136,6 +139,78 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 	}
 
 	return verifiedTimestamps, nil
+}
+
+func VerifyArtifactTransparencyLogV2(entity SignedEntityWithRekorV2, trustedMaterial root.TrustedMaterial, logThreshold int) error { //nolint:revive
+	entries, err := entity.TlogV2Entries()
+	if err != nil {
+		return err
+	}
+	if len(entries) > maxAllowedTlogEntries {
+		return fmt.Errorf("too many tlog entries: %d > %d", len(entries), maxAllowedTlogEntries)
+	}
+	for i := 0; i < len(entries); i++ {
+		for j := i + 1; j < len(entries); j++ {
+			if entries[i].LogKeyID() == entries[j].LogKeyID() && entries[i].LogIndex() == entries[j].LogIndex() {
+				return fmt.Errorf("duplicate tlog entries found")
+			}
+		}
+	}
+
+	sigContent, err := entity.SignatureContent()
+	if err != nil {
+		return fmt.Errorf("getting signature content from signed entity: %w", err)
+	}
+	entitySignature := sigContent.Signature()
+
+	verificationContent, err := entity.VerificationContent()
+	if err != nil {
+		return fmt.Errorf("getting verification content from signed entity: %w", err)
+	}
+
+	logEntriesVerified := 0
+
+	for _, entry := range entries {
+		// TODO: validate hashedrekord/dsse obj?
+		rekorLogs := trustedMaterial.RekorLogs()
+		keyID := entry.LogKeyID()
+		hex64Key := hex.EncodeToString([]byte(keyID))
+		tlogVerifier, ok := rekorLogs[hex64Key]
+		if !ok {
+			return fmt.Errorf("could not find rekor log for public key")
+		}
+		sigVerifier, err := signature.LoadDefaultVerifier(tlogVerifier.PublicKey)
+		if err != nil {
+			return fmt.Errorf("loading verifier: %w", err)
+		}
+		noteVerifier, err := note.NewNoteVerifier("rekor-local", sigVerifier)
+		if err != nil {
+			return fmt.Errorf("loading note verifier: %w", err)
+		}
+		err = verify.VerifyLogEntry(entry.TransparencyLogEntry(), noteVerifier)
+		if err != nil {
+			return fmt.Errorf("verifying log entry: %w", err)
+		}
+		if !bytes.Equal(entry.Signature(), entitySignature) {
+			return fmt.Errorf("transparency log signature does not match")
+		}
+		protoPubKey := entry.PublicKey()
+		keyBytes := protoPubKey.(*rekortilespb.PublicKey).RawBytes
+		pk, err := x509.ParsePKIXPublicKey(keyBytes)
+		if err != nil {
+			return fmt.Errorf("parsing key: %w", err)
+		}
+		if !verificationContent.CompareKey(pk, trustedMaterial) {
+			return fmt.Errorf("transparency log certificate does not match")
+		}
+		logEntriesVerified++
+	}
+
+	if logEntriesVerified < logThreshold {
+		return fmt.Errorf("not enough verified log entries from transparency log: %d < %d", logEntriesVerified, logThreshold)
+	}
+
+	return nil
 }
 
 func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.Verifier, error) {

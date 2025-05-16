@@ -47,6 +47,10 @@ type TlogEntryProvider interface {
 	TlogEntries() ([]*tlog.Entry, error)
 }
 
+type TlogV2EntryProvider interface {
+	TlogV2Entries() ([]tlog.LogEntry, error)
+}
+
 type VerificationProvider interface {
 	VerificationContent() (VerificationContent, error)
 }
@@ -55,7 +59,7 @@ type VersionProvider interface {
 	Version() (string, error)
 }
 
-type SignedEntity interface {
+type baseSignedEntity interface {
 	HasInclusionPromise
 	HasInclusionProof
 	SignatureProvider
@@ -63,6 +67,14 @@ type SignedEntity interface {
 	TlogEntryProvider
 	VerificationProvider
 	VersionProvider
+}
+type SignedEntity interface {
+	baseSignedEntity
+}
+
+type SignedEntityWithRekorV2 interface {
+	baseSignedEntity
+	TlogV2EntryProvider
 }
 
 type VerificationContent interface {
