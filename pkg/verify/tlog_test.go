@@ -121,7 +121,7 @@ func (e *invalidTLogEntity) TlogEntries() ([]*tlog.Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		invalidEntry, err := tlog.NewEntry(body, entry.IntegratedTime().Unix(), entry.LogIndex(), []byte(entry.LogKeyID()), nil, nil)
+		invalidEntry, err := tlog.NewEntry(body, entry.IntegratedTime().Unix(), entry.LogIndex(), []byte(entry.LogKeyID()), nil, nil) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
