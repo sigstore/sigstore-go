@@ -33,6 +33,7 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
+	rekortilespb "github.com/sigstore/rekor-tiles/pkg/generated/protobuf"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/types"
 	dsse_v001 "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
@@ -40,9 +41,22 @@ import (
 	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
 	rekorVerify "github.com/sigstore/rekor/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
+
+type LogEntry interface {
+	Kind() string
+	Version() string
+	HasInclusionPromise() bool
+	HasInclusionProof() bool
+	PublicKey() any
+	Signature() []byte
+	LogKeyID() string
+	LogIndex() int64
+	TransparencyLogEntry() *v1.TransparencyLogEntry
+}
 
 type Entry struct {
 	kind                 string
@@ -50,6 +64,16 @@ type Entry struct {
 	rekorEntry           types.EntryImpl
 	logEntryAnon         models.LogEntryAnon
 	signedEntryTimestamp []byte
+	tle                  *v1.TransparencyLogEntry
+}
+
+type rekorV1Entry = Entry
+
+type rekorV2Entry struct {
+	kind       string
+	version    string
+	rekorEntry *rekortilespb.Entry
+	tle        *v1.TransparencyLogEntry
 }
 
 type RekorPayload struct {
@@ -93,6 +117,39 @@ func NewEntry(body []byte, integratedTime int64, logIndex int64, logID []byte, s
 		}
 	}
 
+	return entry, nil
+}
+
+func ParseLogEntry(tle *v1.TransparencyLogEntry) (LogEntry, error) {
+	if tle == nil {
+		return nil, ErrNilValue
+	}
+	if tle.IntegratedTime != 0 {
+		// rekor v1 entry
+		return ParseEntry(tle)
+	}
+	if tle.CanonicalizedBody == nil ||
+		tle.LogIndex < 0 ||
+		tle.LogId == nil ||
+		tle.LogId.KeyId == nil ||
+		tle.KindVersion == nil ||
+		tle.InclusionProof == nil {
+		return nil, ErrNilValue
+	}
+	if tle.InclusionPromise != nil {
+		return nil, fmt.Errorf("unexpected inclusion promise for Rekor v2 entry")
+	}
+	logEntryBody := rekortilespb.Entry{}
+	err := protojson.Unmarshal(tle.CanonicalizedBody, &logEntryBody)
+	if err != nil {
+		return nil, fmt.Errorf("parsing TLE canonicalized body: %w", err)
+	}
+	entry := &rekorV2Entry{
+		kind:       tle.KindVersion.Kind,
+		version:    tle.KindVersion.Version,
+		rekorEntry: &logEntryBody,
+		tle:        tle,
+	}
 	return entry, nil
 }
 
@@ -148,10 +205,19 @@ func ParseEntry(protoEntry *v1.TransparencyLogEntry) (entry *Entry, err error) {
 	if entry.kind != protoEntry.KindVersion.Kind || entry.version != protoEntry.KindVersion.Version {
 		return nil, fmt.Errorf("kind and version mismatch: %s/%s != %s/%s", entry.kind, entry.version, protoEntry.KindVersion.Kind, protoEntry.KindVersion.Version)
 	}
+	entry.tle = protoEntry
 
 	return entry, nil
 }
 
+func ValidateLogEntryBody(entry LogEntry) error {
+	if e, ok := entry.(*rekorV1Entry); ok {
+		return ValidateEntry(e)
+	}
+	return nil // TODO: validate rekorv2 entry?
+}
+
+// DEPRECATED: use ValidateLogEntryBody
 func ValidateEntry(entry *Entry) error {
 	switch e := entry.rekorEntry.(type) {
 	case *dsse_v001.V001Entry:
@@ -178,6 +244,14 @@ func ValidateEntry(entry *Entry) error {
 
 func (entry *Entry) IntegratedTime() time.Time {
 	return time.Unix(*entry.logEntryAnon.IntegratedTime, 0)
+}
+
+func (entry *Entry) Kind() string {
+	return entry.kind
+}
+
+func (entry *Entry) Version() string {
+	return entry.version
 }
 
 func (entry *Entry) Signature() []byte {
@@ -247,6 +321,51 @@ func (entry *Entry) HasInclusionPromise() bool {
 
 func (entry *Entry) HasInclusionProof() bool {
 	return entry.logEntryAnon.Verification != nil
+}
+
+func (entry *Entry) TransparencyLogEntry() *v1.TransparencyLogEntry {
+	return entry.tle
+}
+
+func (entry *rekorV2Entry) Kind() string {
+	return entry.kind
+}
+
+func (entry *rekorV2Entry) Version() string {
+	return entry.version
+}
+
+func (entry *rekorV2Entry) PublicKey() any {
+	verifier := entry.rekorEntry.GetSpec().GetHashedRekordV0_0_2().GetSignature().GetVerifier() // TODO: dsse
+	pubKey := verifier.GetPublicKey()
+	if pubKey != nil {
+		return pubKey
+	}
+	return verifier.GetX509Certificate()
+}
+
+func (entry *rekorV2Entry) LogKeyID() string {
+	return string(entry.tle.GetLogId().GetKeyId())
+}
+
+func (entry *rekorV2Entry) LogIndex() int64 {
+	return entry.tle.GetLogIndex()
+}
+
+func (entry *rekorV2Entry) HasInclusionPromise() bool {
+	return false
+}
+
+func (entry *rekorV2Entry) HasInclusionProof() bool {
+	return true
+}
+
+func (entry *rekorV2Entry) Signature() []byte {
+	return entry.rekorEntry.GetSpec().GetHashedRekordV0_0_2().GetSignature().GetContent() // TODO: dsse
+}
+
+func (entry *rekorV2Entry) TransparencyLogEntry() *v1.TransparencyLogEntry {
+	return entry.tle
 }
 
 func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {

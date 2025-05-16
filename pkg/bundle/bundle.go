@@ -56,6 +56,10 @@ type Bundle struct {
 	hasInclusionProof   bool
 }
 
+type BundleForRekorV2 struct {
+	Bundle
+}
+
 func NewBundle(pbundle *protobundle.Bundle) (*Bundle, error) {
 	bundle := &Bundle{
 		Bundle:              pbundle,
@@ -80,6 +84,23 @@ func NewProtobufBundle(b *protobundle.Bundle) (*ProtobufBundle, error) {
 }
 
 func (b *Bundle) validate() error {
+	// fetch tlog entries, as next check needs to check them for inclusion proof/promise
+	entries, err := b.TlogEntries()
+	if err != nil {
+		return err
+	}
+	return b.validateCommon(len(entries))
+}
+
+func (b *BundleForRekorV2) validate() error {
+	entries, err := b.TlogV2Entries()
+	if err != nil {
+		return err
+	}
+	return b.validateCommon(len(entries))
+}
+
+func (b *Bundle) validateCommon(numEntries int) error {
 	bundleVersion, err := b.Version()
 	if err != nil {
 		return fmt.Errorf("error getting bundle version: %w", err)
@@ -90,20 +111,14 @@ func (b *Bundle) validate() error {
 		return fmt.Errorf("%w: bundle version %s is not supported", ErrUnsupportedMediaType, bundleVersion)
 	}
 
-	// fetch tlog entries, as next check needs to check them for inclusion proof/promise
-	entries, err := b.TlogEntries()
-	if err != nil {
-		return err
-	}
-
 	// if bundle version == v0.1, require inclusion promise
 	if semver.Compare(bundleVersion, "v0.1") == 0 {
-		if len(entries) > 0 && !b.hasInclusionPromise {
+		if numEntries > 0 && !b.hasInclusionPromise {
 			return errors.New("inclusion promises missing in bundle (required for bundle v0.1)")
 		}
 	} else {
 		// if bundle version >= v0.2, require inclusion proof
-		if len(entries) > 0 && !b.hasInclusionProof {
+		if numEntries > 0 && !b.hasInclusionProof {
 			return errors.New("inclusion proof missing in bundle (required for bundle v0.2)")
 		}
 	}
@@ -221,6 +236,23 @@ func LoadJSONFromPath(path string) (*Bundle, error) {
 	return &bundle, nil
 }
 
+func LoadJSONFromPathForRekorV2(path string) (*BundleForRekorV2, error) {
+	var bundle BundleForRekorV2
+	bundle.Bundle.Bundle = new(protobundle.Bundle)
+
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	err = bundle.UnmarshalJSON(contents)
+	if err != nil {
+		return nil, err
+	}
+
+	return &bundle, nil
+}
+
 func (b *Bundle) MarshalJSON() ([]byte, error) {
 	return protojson.Marshal(b.Bundle)
 }
@@ -228,6 +260,21 @@ func (b *Bundle) MarshalJSON() ([]byte, error) {
 func (b *Bundle) UnmarshalJSON(data []byte) error {
 	b.Bundle = new(protobundle.Bundle)
 	err := protojson.Unmarshal(data, b.Bundle)
+	if err != nil {
+		return err
+	}
+
+	err = b.validate()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *BundleForRekorV2) UnmarshalJSON(data []byte) error {
+	b.Bundle.Bundle = new(protobundle.Bundle)
+	err := protojson.Unmarshal(data, b.Bundle.Bundle)
 	if err != nil {
 		return err
 	}
@@ -305,6 +352,30 @@ func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 	var err error
 	for i, entry := range b.VerificationMaterial.TlogEntries {
 		tlogEntries[i], err = tlog.ParseEntry(entry)
+		if err != nil {
+			return nil, ErrValidationError(err)
+		}
+
+		if tlogEntries[i].HasInclusionPromise() {
+			b.hasInclusionPromise = true
+		}
+		if tlogEntries[i].HasInclusionProof() {
+			b.hasInclusionProof = true
+		}
+	}
+
+	return tlogEntries, nil
+}
+
+func (b *BundleForRekorV2) TlogV2Entries() ([]tlog.LogEntry, error) {
+	if b.VerificationMaterial == nil {
+		return nil, nil
+	}
+
+	tlogEntries := make([]tlog.LogEntry, len(b.VerificationMaterial.TlogEntries))
+	var err error
+	for i, entry := range b.VerificationMaterial.TlogEntries {
+		tlogEntries[i], err = tlog.ParseLogEntry(entry)
 		if err != nil {
 			return nil, ErrValidationError(err)
 		}
