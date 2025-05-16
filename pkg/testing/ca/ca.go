@@ -63,6 +63,7 @@ type VirtualSigstore struct {
 	tsaCA                   *root.SigstoreTimestampingAuthority
 	tsaLeafKey              *ecdsa.PrivateKey
 	rekorKey                *ecdsa.PrivateKey
+	rekorRoot               []byte
 	ctlogKey                *ecdsa.PrivateKey
 	publicKeyVerifier       map[string]root.TimeConstrainedVerifier
 	signingAlgorithmDetails signature.AlgorithmDetails
@@ -125,6 +126,17 @@ func NewVirtualSigstoreWithSigningAlg(signingKeyDetails v1.PublicKeyDetails) (*V
 
 func NewVirtualSigstore() (*VirtualSigstore, error) {
 	return NewVirtualSigstoreWithSigningAlg(v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256)
+}
+
+func NewVirtualSigstoreWithExistingRekorEntry() (*VirtualSigstore, error) {
+	vs, err := NewVirtualSigstore()
+	if err != nil {
+		return nil, err
+	}
+	entry := []byte("foo")
+	hash := sha256.Sum256(append([]byte("\000"), entry...))
+	vs.rekorRoot = hash[:]
+	return vs, nil
 }
 
 // getLogID calculates the digest of a PKIX-encoded public key
@@ -350,7 +362,7 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 			return nil, err
 		}
 	}
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof) //nolint:staticcheck
 }
 
 func (ca *VirtualSigstore) GetInclusionProof(rekorBodyRaw []byte) (*models.InclusionProof, error) {
@@ -358,18 +370,29 @@ func (ca *VirtualSigstore) GetInclusionProof(rekorBodyRaw []byte) (*models.Inclu
 	if err != nil {
 		return nil, err
 	}
-	rootHash := sha256.Sum256(append([]byte("\000"), rekorBodyRaw...))
+	hash := sha256.Sum256(append([]byte("\000"), rekorBodyRaw...))
+	rootHash := hash
+	var pathHash []byte
+	if ca.rekorRoot != nil {
+		rootHash = sha256.Sum256(append([]byte("\001"), append(hash[:], ca.rekorRoot...)...))
+		pathHash = ca.rekorRoot
+	}
 	encodedRootHash := hex.EncodeToString(rootHash[:])
+	var pathHashes []string
+	if pathHash != nil {
+		pathHashes = make([]string, 1)
+		pathHashes[0] = hex.EncodeToString(pathHash)
+	}
 	scBytes, err := util.CreateAndSignCheckpoint(context.Background(), "rekor.localhost", int64(123), uint64(42), rootHash[:], signer)
 	if err != nil {
 		return nil, err
 	}
 
 	return &models.InclusionProof{
-		TreeSize:   swag.Int64(int64(1)),
+		TreeSize:   swag.Int64(int64(len(pathHashes) + 1)),
 		RootHash:   &encodedRootHash,
-		LogIndex:   swag.Int64(0),
-		Hashes:     nil,
+		LogIndex:   swag.Int64(int64(len(pathHashes))),
+		Hashes:     pathHashes,
 		Checkpoint: swag.String(string(scBytes)),
 	}, nil
 }
@@ -408,7 +431,7 @@ func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certific
 		return nil, err
 	}
 
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil)
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil) //nolint:staticcheck
 }
 
 func (ca *VirtualSigstore) PublicKeyVerifier(keyID string) (root.TimeConstrainedVerifier, error) {
