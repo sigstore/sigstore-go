@@ -214,9 +214,10 @@ func main() {
 		}
 	}
 
+	rekorVersion := uint32(2)
 	if *rekor {
 		rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(),
-			signingConfig.RekorLogURLsConfig(), []uint32{1}, time.Now())
+			signingConfig.RekorLogURLsConfig(), []uint32{rekorVersion}, time.Now())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -225,6 +226,7 @@ func main() {
 				BaseURL: rekorURL,
 				Timeout: time.Duration(90 * time.Second),
 				Retries: 1,
+				Version: rekorVersion,
 			}
 			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 		}

@@ -350,7 +350,7 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 			return nil, err
 		}
 	}
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof)
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, inclusionProof) //nolint:staticcheck
 }
 
 func (ca *VirtualSigstore) GetInclusionProof(rekorBodyRaw []byte) (*models.InclusionProof, error) {
@@ -408,7 +408,7 @@ func (ca *VirtualSigstore) generateTlogEntryHashedRekord(leafCert *x509.Certific
 		return nil, err
 	}
 
-	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil)
+	return tlog.NewEntry(rekorBodyRaw, integratedTime, logIndex, rekorLogIDRaw, set, nil) //nolint:staticcheck
 }
 
 func (ca *VirtualSigstore) PublicKeyVerifier(keyID string) (root.TimeConstrainedVerifier, error) {
