@@ -415,7 +415,7 @@ func FetchTrustedRoot() (*TrustedRoot, error) {
 func FetchTrustedRootWithOptions(opts *tuf.Options) (*TrustedRoot, error) {
 	client, err := tuf.New(opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create TUF client %w", err)
 	}
 	return GetTrustedRoot(client)
 }
