@@ -15,10 +15,12 @@
 package main
 
 import (
+	"crypto"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
@@ -214,21 +216,45 @@ func main() {
 		}
 	}
 
+	rekorVersion := uint32(2)
 	if *rekor {
 		rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(),
-			signingConfig.RekorLogURLsConfig(), []uint32{1}, time.Now())
+			signingConfig.RekorLogURLsConfig(), []uint32{rekorVersion}, time.Now())
 		if err != nil {
 			log.Fatal(err)
 		}
 		for _, rekorURL := range rekorURLs {
+			var version uint32
+			for _, r := range signingConfig.RekorLogURLs() {
+				if rekorURL == r.URL {
+					version = r.MajorAPIVersion
+					break
+				}
+			}
+			var publicKey crypto.PublicKey
+			for _, t := range opts.TrustedRoot.RekorLogs() {
+				if rekorURL == t.BaseURL {
+					publicKey = t.PublicKey
+					break
+				}
+			}
+			var origin string
+			if version == 2 {
+				origin = strings.TrimPrefix(rekorURL, "https://")
+			}
 			rekorOpts := &sign.RekorOptions{
-				BaseURL: rekorURL,
-				Timeout: time.Duration(90 * time.Second),
-				Retries: 1,
+				BaseURL:   rekorURL,
+				Timeout:   time.Duration(90 * time.Second),
+				Retries:   1,
+				Version:   version,
+				Origin:    origin,
+				PublicKey: publicKey,
 			}
 			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 		}
 	}
+
+	opts.UseRekorV2 = rekorVersion == uint32(2)
 
 	bundle, err := sign.Bundle(content, keypair, opts)
 	if err != nil {

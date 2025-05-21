@@ -60,6 +60,8 @@ type VerifierConfig struct { // nolint: revive
 	observerTimestampThreshold int
 	// requireTlogEntries requires log inclusion proofs in a bundle
 	requireTlogEntries bool
+	// requireTlogV2Entries requires log inclusion proofs from a Rekor v2 server
+	requireTlogV2Entries bool
 	// tlogEntriesThreshold is the minimum number of verified inclusion
 	// proofs in a bundle
 	tlogEntriesThreshold int
@@ -157,6 +159,19 @@ func WithTransparencyLog(threshold int) VerifierOption {
 			return errors.New("transparency log entry threshold must be at least 1")
 		}
 		c.requireTlogEntries = true
+		c.tlogEntriesThreshold = threshold
+		return nil
+	}
+}
+
+// WithTransparencyLogV2 configures the verifier to expect Transparency Log
+// inclusion proofs from a Rekor V2 server.
+func WithTransparencyLogV2(threshold int) VerifierOption {
+	return func(c *VerifierConfig) error {
+		if threshold < 1 {
+			return errors.New("transparency log entry threshold must be at least 1")
+		}
+		c.requireTlogV2Entries = true
 		c.tlogEntriesThreshold = threshold
 		return nil
 	}
@@ -590,6 +605,24 @@ func (v *Verifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationR
 		return nil, fmt.Errorf("failed to verify log inclusion: %w", err)
 	}
 
+	return v.verifyCommon(entity, policy, verifiedTlogTimestamps)
+}
+
+func (v *SignedEntityVerifier) VerifyWithRekorV2(entity SignedEntityWithRekorV2, pb PolicyBuilder) (*VerificationResult, error) {
+	policy, err := pb.BuildConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build policy: %w", err)
+	}
+
+	err = v.VerifyTransparencyLogV2Inclusion(entity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify log inclusion: %w", err)
+	}
+
+	return v.verifyCommon(entity, policy, nil)
+}
+
+func (v *SignedEntityVerifier) verifyCommon(entity baseSignedEntity, policy *PolicyConfig, verifiedTlogTimestamps []TimestampVerificationResult) (*VerificationResult, error) {
 	// > ## Establishing a Time for the Signature
 	// > First, establish a time for the signature. This timestamp is required to validate the certificate chain, so this step comes first.
 	verifiedTimestamps, err := v.VerifyObserverTimestamps(entity, verifiedTlogTimestamps)
@@ -792,6 +825,13 @@ func (v *Verifier) VerifyTransparencyLogInclusion(entity SignedEntity) ([]Timest
 	}
 
 	return verifiedTimestamps, nil
+}
+
+func (v *SignedEntityVerifier) VerifyTransparencyLogV2Inclusion(entity SignedEntityWithRekorV2) error {
+	if !v.config.requireTlogV2Entries {
+		return nil
+	}
+	return VerifyArtifactTransparencyLogV2(entity, v.trustedMaterial, v.config.tlogEntriesThreshold)
 }
 
 // VerifyObserverTimestamps verifies RFC3161 signed timestamps, and verifies

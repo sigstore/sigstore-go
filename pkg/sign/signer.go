@@ -50,6 +50,7 @@ type BundleOptions struct {
 	Context context.Context
 	// Optional trusted root to verify signed bundle
 	TrustedRoot root.TrustedMaterial
+	UseRekorV2  bool
 }
 
 func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.Bundle, error) {
@@ -144,11 +145,6 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			return nil, err
 		}
 
-		protobundle, err := verifyBundle.NewBundle(bundle)
-		if err != nil {
-			return nil, err
-		}
-
 		// Generally, you should provide an artifact when verifying.
 		//
 		// However, we just signed the DSSE object trusting the user has
@@ -159,7 +155,26 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		}
 
 		policy := verify.NewPolicy(artifactOpts, verify.WithoutIdentitiesUnsafe())
-		_, err = sev.Verify(protobundle, policy)
+		if opts.UseRekorV2 {
+			protobundle, err := verifyBundle.NewBundleForRekorV2(bundle)
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = sev.VerifyWithRekorV2(protobundle, policy)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			protobundle, err := verifyBundle.NewBundle(bundle)
+			if err != nil {
+				return nil, err
+			}
+			_, err = sev.Verify(protobundle, policy)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if err != nil {
 			return nil, err
 		}
