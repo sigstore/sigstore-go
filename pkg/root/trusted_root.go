@@ -472,6 +472,13 @@ func NewLiveTrustedRoot(opts *tuf.Options) (*LiveTrustedRoot, error) {
 // NewLiveTrustedRootFromTarget returns a LiveTrustedRoot that will
 // periodically refresh the trusted root from TUF using the provided target.
 func NewLiveTrustedRootFromTarget(opts *tuf.Options, target string) (*LiveTrustedRoot, error) {
+	return NewLiveTrustedRootFromTargetWithPeriod(opts, target, 24*time.Hour)
+}
+
+// NewLiveTrustedRootFromTargetWithPeriod returns a LiveTrustedRoot that
+// performs a TUF refresh with the provided period, accesssing the provided
+// target.
+func NewLiveTrustedRootFromTargetWithPeriod(opts *tuf.Options, target string, rfPeriod time.Duration) (*LiveTrustedRoot, error) {
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client %w", err)
@@ -490,7 +497,9 @@ func NewLiveTrustedRootFromTarget(opts *tuf.Options, target string) (*LiveTruste
 		TrustedRoot: tr,
 		mu:          sync.RWMutex{},
 	}
-	ticker := time.NewTicker(time.Hour * 24)
+
+	ticker := time.NewTicker(rfPeriod)
+	log.Printf("setting TUF refresh period to %s", rfPeriod)
 	go func() {
 		for range ticker.C {
 			client, err = tuf.New(opts)
@@ -511,6 +520,7 @@ func NewLiveTrustedRootFromTarget(opts *tuf.Options, target string) (*LiveTruste
 			ltr.mu.Lock()
 			ltr.TrustedRoot = newTr
 			ltr.mu.Unlock()
+			log.Printf("successfully refreshed the TUF root")
 		}
 	}()
 	return ltr, nil
