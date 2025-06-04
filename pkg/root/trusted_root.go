@@ -121,13 +121,14 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 		if tlog.GetHashAlgorithm() != protocommon.HashAlgorithm_SHA2_256 {
 			return nil, fmt.Errorf("unsupported tlog hash algorithm: %s", tlog.GetHashAlgorithm())
 		}
+		//nolint:staticcheck // Continuing to use log ID
 		if tlog.GetLogId() == nil {
 			return nil, fmt.Errorf("tlog missing log ID")
 		}
-		if tlog.GetLogId().GetKeyId() == nil {
+		if tlog.GetLogId().GetKeyId() == nil { //nolint:staticcheck
 			return nil, fmt.Errorf("tlog missing log ID key ID")
 		}
-		encodedKeyID := hex.EncodeToString(tlog.GetLogId().GetKeyId())
+		encodedKeyID := hex.EncodeToString(tlog.GetLogId().GetKeyId()) //nolint:staticcheck
 
 		if tlog.GetPublicKey() == nil {
 			return nil, fmt.Errorf("tlog missing public key")
@@ -146,7 +147,7 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 
 		tlogEntry := &TransparencyLog{
 			BaseURL:           tlog.GetBaseUrl(),
-			ID:                tlog.GetLogId().GetKeyId(),
+			ID:                tlog.GetLogId().GetKeyId(), //nolint:staticcheck
 			HashFunc:          hashFunc,
 			SignatureHashFunc: crypto.SHA256,
 		}

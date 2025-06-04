@@ -170,20 +170,21 @@ func TestMediaTypeString(t *testing.T) {
 
 func Test_validate(t *testing.T) {
 	t.Parallel()
+	// From https://rekor.sigstore.dev/api/v1/log/entries?logIndex=23424534
 	tlogBody := map[string]any{
 		"kind":       "hashedrekord",
 		"apiVersion": "0.0.1",
 		"spec": map[string]any{
 			"signature": map[string]any{
-				"content": "sn/VqLMqWjDeYt93XTb6LzWIsKIn5bOvEsZQyF1elkvpur85LoDk5q/ExGWBB0Y+v8q0B04Bg2xGMOVMNyD/LQ==",
+				"content": "MEQCIFrwIdVX8n5RM+Fy9fgCmaBc20jmksfL0XL08y1zx3XpAiB95HkXz37kTUzdykwuNStwCc5B9NKHtioD+3GYMuWU/w==",
 				"publicKey": map[string]any{
-					"content": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJnekNDQVMyZ0F3SUJBZ0lVS2cxZHN1OTBoS0daVW5WN1RRWFZPRjdOZCtrd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0ZqRVVNQklHQTFVRUF3d0xhblZ6ZEhSeWRYTjBiV1V3SGhjTk1qUXdOakkwTWpJMU5USXpXaGNOTXpRdwpOakl5TWpJMU5USXpXakFXTVJRd0VnWURWUVFEREF0cWRYTjBkSEoxYzNSdFpUQmNNQTBHQ1NxR1NJYjNEUUVCCkFRVUFBMHNBTUVnQ1FRRGIwNjhSMkpYNStZSE5nZWVyeDlzM1k2eEp2ZVdPRGl3YnROZWtKaytTWUlDUjNYQlQKaDErNUJ1SStwTGNyTXNyQTZlOThaNkNxUkJjNDdEL05LdWgvQWdNQkFBR2pVekJSTUIwR0ExVWREZ1FXQkJTbgpKbExuNWZjeXYzNnlibHBKYTVkcmdhQlNBREFmQmdOVkhTTUVHREFXZ0JTbkpsTG41ZmN5djM2eWJscEphNWRyCmdhQlNBREFQQmdOVkhSTUJBZjhFQlRBREFRSC9NQTBHQ1NxR1NJYjNEUUVCQ3dVQUEwRUFaaTNCMTF4VDY5TjQKNnl4ODg5Rkl2Z0xIdjQvaUROR2JTUkpHanlXMXY1RFpscXBBT0dYWjc5V3d2TFJZQlAxbFhid0tGaGlzTlNsUwpNRk84c0FHZ1hRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=",
+					"content": "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFNHlQQ080MStjeGxEdENBUndTNDNvQU1YVWs3NApyWGZ5eGhKSldJZ05KbTUyTlppZllHaDNnYzNaakJVOVJhRXJLb0NidGVxdW1IWU9CSnN6RmNIUGFBPT0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg==",
 				},
 			},
 			"data": map[string]any{
 				"hash": map[string]any{
 					"algorithm": "sha256",
-					"value":     "bc103b4a84971ef6459b294a2b98568a2bfb72cded09d4acd1e16366a401f95b",
+					"value":     "0c0f699f002f4de2ab43b04a0c930ceb57be35d2c81b31648d88b021713e9477",
 				},
 			},
 		},
