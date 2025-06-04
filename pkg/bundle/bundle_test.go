@@ -575,9 +575,9 @@ func TestVerificationContent(t *testing.T) {
 	leafCert := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
 	}
-	caKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	leafKey, err := rsa.GenerateKey(rand.Reader, 512) //nolint:gosec
+	leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	caDer, err := x509.CreateCertificate(rand.Reader, caCert, caCert, &caKey.PublicKey, caKey)
 	require.NoError(t, err)
