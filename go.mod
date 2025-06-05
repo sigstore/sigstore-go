@@ -1,6 +1,6 @@
 module github.com/sigstore/sigstore-go
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 
@@ -14,7 +14,7 @@ require (
 	github.com/in-toto/attestation v1.1.1
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
-	github.com/sigstore/protobuf-specs v0.4.1
+	github.com/sigstore/protobuf-specs v0.4.2
 	github.com/sigstore/rekor v1.3.10
 	github.com/sigstore/sigstore v1.9.4
 	github.com/sigstore/timestamp-authority v1.2.7
@@ -47,7 +47,7 @@ require (
 	github.com/go-openapi/validate v0.24.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
-	github.com/google/go-containerregistry v0.20.3 // indirect
+	github.com/google/go-containerregistry v0.20.5 // indirect
 	github.com/google/trillian v1.7.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -94,7 +94,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/oauth2 v0.29.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
