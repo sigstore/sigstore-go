@@ -135,7 +135,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			}
 		}
 
-		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.TransparencyLogs)), verify.WithIntegratedTimestamps(len(opts.TransparencyLogs)))
+		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.TransparencyLogs)), verify.WithCurrentTime()) // FIXME
 	}
 
 	if opts.TrustedRoot != nil && len(verifierOptions) > 0 {
