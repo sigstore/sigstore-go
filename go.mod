@@ -17,11 +17,11 @@ require (
 	github.com/sigstore/protobuf-specs v0.4.2
 	github.com/sigstore/rekor v1.3.10
 	github.com/sigstore/sigstore v1.9.4
-	github.com/sigstore/timestamp-authority v1.2.7
+	github.com/sigstore/timestamp-authority v1.2.8
 	github.com/stretchr/testify v1.10.0
 	github.com/theupdateframework/go-tuf/v2 v2.1.1
-	golang.org/x/crypto v0.38.0
-	golang.org/x/mod v0.24.0
+	golang.org/x/crypto v0.39.0
+	golang.org/x/mod v0.25.0
 	google.golang.org/protobuf v1.36.6
 )
 
@@ -95,13 +95,13 @@ require (
 	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
-	google.golang.org/grpc v1.72.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250512202823-5a2f75b736a9 // indirect
+	google.golang.org/grpc v1.72.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
