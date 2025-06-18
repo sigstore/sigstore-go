@@ -19,6 +19,7 @@ package e2e
 import (
 	"crypto/sha256"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"testing"
@@ -73,14 +74,18 @@ func TestSignVerify(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		content sign.Content
+		name               string
+		content            sign.Content
+		rekorVersion       uint32
+		expectedTimestamps int
 	}{
 		{
 			name: "hashedrekord_v001",
 			content: &sign.PlainData{
 				Data: artifactData,
 			},
+			rekorVersion:       1,
+			expectedTimestamps: 2,
 		},
 		{
 			name: "dsse_v001",
@@ -88,12 +93,31 @@ func TestSignVerify(t *testing.T) {
 				Data:        intotoData,
 				PayloadType: "application/vnd.in-toto+json",
 			},
+			rekorVersion:       1,
+			expectedTimestamps: 2,
+		},
+		{
+			name: "hashedrekor_v002",
+			content: &sign.PlainData{
+				Data: artifactData,
+			},
+			rekorVersion:       2,
+			expectedTimestamps: 1,
+		},
+		{
+			name: "dsse_v002",
+			content: &sign.DSSEData{
+				Data:        intotoData,
+				PayloadType: "application/vnd.in-toto+json",
+			},
+			rekorVersion:       2,
+			expectedTimestamps: 1,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			protoBundle, err := signContent(signingConfig, token, test.content, opts)
+			protoBundle, err := signContent(signingConfig, token, test.content, test.rekorVersion, opts)
 			assert.NoError(t, err)
 
 			result, err := verifyBundle(protoBundle, oidcURL, defaultCertID, getDigest(artifactData), trustedRoot)
@@ -101,23 +125,25 @@ func TestSignVerify(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 			assert.NotNil(t, result.Signature)
-			assert.Len(t, result.VerifiedTimestamps, 1)
+			assert.Len(t, result.VerifiedTimestamps, test.expectedTimestamps)
 			assert.NotNil(t, result.VerifiedIdentity)
 			assert.Equal(t, result.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName, defaultCertID)
 		})
 	}
 }
 
-func signContent(signingConfig *root.SigningConfig, token string, content sign.Content, opts sign.BundleOptions) (*protobundle.Bundle, error) {
-	rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(), signingConfig.RekorLogURLsConfig(), []uint32{1}, time.Now())
+func signContent(signingConfig *root.SigningConfig, token string, content sign.Content, rekorVersion uint32, opts sign.BundleOptions) (*protobundle.Bundle, error) {
+	rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(), signingConfig.RekorLogURLsConfig(), []uint32{rekorVersion}, time.Now())
 	if err != nil {
 		return nil, err
 	}
 	for _, rekorURL := range rekorURLs {
+		log.Printf("using Rekor URL %s", rekorURL)
 		rekorOpts := &sign.RekorOptions{
 			BaseURL: rekorURL,
 			Timeout: time.Duration(90 * time.Second),
 			Retries: 1,
+			Version: rekorVersion,
 		}
 		opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
@@ -136,6 +162,19 @@ func signContent(signingConfig *root.SigningConfig, token string, content sign.C
 		IDToken: token,
 	}
 
+	tsaURLs, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(), signingConfig.TimestampAuthorityURLsConfig(), []uint32{1}, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	for _, tsaURL := range tsaURLs {
+		tsaOpts := &sign.TimestampAuthorityOptions{
+			URL:     tsaURL,
+			Timeout: time.Duration(30 * time.Second),
+			Retries: 1,
+		}
+		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
+	}
+
 	keypair, err := sign.NewEphemeralKeypair(nil)
 	if err != nil {
 		return nil, err
@@ -150,7 +189,7 @@ func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, trus
 	verifierConfig := []verify.VerifierOption{
 		verify.WithSignedCertificateTimestamps(1),
 		verify.WithTransparencyLog(1),
-		verify.WithIntegratedTimestamps(1),
+		verify.WithObserverTimestamps(1),
 	}
 
 	certID, err := verify.NewShortCertificateIdentity(issuer, "", san, "")

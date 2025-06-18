@@ -225,6 +225,21 @@ func main() {
 				BaseURL: rekorURL,
 				Timeout: time.Duration(90 * time.Second),
 				Retries: 1,
+				Version: 1,
+			}
+			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
+		}
+		rekorURLs, err = root.SelectServices(signingConfig.RekorLogURLs(),
+			signingConfig.RekorLogURLsConfig(), []uint32{2}, time.Now())
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, rekorURL := range rekorURLs {
+			rekorOpts := &sign.RekorOptions{
+				BaseURL: rekorURL,
+				Timeout: time.Duration(90 * time.Second),
+				Retries: 1,
+				Version: 2,
 			}
 			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 		}
