@@ -156,6 +156,19 @@ func TestTimestampingAuthority(t *testing.T) {
 			expectError:   true,
 		},
 		{
+			name: "nil root",
+			tsa: &root.SigstoreTimestampingAuthority{
+				Root: nil,
+				Intermediates: []*x509.Certificate{
+					intermediateCert,
+				},
+				Leaf: leafCert,
+			},
+			tsrBytes:      tsrBytes,
+			artifactBytes: artifactBytes,
+			expectError:   true,
+		},
+		{
 			name: "signature over wrong artifact",
 			tsa: &root.SigstoreTimestampingAuthority{
 				Root: rootCert,
