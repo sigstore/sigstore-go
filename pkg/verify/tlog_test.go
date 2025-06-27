@@ -121,7 +121,7 @@ func (e *invalidTLogEntity) TlogEntries() ([]*tlog.Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		invalidEntry, err := tlog.NewEntry(body, entry.IntegratedTime().Unix(), entry.LogIndex(), []byte(entry.LogKeyID()), nil, nil)
+		invalidEntry, err := tlog.NewEntry(body, entry.IntegratedTime().Unix(), entry.LogIndex(), []byte(entry.LogKeyID()), nil, nil) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -225,6 +225,19 @@ func TestMaxAllowedTlogEntries(t *testing.T) {
 
 func TestOfflineInclusionProofVerification(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+	integratedTime := time.Now().Add(5 * time.Minute)
+	entity, err := virtualSigstore.AttestAtTime("foo@example.com", "issuer", statement, integratedTime, true)
+	assert.NoError(t, err)
+
+	_, err = verify.VerifyTlogEntry(entity, virtualSigstore, 1, true)
+	assert.NoError(t, err)
+}
+
+func TestInclusionProofAuditPath(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstoreWithExistingRekorEntry()
 	assert.NoError(t, err)
 
 	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)

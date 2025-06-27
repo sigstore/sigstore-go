@@ -135,7 +135,12 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			}
 		}
 
-		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.TransparencyLogs)), verify.WithIntegratedTimestamps(len(opts.TransparencyLogs)))
+		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.TransparencyLogs)))
+		// Rekor v2 requires a timestamp authority, it will not provide integrated timestamps.
+		// Verification will fail if a timestamp authority is not provided for Rekor v2.
+		if len(opts.TimestampAuthorities) == 0 {
+			verifierOptions = append(verifierOptions, verify.WithIntegratedTimestamps(len(opts.TransparencyLogs)))
+		}
 	}
 
 	if opts.TrustedRoot != nil && len(verifierOptions) > 0 {

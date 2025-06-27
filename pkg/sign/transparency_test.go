@@ -25,6 +25,7 @@ import (
 
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/client/entries"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -102,6 +103,25 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 	return created, nil
 }
 
+type mockRekorV2 struct{}
+
+func (m *mockRekorV2) Add(_ context.Context, _ any) (*protorekor.TransparencyLogEntry, error) {
+	rootHash := []byte("deadbeef")
+	tle := &protorekor.TransparencyLogEntry{
+		LogIndex: 0,
+		InclusionProof: &protorekor.InclusionProof{
+			RootHash: rootHash,
+			LogIndex: 0,
+			TreeSize: 1,
+			Checkpoint: &protorekor.Checkpoint{
+				Envelope: string(rootHash),
+			},
+		},
+		CanonicalizedBody: []byte("canonicalized JSON entry"),
+	}
+	return tle, nil
+}
+
 func Test_GetTransparencyLogEntry(t *testing.T) {
 	ctx := context.Background()
 
@@ -121,6 +141,33 @@ func Test_GetTransparencyLogEntry(t *testing.T) {
 	// Test the happy path
 	opts := &RekorOptions{Retries: 1, Client: &mockRekor{}}
 	rekor := NewRekor(opts)
+	pubkey, err := keypair.GetPublicKeyPem()
+	assert.Nil(t, err)
+
+	err = rekor.GetTransparencyLogEntry(ctx, []byte(pubkey), bundle)
+	assert.Nil(t, err)
+	assert.NotNil(t, bundle.VerificationMaterial.TlogEntries)
+}
+
+func Test_GetTransparencyLogEntryRekorV2(t *testing.T) {
+	ctx := context.Background()
+
+	// First create a bundle with DSSE content
+	keypair, err := NewEphemeralKeypair(nil)
+	assert.Nil(t, err)
+
+	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
+	content := DSSEData{Data: []byte("hello world"), PayloadType: "something"}
+	envelopeBody = content.PreAuthEncoding()
+	signature, digest, err := keypair.SignData(ctx, content.PreAuthEncoding())
+	assert.Nil(t, err)
+
+	content.Bundle(bundle, signature, digest, keypair.GetHashAlgorithm())
+	bundle.VerificationMaterial = &protobundle.VerificationMaterial{}
+
+	opts := &RekorOptions{Retries: 1, ClientV2: &mockRekorV2{}, Version: rekorV2}
+	rekor := NewRekor(opts)
+
 	pubkey, err := keypair.GetPublicKeyPem()
 	assert.Nil(t, err)
 
