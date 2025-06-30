@@ -16,7 +16,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/protobuf-specs v0.4.3
 	github.com/sigstore/rekor v1.3.10
-	github.com/sigstore/rekor-tiles v0.1.7-0.20250624231741-98cd4a77300f
+	github.com/sigstore/rekor-tiles v0.99.0
 	github.com/sigstore/sigstore v1.9.5
 	github.com/sigstore/timestamp-authority v1.2.8
 	github.com/stretchr/testify v1.10.0
@@ -44,6 +44,8 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.53.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/avast/retry-go/v4 v4.6.1 // indirect
+	github.com/aws/aws-sdk-go v1.55.7 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.29.15 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -115,7 +117,7 @@ require (
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/transparency-dev/formats v0.0.0-20250421220931-bb8ad4d07c26 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
-	github.com/transparency-dev/tessera v0.2.1-0.20250610150926-8ee4e93b2823 // indirect
+	github.com/transparency-dev/trillian-tessera v0.1.2-0.20250328155538-61661a3e3954 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
