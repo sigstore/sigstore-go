@@ -22,6 +22,7 @@ import (
 
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	prototrustroot "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -34,19 +35,21 @@ func servicesEqual(got []Service, want []Service) bool {
 		w := want[i]
 		if g.URL != w.URL || g.MajorAPIVersion != w.MajorAPIVersion ||
 			!g.ValidityPeriodStart.Equal(w.ValidityPeriodStart) ||
-			!g.ValidityPeriodEnd.Equal(w.ValidityPeriodEnd) {
+			!g.ValidityPeriodEnd.Equal(w.ValidityPeriodEnd) ||
+			g.Operator != w.Operator {
 			return false
 		}
 	}
 	return true
 }
 
-func newService(url string, now time.Time) Service {
+func newService(url, operator string, now time.Time) Service {
 	return Service{
 		URL:                 url,
 		MajorAPIVersion:     1,
 		ValidityPeriodStart: now.Add(-time.Hour),
 		ValidityPeriodEnd:   now.Add(time.Hour),
+		Operator:            operator,
 	}
 }
 
@@ -58,28 +61,33 @@ func TestSelectService(t *testing.T) {
 
 	services := []Service{
 		{
-			URL:                 "url1",
+			URL:                 "past-future-v1",
 			MajorAPIVersion:     1,
 			ValidityPeriodStart: past,
 			ValidityPeriodEnd:   future,
+			Operator:            "operator",
 		},
 		{
-			URL:                 "url2",
+			// Should never be selected since now-future-v2 is newer
+			URL:                 "past-future-v2",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: past,
 			ValidityPeriodEnd:   future,
+			Operator:            "operator",
 		},
 		{
-			URL:                 "url3_new",
+			URL:                 "now-future-v2",
 			MajorAPIVersion:     2,
-			ValidityPeriodStart: now,
+			ValidityPeriodStart: now.Add(-time.Minute),
 			ValidityPeriodEnd:   future,
+			Operator:            "operator",
 		},
 		{
-			URL:                 "url_no_end",
+			URL:                 "farfuture-present-v2",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: farFuture,
 			ValidityPeriodEnd:   time.Time{},
+			Operator:            "operator",
 		},
 	}
 
@@ -97,15 +105,15 @@ func TestSelectService(t *testing.T) {
 			services:          services,
 			supportedVersions: []uint32{1},
 			currentTime:       now,
-			expectedURL:       "url1",
+			expectedURL:       "past-future-v1",
 			expectedErr:       false,
 		},
 		{
-			name:              "multiple matching service, first selected",
+			name:              "multiple matching service, newest selected",
 			services:          services,
 			supportedVersions: []uint32{2},
 			currentTime:       now,
-			expectedURL:       "url2",
+			expectedURL:       "now-future-v2",
 			expectedErr:       false,
 		},
 		{
@@ -121,7 +129,7 @@ func TestSelectService(t *testing.T) {
 			services:          services,
 			supportedVersions: []uint32{2},
 			currentTime:       farFuture,
-			expectedURL:       "url_no_end",
+			expectedURL:       "farfuture-present-v2",
 			expectedErr:       false,
 		},
 		{
@@ -133,30 +141,22 @@ func TestSelectService(t *testing.T) {
 			expectedErrMessage: "no matching service found for API versions [1] and current time",
 		},
 		{
-			name:              "first service selected when multiple match",
-			services:          services,
-			supportedVersions: []uint32{2},
-			currentTime:       now.Add(time.Minute), // In the validity period of url3_new
-			expectedURL:       "url2",
-			expectedErr:       false,
-		},
-		{
 			name:              "match to highest API version with multiple supported versions",
 			services:          services,
 			supportedVersions: []uint32{1, 2},
 			currentTime:       now,
-			expectedURL:       "url2",
+			expectedURL:       "now-future-v2",
 			expectedErr:       false,
 		},
 		{
 			name: "match to highest API version with multiple supported versions, lower API version",
-			services: []Service{{URL: "url1",
+			services: []Service{{URL: "past-future-v1",
 				MajorAPIVersion:     1,
 				ValidityPeriodStart: past,
 				ValidityPeriodEnd:   future}},
 			supportedVersions: []uint32{2, 1},
 			currentTime:       now,
-			expectedURL:       "url1",
+			expectedURL:       "past-future-v1",
 			expectedErr:       false,
 		},
 		{
@@ -194,22 +194,33 @@ func TestSelectServices(t *testing.T) {
 
 	services := []Service{
 		{
-			URL:                 "url1",
+			URL:                 "past-future-v1",
 			MajorAPIVersion:     1,
 			ValidityPeriodStart: past,
 			ValidityPeriodEnd:   future,
+			Operator:            "operator",
 		},
 		{
-			URL:                 "url2",
+			// Should never be selected since now-future-v2 is newer
+			URL:                 "past-future-v2",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: past,
 			ValidityPeriodEnd:   future,
+			Operator:            "operator",
 		},
 		{
-			URL:                 "url3",
+			URL:                 "now-future-v2",
+			MajorAPIVersion:     2,
+			ValidityPeriodStart: now,
+			ValidityPeriodEnd:   future,
+			Operator:            "operator",
+		},
+		{
+			URL:                 "past-future-v2-diff-op",
 			MajorAPIVersion:     2,
 			ValidityPeriodStart: past,
 			ValidityPeriodEnd:   future,
+			Operator:            "operator-other",
 		},
 	}
 
@@ -225,14 +236,14 @@ func TestSelectServices(t *testing.T) {
 		expectedErrMessage string
 	}{
 		{
-			name:     "ALL selector, multiple matches",
+			name:     "ALL selector, multiple matches with newest selected, no duplicate operator",
 			services: services,
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ALL,
 			},
 			supportedVersions: []uint32{2},
 			currentTime:       now,
-			expectedURLs:      []string{"url2", "url3"},
+			expectedURLs:      []string{"now-future-v2", "past-future-v2-diff-op"},
 			expectedErr:       false,
 		},
 		{
@@ -243,7 +254,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{1},
 			currentTime:       now,
-			expectedURLs:      []string{"url1"},
+			expectedURLs:      []string{"past-future-v1"},
 			expectedErr:       false,
 		},
 		{
@@ -258,14 +269,14 @@ func TestSelectServices(t *testing.T) {
 			expectedErrMessage: "no matching services found for API versions [3] and current time",
 		},
 		{
-			name:     "ANY selector, multiple matches",
+			name:     "ANY selector, multiple matches with newest selected, no duplicate operator",
 			services: services,
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ANY,
 			},
 			supportedVersions: []uint32{2},
 			currentTime:       now,
-			possibleURLs:      [][]string{{"url2"}, {"url3"}},
+			possibleURLs:      [][]string{{"now-future-v2"}, {"past-future-v2-diff-op"}},
 			expectedErr:       false,
 		},
 		{
@@ -276,7 +287,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{1},
 			currentTime:       now,
-			expectedURLs:      []string{"url1"},
+			expectedURLs:      []string{"past-future-v1"},
 			expectedErr:       false,
 		},
 		{
@@ -299,7 +310,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{2},
 			currentTime:       now,
-			possibleURLs:      [][]string{{"url2"}, {"url3"}},
+			possibleURLs:      [][]string{{"now-future-v2"}, {"past-future-v2-diff-op"}},
 			expectedErr:       false,
 		},
 		{
@@ -311,7 +322,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{2},
 			currentTime:       now,
-			possibleURLs:      [][]string{{"url2", "url3"}, {"url3", "url2"}},
+			possibleURLs:      [][]string{{"now-future-v2", "past-future-v2-diff-op"}, {"past-future-v2-diff-op", "now-future-v2"}},
 			expectedErr:       false,
 		},
 		{
@@ -323,7 +334,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{1},
 			currentTime:       now,
-			expectedURLs:      []string{"url1"},
+			expectedURLs:      []string{"past-future-v1"},
 			expectedErr:       false,
 		},
 		{
@@ -405,12 +416,12 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{1, 2},
 			currentTime:       now,
-			expectedURLs:      []string{"url2", "url3"},
+			expectedURLs:      []string{"now-future-v2", "past-future-v2-diff-op"},
 			expectedErr:       false,
 		},
 		{
 			name: "match to highest API version with multiple supported versions, lower API version",
-			services: []Service{{URL: "url1",
+			services: []Service{{URL: "past-future-v1",
 				MajorAPIVersion:     1,
 				ValidityPeriodStart: past,
 				ValidityPeriodEnd:   future}},
@@ -419,7 +430,7 @@ func TestSelectServices(t *testing.T) {
 			},
 			supportedVersions: []uint32{2, 1},
 			currentTime:       now,
-			expectedURLs:      []string{"url1"},
+			expectedURLs:      []string{"past-future-v1"},
 			expectedErr:       false,
 		},
 		{
@@ -923,10 +934,10 @@ func TestNewSigningConfig(t *testing.T) {
 
 func TestNewSigningConfigWithOptions(t *testing.T) {
 	now := time.Now()
-	expectedCAService := newService("ca-url", now)
-	expectedOIDCService := newService("oidc-url", now)
-	expectedRekorLogService := newService("rekor-url", now)
-	expectedTSAService := newService("tsa-url", now)
+	expectedCAService := newService("ca-url", "operator", now)
+	expectedOIDCService := newService("oidc-url", "operator", now)
+	expectedRekorLogService := newService("rekor-url", "operator", now)
+	expectedTSAService := newService("tsa-url", "operator", now)
 	sc, err := NewSigningConfig(SigningConfigMediaType02, nil, nil, nil, ServiceConfiguration{}, nil, ServiceConfiguration{})
 	sc = sc.WithFulcioCertificateAuthorityURLs(expectedCAService).
 		WithOIDCProviderURLs(expectedOIDCService).
@@ -956,10 +967,10 @@ func TestNewSigningConfigWithOptions(t *testing.T) {
 		t.Errorf("unexpected TSA config, expected %v", sc.TimestampAuthorityURLsConfig())
 	}
 
-	expectedAddedCAService := newService("ca-url2", now)
-	expectedAddedOIDCService := newService("oidc-url2", now)
-	expectedAddedRekorLogService := newService("rekor-url2", now)
-	expectedAddedTSAService := newService("tsa-url2", now)
+	expectedAddedCAService := newService("ca-url2", "operator", now)
+	expectedAddedOIDCService := newService("oidc-url2", "operator", now)
+	expectedAddedRekorLogService := newService("rekor-url2", "operator", now)
+	expectedAddedTSAService := newService("tsa-url2", "operator", now)
 
 	sc = sc.AddFulcioCertificateAuthorityURLs(expectedAddedCAService).AddOIDCProviderURLs(expectedAddedOIDCService).
 		AddRekorLogURLs(expectedAddedRekorLogService).AddTimestampAuthorityURLs(expectedAddedTSAService)
@@ -975,4 +986,22 @@ func TestNewSigningConfigWithOptions(t *testing.T) {
 	if !servicesEqual(sc.TimestampAuthorityURLs(), []Service{expectedTSAService, expectedAddedTSAService}) {
 		t.Errorf("unexpected TSA service, expected %v, got %v", expectedTSAService, sc.TimestampAuthorityURLs())
 	}
+}
+
+func TestNewSigningConfigFromPath(t *testing.T) {
+	// Parse and validate a v0.2 signing config from root-signing-staging
+	signingConfig, err := NewSigningConfigFromPath("../../examples/signing_config.v0.2.json")
+	assert.NoError(t, err)
+	fulcioServices := signingConfig.FulcioCertificateAuthorityURLs()
+	assert.Len(t, fulcioServices, 1)
+	oidcServices := signingConfig.OIDCProviderURLs()
+	assert.Len(t, oidcServices, 1)
+	rekorServices := signingConfig.RekorLogURLs()
+	assert.Len(t, rekorServices, 1)
+	rekorConfig := signingConfig.RekorLogURLsConfig()
+	assert.Equal(t, rekorConfig.Selector, prototrustroot.ServiceSelector_ANY)
+	tsaServices := signingConfig.TimestampAuthorityURLs()
+	assert.Len(t, tsaServices, 1)
+	tsaConfig := signingConfig.TimestampAuthorityURLsConfig()
+	assert.Equal(t, tsaConfig.Selector, prototrustroot.ServiceSelector_ANY)
 }
