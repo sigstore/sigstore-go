@@ -173,8 +173,6 @@ func (r *Rekor) getRekorV2TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *protobundle.Bundle) (*protorekor.TransparencyLogEntry, error) {
 	dsseEnvelope := b.GetDsseEnvelope()
 	messageSignature := b.GetMessageSignature()
-	verificationMaterial := b.GetVerificationMaterial()
-	bundleCertificate := verificationMaterial.GetCertificate()
 
 	artifactProperties := types.ArtifactProperties{
 		PublicKeyBytes: [][]byte{keyOrCertPEM},
@@ -199,10 +197,6 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 		}
 	case messageSignature != nil:
 		hashedrekordType := hashedrekord.New()
-
-		if bundleCertificate == nil {
-			return nil, errors.New("hashedrekord requires X.509 certificate")
-		}
 
 		hexDigest := hex.EncodeToString(messageSignature.MessageDigest.Digest)
 

@@ -15,6 +15,9 @@
 package main
 
 import (
+	"crypto"
+	"crypto/x509"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
@@ -26,6 +29,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/util"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -196,6 +200,25 @@ func main() {
 		opts.CertificateProviderOptions = &sign.CertificateProviderOptions{
 			IDToken: *idToken,
 		}
+	} else {
+		block, _ := pem.Decode([]byte(publicKeyPem))
+		pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		verifier, err := signature.LoadVerifier(pubKey, crypto.SHA256)
+		if err != nil {
+			log.Fatal(err)
+		}
+		key := root.NewExpiringKey(verifier, time.Time{}, time.Time{})
+		keyTrustedMaterial := root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+			return key, nil
+		})
+		trustedMaterial := &verifyTrustedMaterial{
+			TrustedMaterial:    opts.TrustedRoot,
+			keyTrustedMaterial: keyTrustedMaterial,
+		}
+		opts.TrustedRoot = trustedMaterial
 	}
 
 	if *tsa {
@@ -256,4 +279,13 @@ func main() {
 	}
 
 	fmt.Println(string(bundleJSON))
+}
+
+type verifyTrustedMaterial struct {
+	root.TrustedMaterial
+	keyTrustedMaterial root.TrustedMaterial
+}
+
+func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstrainedVerifier, error) {
+	return v.keyTrustedMaterial.PublicKeyVerifier(hint)
 }
