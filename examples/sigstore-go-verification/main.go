@@ -116,11 +116,15 @@ func run() error {
 		verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
 	}
 
-	certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedOIDIssuerRegex, *expectedSAN, *expectedSANRegex)
-	if err != nil {
-		return err
+	if *trustedPublicKey == "" {
+		certID, err := verify.NewShortCertificateIdentity(*expectedOIDIssuer, *expectedOIDIssuerRegex, *expectedSAN, *expectedSANRegex)
+		if err != nil {
+			return err
+		}
+		identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
+	} else {
+		identityPolicies = append(identityPolicies, verify.WithKey())
 	}
-	identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
 
 	var trustedMaterial = make(root.TrustedMaterialCollection, 0)
 	var trustedRootJSON []byte
