@@ -39,6 +39,7 @@ type Service struct {
 	MajorAPIVersion     uint32
 	ValidityPeriodStart time.Time
 	ValidityPeriodEnd   time.Time
+	Operator            string
 }
 
 type ServiceConfiguration struct {
@@ -64,6 +65,7 @@ func NewService(s *prototrustroot.Service) Service {
 		MajorAPIVersion:     s.GetMajorApiVersion(),
 		ValidityPeriodStart: start,
 		ValidityPeriodEnd:   end,
+		Operator:            s.GetOperator(),
 	}
 }
 
@@ -76,13 +78,22 @@ func SelectService(services []Service, supportedAPIVersions []uint32, currentTim
 		return "", fmt.Errorf("no supported API versions")
 	}
 
+	// Order supported versions from highest to lowest
 	sortedVersions := make([]uint32, len(supportedAPIVersions))
 	copy(sortedVersions, supportedAPIVersions)
 	slices.Sort(sortedVersions)
 	slices.Reverse(sortedVersions)
 
+	// Order services from newest to oldest
+	sortedServices := make([]Service, len(services))
+	copy(sortedServices, services)
+	slices.SortFunc(sortedServices, func(i, j Service) int {
+		return i.ValidityPeriodStart.Compare(j.ValidityPeriodStart)
+	})
+	slices.Reverse(sortedServices)
+
 	for _, version := range sortedVersions {
-		for _, s := range services {
+		for _, s := range sortedServices {
 			if version == s.MajorAPIVersion && s.ValidAtTime(currentTime) {
 				return s.URL, nil
 			}
@@ -97,19 +108,34 @@ func SelectService(services []Service, supportedAPIVersions []uint32, currentTim
 // ALL will return all service endpoints, ANY will return a random endpoint, and
 // EXACT will return a random selection of a specified number of endpoints.
 // It will select services from the highest supported API versions and will not select
-// services from different API versions.
+// services from different API versions. It will select distinct service operators, selecting
+// at most one service per operator.
 func SelectServices(services []Service, config ServiceConfiguration, supportedAPIVersions []uint32, currentTime time.Time) ([]string, error) {
 	if len(supportedAPIVersions) == 0 {
 		return nil, fmt.Errorf("no supported API versions")
 	}
 
+	// Order services from newest to oldest
+	sortedServices := make([]Service, len(services))
+	copy(sortedServices, services)
+	slices.SortFunc(sortedServices, func(i, j Service) int {
+		return i.ValidityPeriodStart.Compare(j.ValidityPeriodStart)
+	})
+	slices.Reverse(sortedServices)
+
+	operators := make(map[string]bool)
 	urlsByVersion := make(map[uint32][]string)
-	for _, s := range services {
+	for _, s := range sortedServices {
 		if slices.Contains(supportedAPIVersions, s.MajorAPIVersion) && s.ValidAtTime(currentTime) {
-			urlsByVersion[s.MajorAPIVersion] = append(urlsByVersion[s.MajorAPIVersion], s.URL)
+			// Select only the first valid, newest operator
+			if !operators[s.Operator] {
+				operators[s.Operator] = true
+				urlsByVersion[s.MajorAPIVersion] = append(urlsByVersion[s.MajorAPIVersion], s.URL)
+			}
 		}
 	}
 
+	// Order supported versions from highest to lowest
 	sortedVersions := make([]uint32, len(supportedAPIVersions))
 	copy(sortedVersions, supportedAPIVersions)
 	slices.Sort(sortedVersions)
@@ -187,6 +213,7 @@ func (s Service) ToServiceProtobuf() *prototrustroot.Service {
 			Start: timestamppb.New(s.ValidityPeriodStart),
 			End:   timestamppb.New(s.ValidityPeriodEnd),
 		},
+		Operator: s.Operator,
 	}
 }
 
@@ -410,8 +437,9 @@ func FetchSigningConfigWithOptions(opts *tuf.Options) (*SigningConfig, error) {
 	return GetSigningConfig(client)
 }
 
-// FetchSigningConfig fetches the public-good Sigstore signing configuration target from TUF.
+// GetSigningConfig fetches the public-good Sigstore signing configuration target from TUF.
 func GetSigningConfig(c *tuf.Client) (*SigningConfig, error) {
+	// TODO(#495): Update to signing_config.v0.2.json once distributed by root-signing and root-signing-staging
 	jsonBytes, err := c.GetTarget("signing_config.json")
 	if err != nil {
 		return nil, err

@@ -132,8 +132,8 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		// TODO: Uncomment once an updated v0.2 SigningConfig is distributed
-		// via TUF
+		// TODO(#495): Uncomment once an updated v0.2 SigningConfig is distributed
+		// via TUF. Currently this is distributed only by the staging TUF repo.
 		// signingConfigPGI, err := root.GetSigningConfig(tufClient)
 
 		// for now we hard code the staging services here
@@ -146,6 +146,7 @@ func main() {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
 					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					Operator:            "sigstore.dev",
 				},
 			},
 			// OIDC Provider URLs
@@ -155,6 +156,7 @@ func main() {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
 					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					Operator:            "sigstore.dev",
 				},
 			},
 			// Rekor URLs
@@ -164,6 +166,7 @@ func main() {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
 					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					Operator:            "sigstore.dev",
 				},
 			},
 			root.ServiceConfiguration{
@@ -175,6 +178,7 @@ func main() {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: time.Now().Add(-time.Hour),
 					ValidityPeriodEnd:   time.Now().Add(time.Hour),
+					Operator:            "sigstore.dev",
 				},
 			},
 			root.ServiceConfiguration{
