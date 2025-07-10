@@ -206,14 +206,18 @@ func (s Service) ValidAtTime(t time.Time) bool {
 }
 
 func (s Service) ToServiceProtobuf() *prototrustroot.Service {
+	tr := &v1.TimeRange{
+		Start: timestamppb.New(s.ValidityPeriodStart),
+	}
+	if !s.ValidityPeriodEnd.IsZero() {
+		tr.End = timestamppb.New(s.ValidityPeriodEnd)
+	}
+
 	return &prototrustroot.Service{
 		Url:             s.URL,
 		MajorApiVersion: s.MajorAPIVersion,
-		ValidFor: &v1.TimeRange{
-			Start: timestamppb.New(s.ValidityPeriodStart),
-			End:   timestamppb.New(s.ValidityPeriodEnd),
-		},
-		Operator: s.Operator,
+		ValidFor:        tr,
+		Operator:        s.Operator,
 	}
 }
 
@@ -356,6 +360,10 @@ func (sc SigningConfig) String() string {
 		sc.RekorLogURLs(),
 		sc.TimestampAuthorityURLs(),
 		SigningConfigMediaType02)
+}
+
+func (sc SigningConfig) MarshalJSON() ([]byte, error) {
+	return protojson.Marshal(sc.signingConfig)
 }
 
 // NewSigningConfig initializes a SigningConfig object from a mediaType string, Fulcio certificate

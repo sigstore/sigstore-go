@@ -581,6 +581,7 @@ func TestSigningConfig_FulcioCertificateAuthorityURLs(t *testing.T) {
 						Url:             "https://fulcio.sigstore.dev",
 						MajorApiVersion: 1,
 						ValidFor:        &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now)},
+						Operator:        "operator",
 					},
 				},
 			},
@@ -590,6 +591,7 @@ func TestSigningConfig_FulcioCertificateAuthorityURLs(t *testing.T) {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
 					ValidityPeriodEnd:   now,
+					Operator:            "operator",
 				},
 			},
 		},
@@ -628,6 +630,7 @@ func TestSigningConfig_OIDCProviderURLs(t *testing.T) {
 						Url:             "https://oauth2.sigstore.dev/auth",
 						MajorApiVersion: 1,
 						ValidFor:        &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now)},
+						Operator:        "operator",
 					},
 				},
 			},
@@ -637,6 +640,7 @@ func TestSigningConfig_OIDCProviderURLs(t *testing.T) {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
 					ValidityPeriodEnd:   now,
+					Operator:            "operator",
 				},
 			},
 		},
@@ -675,6 +679,7 @@ func TestSigningConfig_RekorLogURLs(t *testing.T) {
 						Url:             "https://rekor.sigstore.dev",
 						MajorApiVersion: 1,
 						ValidFor:        &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now)},
+						Operator:        "operator",
 					},
 				},
 			},
@@ -684,6 +689,7 @@ func TestSigningConfig_RekorLogURLs(t *testing.T) {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
 					ValidityPeriodEnd:   now,
+					Operator:            "operator",
 				},
 			},
 		},
@@ -759,6 +765,7 @@ func TestSigningConfig_TimestampAuthorityURLs(t *testing.T) {
 						Url:             "https://timestamp.sigstore.dev",
 						MajorApiVersion: 1,
 						ValidFor:        &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now)},
+						Operator:        "operator",
 					},
 				},
 			},
@@ -768,6 +775,7 @@ func TestSigningConfig_TimestampAuthorityURLs(t *testing.T) {
 					MajorAPIVersion:     1,
 					ValidityPeriodStart: now,
 					ValidityPeriodEnd:   now,
+					Operator:            "operator",
 				},
 			},
 		},
@@ -868,20 +876,20 @@ func TestNewSigningConfig(t *testing.T) {
 			name: "valid",
 			args: args{
 				mediaType:                    SigningConfigMediaType02,
-				fulcioCertificateAuthorities: []Service{{URL: "https://fulcio.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				oidcProviders:                []Service{{URL: "https://oauth2.sigstore.dev/auth", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				rekorLogs:                    []Service{{URL: "https://rekor.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
-				timestampAuthorities:         []Service{{URL: "https://timestamp.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour)}},
+				fulcioCertificateAuthorities: []Service{{URL: "https://fulcio.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), MajorAPIVersion: 1, Operator: "operator"}},
+				oidcProviders:                []Service{{URL: "https://oauth2.sigstore.dev/auth", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), MajorAPIVersion: 1, Operator: "operator"}},
+				rekorLogs:                    []Service{{URL: "https://rekor.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), MajorAPIVersion: 1, Operator: "operator"}},
+				timestampAuthorities:         []Service{{URL: "https://timestamp.sigstore.dev", ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), MajorAPIVersion: 1, Operator: "operator"}},
 				config:                       ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
 			},
 			want: &SigningConfig{
 				signingConfig: &prototrustroot.SigningConfig{
 					MediaType:       SigningConfigMediaType02,
-					CaUrls:          []*prototrustroot.Service{{Url: "https://fulcio.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
-					OidcUrls:        []*prototrustroot.Service{{Url: "https://oauth2.sigstore.dev/auth", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
-					RekorTlogUrls:   []*prototrustroot.Service{{Url: "https://rekor.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
+					CaUrls:          []*prototrustroot.Service{{Url: "https://fulcio.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}, MajorApiVersion: 1, Operator: "operator"}},
+					OidcUrls:        []*prototrustroot.Service{{Url: "https://oauth2.sigstore.dev/auth", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}, MajorApiVersion: 1, Operator: "operator"}},
+					RekorTlogUrls:   []*prototrustroot.Service{{Url: "https://rekor.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}, MajorApiVersion: 1, Operator: "operator"}},
 					RekorTlogConfig: &prototrustroot.ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
-					TsaUrls:         []*prototrustroot.Service{{Url: "https://timestamp.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}}},
+					TsaUrls:         []*prototrustroot.Service{{Url: "https://timestamp.sigstore.dev", ValidFor: &v1.TimeRange{Start: timestamppb.New(now), End: timestamppb.New(now.Add(time.Hour))}, MajorApiVersion: 1, Operator: "operator"}},
 					TsaConfig:       &prototrustroot.ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY},
 				},
 			},
@@ -986,6 +994,83 @@ func TestNewSigningConfigWithOptions(t *testing.T) {
 	if !servicesEqual(sc.TimestampAuthorityURLs(), []Service{expectedTSAService, expectedAddedTSAService}) {
 		t.Errorf("unexpected TSA service, expected %v, got %v", expectedTSAService, sc.TimestampAuthorityURLs())
 	}
+}
+
+func TestSigningConfig_MarshalJSON(t *testing.T) {
+	now := time.Unix(1672531200, 0).UTC() // 2023-01-01 00:00:00 +0000 UTC
+	sc, err := NewSigningConfig(
+		SigningConfigMediaType02,
+		[]Service{{URL: "fulcio", MajorAPIVersion: 1, ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), Operator: "operator"}},
+		[]Service{{URL: "oidc", MajorAPIVersion: 1, ValidityPeriodStart: now, Operator: "operator"}}, // No end time
+		[]Service{{URL: "rekor", MajorAPIVersion: 1, ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), Operator: "operator"}},
+		ServiceConfiguration{Selector: prototrustroot.ServiceSelector_ANY, Count: 1},
+		[]Service{{URL: "tsa", MajorAPIVersion: 1, ValidityPeriodStart: now, ValidityPeriodEnd: now.Add(time.Hour), Operator: "operator"}},
+		ServiceConfiguration{Selector: prototrustroot.ServiceSelector_EXACT, Count: 1},
+	)
+	assert.NoError(t, err)
+
+	jsonBytes, err := sc.MarshalJSON()
+	assert.NoError(t, err)
+
+	startTimeStr := "2023-01-01T00:00:00Z"
+	endTimeStr := "2023-01-01T01:00:00Z"
+
+	expectedJSON := fmt.Sprintf(`{
+		"mediaType": "%s",
+		"caUrls": [
+			{
+				"url": "fulcio",
+				"majorApiVersion": 1,
+				"validFor": {
+					"start": "%s",
+					"end": "%s"
+				},
+				"operator": "operator"
+			}
+		],
+		"oidcUrls": [
+			{
+				"url": "oidc",
+				"majorApiVersion": 1,
+				"validFor": {
+					"start": "%s"
+				},
+				"operator": "operator"
+			}
+		],
+		"rekorTlogUrls": [
+			{
+				"url": "rekor",
+				"majorApiVersion": 1,
+				"validFor": {
+					"start": "%s",
+					"end": "%s"
+				},
+				"operator": "operator"
+			}
+		],
+		"rekorTlogConfig": {
+			"selector": "ANY",
+			"count": 1
+		},
+		"tsaUrls": [
+			{
+				"url": "tsa",
+				"majorApiVersion": 1,
+				"validFor": {
+					"start": "%s",
+					"end": "%s"
+				},
+				"operator": "operator"
+			}
+		],
+		"tsaConfig": {
+			"selector": "EXACT",
+			"count": 1
+		}
+	}`, SigningConfigMediaType02, startTimeStr, endTimeStr, startTimeStr, startTimeStr, endTimeStr, startTimeStr, endTimeStr)
+
+	assert.JSONEq(t, expectedJSON, string(jsonBytes))
 }
 
 func TestNewSigningConfigFromPath(t *testing.T) {
