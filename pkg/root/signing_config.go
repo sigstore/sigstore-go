@@ -115,6 +115,12 @@ func SelectServices(services []Service, config ServiceConfiguration, supportedAP
 		return nil, fmt.Errorf("no supported API versions")
 	}
 
+	// Order supported versions from highest to lowest
+	sortedVersions := make([]uint32, len(supportedAPIVersions))
+	copy(sortedVersions, supportedAPIVersions)
+	slices.Sort(sortedVersions)
+	slices.Reverse(sortedVersions)
+
 	// Order services from newest to oldest
 	sortedServices := make([]Service, len(services))
 	copy(sortedServices, services)
@@ -124,47 +130,43 @@ func SelectServices(services []Service, config ServiceConfiguration, supportedAP
 	slices.Reverse(sortedServices)
 
 	operators := make(map[string]bool)
-	urlsByVersion := make(map[uint32][]string)
-	for _, s := range sortedServices {
-		if slices.Contains(supportedAPIVersions, s.MajorAPIVersion) && s.ValidAtTime(currentTime) {
-			// Select only the first valid, newest operator
-			if !operators[s.Operator] {
-				operators[s.Operator] = true
-				urlsByVersion[s.MajorAPIVersion] = append(urlsByVersion[s.MajorAPIVersion], s.URL)
+	var urls []string
+	for _, version := range sortedVersions {
+		for _, s := range sortedServices {
+			if version == s.MajorAPIVersion && s.ValidAtTime(currentTime) {
+				// Select the newest service for a given operator
+				if !operators[s.Operator] {
+					operators[s.Operator] = true
+					urls = append(urls, s.URL)
+				}
 			}
+		}
+		// Exit once a list of services is found
+		if len(urls) != 0 {
+			break
 		}
 	}
 
-	// Order supported versions from highest to lowest
-	sortedVersions := make([]uint32, len(supportedAPIVersions))
-	copy(sortedVersions, supportedAPIVersions)
-	slices.Sort(sortedVersions)
-	slices.Reverse(sortedVersions)
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("no matching services found for API versions %v and current time %v", supportedAPIVersions, currentTime)
+	}
 
 	// Select services from the highest supported API version
-	for _, version := range sortedVersions {
-		urls, ok := urlsByVersion[version]
-		if !ok {
-			continue
+	switch config.Selector {
+	case prototrustroot.ServiceSelector_ALL:
+		return urls, nil
+	case prototrustroot.ServiceSelector_ANY:
+		i := rand.Intn(len(urls)) // #nosec G404
+		return []string{urls[i]}, nil
+	case prototrustroot.ServiceSelector_EXACT:
+		matchedUrls, err := selectExact(urls, config.Count)
+		if err != nil {
+			return nil, err
 		}
-		switch config.Selector {
-		case prototrustroot.ServiceSelector_ALL:
-			return urls, nil
-		case prototrustroot.ServiceSelector_ANY:
-			i := rand.Intn(len(urls)) // #nosec G404
-			return []string{urls[i]}, nil
-		case prototrustroot.ServiceSelector_EXACT:
-			matchedUrls, err := selectExact(urls, config.Count)
-			if err != nil {
-				return nil, err
-			}
-			return matchedUrls, nil
-		default:
-			return nil, fmt.Errorf("invalid service selector")
-		}
+		return matchedUrls, nil
+	default:
+		return nil, fmt.Errorf("invalid service selector")
 	}
-
-	return nil, fmt.Errorf("no matching services found for API versions %v and current time %v", supportedAPIVersions, currentTime)
 }
 
 func selectExact[T any](slice []T, count uint32) ([]T, error) {
