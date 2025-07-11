@@ -421,10 +421,14 @@ func TestSelectServices(t *testing.T) {
 		},
 		{
 			name: "match to highest API version with multiple supported versions, lower API version",
-			services: []Service{{URL: "past-future-v1",
-				MajorAPIVersion:     1,
-				ValidityPeriodStart: past,
-				ValidityPeriodEnd:   future}},
+			services: []Service{
+				{
+					URL:                 "past-future-v1",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: past,
+					ValidityPeriodEnd:   future,
+				},
+			},
 			config: ServiceConfiguration{
 				Selector: prototrustroot.ServiceSelector_ALL,
 			},
@@ -432,6 +436,35 @@ func TestSelectServices(t *testing.T) {
 			currentTime:       now,
 			expectedURLs:      []string{"past-future-v1"},
 			expectedErr:       false,
+		},
+		{
+			name: "select highest API version even if lower version service is newer",
+			services: []Service{
+				{
+					URL:                 "svc-v2",
+					MajorAPIVersion:     2,
+					ValidityPeriodStart: now.Add(-time.Hour),
+					Operator:            "operator",
+				},
+				{
+					URL:                 "svc-v1",
+					MajorAPIVersion:     1,
+					ValidityPeriodStart: now,
+					Operator:            "operator",
+				},
+				{
+					URL:                 "svc-op-other-v2",
+					MajorAPIVersion:     2,
+					ValidityPeriodStart: now.Add(-2 * time.Hour),
+					Operator:            "operator-other",
+				},
+			},
+			config: ServiceConfiguration{
+				Selector: prototrustroot.ServiceSelector_ALL,
+			},
+			supportedVersions: []uint32{1, 2},
+			currentTime:       now,
+			expectedURLs:      []string{"svc-v2", "svc-op-other-v2"},
 		},
 		{
 			name:     "no supported versions",
