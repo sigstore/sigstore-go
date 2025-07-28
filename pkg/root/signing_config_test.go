@@ -171,7 +171,7 @@ func TestSelectService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url, err := SelectService(tt.services, tt.supportedVersions, tt.currentTime)
+			service, err := SelectService(tt.services, tt.supportedVersions, tt.currentTime)
 			if (err != nil) != tt.expectedErr {
 				t.Errorf("SelectService() error = %v, expectedErr %v", err, tt.expectedErr)
 				return
@@ -180,8 +180,8 @@ func TestSelectService(t *testing.T) {
 				if err.Error()[:len(tt.expectedErrMessage)] != tt.expectedErrMessage {
 					t.Errorf("SelectService() error message = %v, expected %v", err.Error(), tt.expectedErrMessage)
 				}
-			} else if url != tt.expectedURL {
-				t.Errorf("SelectService() got = %v, want %v", url, tt.expectedURL)
+			} else if service.URL != tt.expectedURL {
+				t.Errorf("SelectService() got = %v, want %v", service.URL, tt.expectedURL)
 			}
 		})
 	}
@@ -481,10 +481,14 @@ func TestSelectServices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			urls, err := SelectServices(tt.services, tt.config, tt.supportedVersions, tt.currentTime)
+			services, err := SelectServices(tt.services, tt.config, tt.supportedVersions, tt.currentTime)
 			if (err != nil) != tt.expectedErr {
 				t.Errorf("SelectServices() error = %v, expectedErr %v", err, tt.expectedErr)
 				return
+			}
+			var urls []string
+			for _, s := range services {
+				urls = append(urls, s.URL)
 			}
 			if tt.expectedErr { //nolint:gocritic
 				if err.Error()[:len(tt.expectedErrMessage)] != tt.expectedErrMessage {

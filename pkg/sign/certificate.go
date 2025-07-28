@@ -57,6 +57,8 @@ type FulcioOptions struct {
 	Transport http.RoundTripper
 }
 
+var FulcioAPIVersions = []uint32{1}
+
 type fulcioCertRequest struct {
 	PublicKeyRequest publicKeyRequest `json:"publicKeyRequest"`
 }
