@@ -243,8 +243,12 @@ func main() {
 		}
 
 		// Check bundle and trusted root for Tlog information
-		if len(tr.RekorLogs()) > 0 && b.HasInclusionPromise() {
-			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
+		if len(tr.RekorLogs()) > 0 {
+			verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
+			// Check for inclusion promise and integrated time
+			if b.HasInclusionPromise() {
+				verifierConfig = append(verifierConfig, verify.WithIntegratedTimestamps(1))
+			}
 		}
 
 		sev, err := verify.NewVerifier(tr, verifierConfig...)
