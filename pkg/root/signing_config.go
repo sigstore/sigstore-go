@@ -449,8 +449,7 @@ func FetchSigningConfigWithOptions(opts *tuf.Options) (*SigningConfig, error) {
 
 // GetSigningConfig fetches the public-good Sigstore signing configuration target from TUF.
 func GetSigningConfig(c *tuf.Client) (*SigningConfig, error) {
-	// TODO(#495): Update to signing_config.v0.2.json once distributed by root-signing and root-signing-staging
-	jsonBytes, err := c.GetTarget("signing_config.json")
+	jsonBytes, err := c.GetTarget("signing_config.v0.2.json")
 	if err != nil {
 		return nil, err
 	}

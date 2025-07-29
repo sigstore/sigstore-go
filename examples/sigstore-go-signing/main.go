@@ -24,7 +24,6 @@ import (
 	"os"
 	"time"
 
-	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
@@ -98,6 +97,25 @@ func main() {
 
 	var signingConfig *root.SigningConfig
 
+	// We will use a TUF client to get the trusted root and the
+	// signing config from TUF, but only when using the default
+	// signing config
+	var stagingTUFClient *tuf.Client
+	if signingconfigPath == "" {
+		fetcher := fetcher.NewDefaultFetcher()
+		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
+
+		tufOptions := &tuf.Options{
+			Root:              tuf.StagingRoot(),
+			RepositoryBaseURL: tuf.StagingMirror,
+			Fetcher:           fetcher,
+		}
+		stagingTUFClient, err = tuf.New(tufOptions)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// A trusted root is not required but we will load one if
 	// * it is given as argument or
 	// * we are using default signing config (as in that case we know which trusted root to use)
@@ -108,19 +126,7 @@ func main() {
 		}
 	} else if signingconfigPath == "" {
 		// Get staging trusted_root.json by default
-		fetcher := fetcher.NewDefaultFetcher()
-		fetcher.SetHTTPUserAgent(util.ConstructUserAgent())
-
-		tufOptions := &tuf.Options{
-			Root:              tuf.StagingRoot(),
-			RepositoryBaseURL: tuf.StagingMirror,
-			Fetcher:           fetcher,
-		}
-		tufClient, err := tuf.New(tufOptions)
-		if err != nil {
-			log.Fatal(err)
-		}
-		opts.TrustedRoot, err = root.GetTrustedRoot(tufClient)
+		opts.TrustedRoot, err = root.GetTrustedRoot(stagingTUFClient)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -132,59 +138,7 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		// TODO(#495): Uncomment once an updated v0.2 SigningConfig is distributed
-		// via TUF. Currently this is distributed only by the staging TUF repo.
-		// signingConfigPGI, err := root.GetSigningConfig(tufClient)
-
-		// for now we hard code the staging services here
-		signingConfig, err = root.NewSigningConfig(
-			root.SigningConfigMediaType02,
-			// Fulcio URLs
-			[]root.Service{
-				{
-					URL:                 "https://fulcio.sigstage.dev",
-					MajorAPIVersion:     1,
-					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
-					Operator:            "sigstore.dev",
-				},
-			},
-			// OIDC Provider URLs
-			[]root.Service{
-				{
-					URL:                 "https://oauth2.sigstage.dev/auth",
-					MajorAPIVersion:     1,
-					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
-					Operator:            "sigstore.dev",
-				},
-			},
-			// Rekor URLs
-			[]root.Service{
-				{
-					URL:                 "https://rekor.sigstage.dev",
-					MajorAPIVersion:     1,
-					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
-					Operator:            "sigstore.dev",
-				},
-			},
-			root.ServiceConfiguration{
-				Selector: v1.ServiceSelector_ANY,
-			},
-			[]root.Service{
-				{
-					URL:                 "https://timestamp.sigstage.dev/api/v1/timestamp",
-					MajorAPIVersion:     1,
-					ValidityPeriodStart: time.Now().Add(-time.Hour),
-					ValidityPeriodEnd:   time.Now().Add(time.Hour),
-					Operator:            "sigstore.dev",
-				},
-			},
-			root.ServiceConfiguration{
-				Selector: v1.ServiceSelector_ANY,
-			},
-		)
+		signingConfig, err = root.GetSigningConfig(stagingTUFClient)
 		if err != nil {
 			log.Fatal(err)
 		}
