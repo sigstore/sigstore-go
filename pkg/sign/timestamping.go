@@ -46,6 +46,8 @@ type TimestampAuthority struct {
 	client  *http.Client
 }
 
+var TimestampAuthorityAPIVersions = []uint32{1}
+
 func NewTimestampAuthority(opts *TimestampAuthorityOptions) *TimestampAuthority {
 	ta := &TimestampAuthority{options: opts}
 	ta.client = &http.Client{

@@ -79,6 +79,8 @@ type RekorOptions struct {
 	Version  uint32
 }
 
+var RekorAPIVersions = []uint32{1, 2}
+
 func NewRekor(opts *RekorOptions) *Rekor {
 	if opts.Version == 0 {
 		opts.Version = rekorV1

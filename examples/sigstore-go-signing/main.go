@@ -145,12 +145,12 @@ func main() {
 	}
 
 	if *idToken != "" {
-		fulcioURL, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
+		fulcioService, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), sign.FulcioAPIVersions, time.Now())
 		if err != nil {
 			log.Fatal(err)
 		}
 		fulcioOpts := &sign.FulcioOptions{
-			BaseURL: fulcioURL,
+			BaseURL: fulcioService.URL,
 			Timeout: time.Duration(30 * time.Second),
 			Retries: 1,
 		}
@@ -180,14 +180,14 @@ func main() {
 	}
 
 	if *tsa {
-		tsaURLs, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(),
-			signingConfig.TimestampAuthorityURLsConfig(), []uint32{1}, time.Now())
+		tsaServices, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(),
+			signingConfig.TimestampAuthorityURLsConfig(), sign.TimestampAuthorityAPIVersions, time.Now())
 		if err != nil {
 			log.Fatal(err)
 		}
-		for _, tsaURL := range tsaURLs {
+		for _, tsaService := range tsaServices {
 			tsaOpts := &sign.TimestampAuthorityOptions{
-				URL:     tsaURL,
+				URL:     tsaService.URL,
 				Timeout: time.Duration(30 * time.Second),
 				Retries: 1,
 			}
@@ -196,31 +196,17 @@ func main() {
 	}
 
 	if *rekor {
-		rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(),
-			signingConfig.RekorLogURLsConfig(), []uint32{1}, time.Now())
+		rekorServices, err := root.SelectServices(signingConfig.RekorLogURLs(),
+			signingConfig.RekorLogURLsConfig(), sign.RekorAPIVersions, time.Now())
 		if err != nil {
-			log.Println("no Rekor logs found for version 1")
+			log.Fatal(err)
 		}
-		for _, rekorURL := range rekorURLs {
+		for _, rekorService := range rekorServices {
 			rekorOpts := &sign.RekorOptions{
-				BaseURL: rekorURL,
+				BaseURL: rekorService.URL,
 				Timeout: time.Duration(90 * time.Second),
 				Retries: 1,
-				Version: 1,
-			}
-			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
-		}
-		rekorURLs, err = root.SelectServices(signingConfig.RekorLogURLs(),
-			signingConfig.RekorLogURLsConfig(), []uint32{2}, time.Now())
-		if err != nil {
-			log.Println("no Rekor logs found for version 2")
-		}
-		for _, rekorURL := range rekorURLs {
-			rekorOpts := &sign.RekorOptions{
-				BaseURL: rekorURL,
-				Timeout: time.Duration(90 * time.Second),
-				Retries: 1,
-				Version: 2,
+				Version: rekorService.MajorAPIVersion,
 			}
 			opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 		}

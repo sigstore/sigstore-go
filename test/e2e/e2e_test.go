@@ -133,27 +133,27 @@ func TestSignVerify(t *testing.T) {
 }
 
 func signContent(signingConfig *root.SigningConfig, token string, content sign.Content, rekorVersion uint32, opts sign.BundleOptions) (*protobundle.Bundle, error) {
-	rekorURLs, err := root.SelectServices(signingConfig.RekorLogURLs(), signingConfig.RekorLogURLsConfig(), []uint32{rekorVersion}, time.Now())
+	rekorServices, err := root.SelectServices(signingConfig.RekorLogURLs(), signingConfig.RekorLogURLsConfig(), []uint32{rekorVersion}, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	for _, rekorURL := range rekorURLs {
-		log.Printf("using Rekor URL %s", rekorURL)
+	for _, rekorService := range rekorServices {
+		log.Printf("using Rekor URL %s", rekorService.URL)
 		rekorOpts := &sign.RekorOptions{
-			BaseURL: rekorURL,
+			BaseURL: rekorService.URL,
 			Timeout: time.Duration(90 * time.Second),
 			Retries: 1,
-			Version: rekorVersion,
+			Version: rekorService.MajorAPIVersion,
 		}
 		opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
 
-	fulcioURL, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
+	fulcioService, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
 	if err != nil {
 		return nil, err
 	}
 	fulcioOpts := &sign.FulcioOptions{
-		BaseURL: fulcioURL,
+		BaseURL: fulcioService.URL,
 		Timeout: time.Duration(30 * time.Second),
 		Retries: 1,
 	}
@@ -162,13 +162,13 @@ func signContent(signingConfig *root.SigningConfig, token string, content sign.C
 		IDToken: token,
 	}
 
-	tsaURLs, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(), signingConfig.TimestampAuthorityURLsConfig(), []uint32{1}, time.Now())
+	tsaServices, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(), signingConfig.TimestampAuthorityURLsConfig(), []uint32{1}, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	for _, tsaURL := range tsaURLs {
+	for _, tsaService := range tsaServices {
 		tsaOpts := &sign.TimestampAuthorityOptions{
-			URL:     tsaURL,
+			URL:     tsaService.URL,
 			Timeout: time.Duration(30 * time.Second),
 			Retries: 1,
 		}
