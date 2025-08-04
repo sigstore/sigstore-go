@@ -499,7 +499,6 @@ func NewLiveTrustedRootFromTargetWithPeriod(opts *tuf.Options, target string, rf
 	}
 
 	ticker := time.NewTicker(rfPeriod)
-	log.Printf("setting TUF refresh period to %s", rfPeriod)
 	go func() {
 		for range ticker.C {
 			client, err = tuf.New(opts)
