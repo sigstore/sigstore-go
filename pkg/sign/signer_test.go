@@ -15,8 +15,14 @@
 package sign
 
 import (
+	"crypto"
+	"crypto/ecdsa"
 	"testing"
+	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,4 +41,33 @@ func Test_Bundle(t *testing.T) {
 	bundle, err = Bundle(content, keypair, opts)
 	assert.NotNil(t, bundle)
 	assert.Nil(t, err)
+
+	pubKeyPem, err := keypair.GetPublicKeyPem()
+	assert.NoError(t, err)
+	pubKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(pubKeyPem))
+	assert.NoError(t, err)
+	opts.TrustedRoot = trustedPublicKeyMaterial(pubKey)
+
+	// Test signing and verification succeeds
+	bundle, err = Bundle(content, keypair, opts)
+	assert.NotNil(t, bundle)
+	assert.Nil(t, err)
+}
+
+type nonExpiringVerifier struct {
+	signature.Verifier
+}
+
+func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
+	return true
+}
+
+func trustedPublicKeyMaterial(pk crypto.PublicKey) *root.TrustedPublicKeyMaterial {
+	return root.NewTrustedPublicKeyMaterial(func(string) (root.TimeConstrainedVerifier, error) {
+		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		return &nonExpiringVerifier{verifier}, nil
+	})
 }
