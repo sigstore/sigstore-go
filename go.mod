@@ -21,9 +21,9 @@ require (
 	github.com/sigstore/timestamp-authority v1.2.8
 	github.com/stretchr/testify v1.10.0
 	github.com/theupdateframework/go-tuf/v2 v2.1.1
-	golang.org/x/crypto v0.40.0
-	golang.org/x/mod v0.26.0
-	google.golang.org/protobuf v1.36.6
+	golang.org/x/crypto v0.41.0
+	golang.org/x/mod v0.27.0
+	google.golang.org/protobuf v1.36.7
 )
 
 require (
@@ -134,9 +134,9 @@ require (
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/term v0.33.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/term v0.34.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.242.0 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
