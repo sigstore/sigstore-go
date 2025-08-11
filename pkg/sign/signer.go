@@ -108,21 +108,20 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		verifierPEM = []byte(pubKeyStr)
 	}
 
-	for _, timestampAuthority := range opts.TimestampAuthorities {
-		timestampBytes, err := timestampAuthority.GetTimestamp(opts.Context, signature)
-		if err != nil {
-			return nil, err
+	if len(opts.TimestampAuthorities) > 0 {
+		for _, timestampAuthority := range opts.TimestampAuthorities {
+			timestampBytes, err := timestampAuthority.GetTimestamp(opts.Context, signature)
+			if err != nil {
+				return nil, err
+			}
+			signedTimestamp := &protocommon.RFC3161SignedTimestamp{
+				SignedTimestamp: timestampBytes,
+			}
+			if bundle.VerificationMaterial.TimestampVerificationData == nil {
+				bundle.VerificationMaterial.TimestampVerificationData = &protobundle.TimestampVerificationData{}
+			}
+			bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps = append(bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps, signedTimestamp)
 		}
-
-		signedTimestamp := &protocommon.RFC3161SignedTimestamp{
-			SignedTimestamp: timestampBytes,
-		}
-
-		if bundle.VerificationMaterial.TimestampVerificationData == nil {
-			bundle.VerificationMaterial.TimestampVerificationData = &protobundle.TimestampVerificationData{}
-		}
-
-		bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps = append(bundle.VerificationMaterial.TimestampVerificationData.Rfc3161Timestamps, signedTimestamp)
 
 		verifierOptions = append(verifierOptions, verify.WithSignedTimestamps(len(opts.TimestampAuthorities)))
 	}
@@ -136,14 +135,29 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		}
 
 		verifierOptions = append(verifierOptions, verify.WithTransparencyLog(len(opts.TransparencyLogs)))
-		// Rekor v2 requires a timestamp authority, it will not provide integrated timestamps.
+		// Note: Rekor v2 requires a timestamp authority, it will not provide integrated timestamps.
 		// Verification will fail if a timestamp authority is not provided for Rekor v2.
 		if len(opts.TimestampAuthorities) == 0 {
-			verifierOptions = append(verifierOptions, verify.WithIntegratedTimestamps(len(opts.TransparencyLogs)))
+			// Only use the Rekor integrated timestamp if there's a certificate, otherwise don't require time
+			if opts.CertificateProvider != nil {
+				verifierOptions = append(verifierOptions, verify.WithIntegratedTimestamps(len(opts.TransparencyLogs)))
+			} else {
+				verifierOptions = append(verifierOptions, verify.WithNoObserverTimestamps())
+			}
 		}
 	}
 
-	if opts.TrustedRoot != nil && len(verifierOptions) > 0 {
+	// A time verification policy must be provided. If no signed timestamp or integrated timestamp was
+	// retrieved, verify a certificate with the current time or don't verify time for a key
+	if len(opts.TimestampAuthorities) == 0 && len(opts.TransparencyLogs) == 0 {
+		if opts.CertificateProvider != nil {
+			verifierOptions = append(verifierOptions, verify.WithCurrentTime())
+		} else {
+			verifierOptions = append(verifierOptions, verify.WithNoObserverTimestamps())
+		}
+	}
+
+	if opts.TrustedRoot != nil {
 		sev, err := verify.NewVerifier(opts.TrustedRoot, verifierOptions...)
 		if err != nil {
 			return nil, err

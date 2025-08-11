@@ -15,18 +15,27 @@
 package verify_test
 
 import (
+	"bytes"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/x509"
 	"errors"
 	"strings"
 	"testing"
+	"time"
 	"unicode"
 
 	"encoding/hex"
 	"encoding/json"
 
 	in_toto "github.com/in-toto/attestation/go/v1"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/testing/data"
 	"github.com/sigstore/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -46,6 +55,10 @@ func TestVerifierInitialization(t *testing.T) {
 	_, err = verify.NewVerifier(tr, verify.WithCurrentTime())
 	assert.Nil(t, err)
 
+	// or if we don't want timestamps at all
+	_, err = verify.NewVerifier(tr, verify.WithNoObserverTimestamps())
+	assert.Nil(t, err)
+
 	// can configure the verifiers with thresholds
 	_, err = verify.NewVerifier(tr, verify.WithTransparencyLog(2), verify.WithSignedTimestamps(10))
 
@@ -53,6 +66,16 @@ func TestVerifierInitialization(t *testing.T) {
 
 	// can't configure them with < 1 thresholds
 	_, err = verify.NewVerifier(tr, verify.WithTransparencyLog(0), verify.WithSignedTimestamps(-10))
+	assert.Error(t, err)
+
+	// can't configure no observer timestamp with any other options
+	_, err = verify.NewVerifier(tr, verify.WithNoObserverTimestamps(), verify.WithCurrentTime())
+	assert.Error(t, err)
+	_, err = verify.NewVerifier(tr, verify.WithNoObserverTimestamps(), verify.WithSignedTimestamps(1))
+	assert.Error(t, err)
+	_, err = verify.NewVerifier(tr, verify.WithNoObserverTimestamps(), verify.WithIntegratedTimestamps(1))
+	assert.Error(t, err)
+	_, err = verify.NewVerifier(tr, verify.WithNoObserverTimestamps(), verify.WithObserverTimestamps(1))
 	assert.Error(t, err)
 }
 
@@ -522,6 +545,43 @@ func TestForcedKeySignedEntityWithSCTsRequiredFails(t *testing.T) {
 	)
 }
 
+func TestNoTimestamp(t *testing.T) {
+	t.Run("key-signed", func(t *testing.T) {
+		keypair, err := sign.NewEphemeralKeypair(nil)
+		assert.NoError(t, err)
+
+		content := &sign.PlainData{Data: []byte("test content")}
+		pBundle, err := sign.Bundle(content, keypair, sign.BundleOptions{})
+		assert.NoError(t, err)
+		entity, err := bundle.NewBundle(pBundle)
+		assert.NoError(t, err)
+
+		pubKeyPem, err := keypair.GetPublicKeyPem()
+		assert.NoError(t, err)
+		pubKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(pubKeyPem))
+		assert.NoError(t, err)
+		trustedRoot := trustedPublicKeyMaterial(pubKey)
+
+		verifier, err := verify.NewVerifier(trustedRoot, verify.WithNoObserverTimestamps())
+		assert.NoError(t, err)
+
+		policy := verify.NewPolicy(verify.WithArtifact(bytes.NewReader(content.Data)), verify.WithKey())
+		_, err = verifier.Verify(entity, policy)
+		assert.NoError(t, err)
+	})
+
+	t.Run("certificate-signed", func(t *testing.T) {
+		// Test that verification fails with a certificate-signed entity without a timestamp
+		certEntity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
+		certTrustedRoot := data.TrustedRoot(t, "public-good.json")
+		certVerifier, err := verify.NewVerifier(certTrustedRoot, verify.WithNoObserverTimestamps())
+		assert.NoError(t, err)
+		_, err = certVerifier.Verify(certEntity, verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe()))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "must provide timestamp to verify certificate")
+	})
+}
+
 type keySignedEntityWrapper struct {
 	verify.SignedEntity
 	forceKey bool
@@ -567,4 +627,22 @@ func (p *mockPublicKeyProvider) PublicKey() ([]byte, error) {
 
 func (p *mockPublicKeyProvider) Hint() string {
 	return "mock"
+}
+
+type nonExpiringVerifier struct {
+	signature.Verifier
+}
+
+func (*nonExpiringVerifier) ValidAtTime(_ time.Time) bool {
+	return true
+}
+
+func trustedPublicKeyMaterial(pk crypto.PublicKey) root.TrustedMaterial {
+	return root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+		verifier, err := signature.LoadECDSAVerifier(pk.(*ecdsa.PublicKey), crypto.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		return &nonExpiringVerifier{verifier}, nil
+	})
 }
