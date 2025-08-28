@@ -68,7 +68,11 @@ func TestSignVerify(t *testing.T) {
 	if issuerURL == "" {
 		t.Fatal("must set ISSUER_URL")
 	}
-	token, err := getOIDCToken(issuerURL)
+	oidcURL := os.Getenv("OIDC_URL")
+	if oidcURL == "" {
+		t.Fatal("must set OIDC_URL")
+	}
+	token, err := getOIDCToken(oidcURL)
 	if err != nil {
 		t.Fatal(err)
 	}
