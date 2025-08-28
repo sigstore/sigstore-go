@@ -64,11 +64,11 @@ func TestSignVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oidcURL := os.Getenv("OIDC_URL")
-	if oidcURL == "" {
-		t.Fatal("must set OIDC_URL")
+	issuerURL := os.Getenv("ISSUER_URL")
+	if issuerURL == "" {
+		t.Fatal("must set ISSUER_URL")
 	}
-	token, err := getOIDCToken(oidcURL)
+	token, err := getOIDCToken(issuerURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestSignVerify(t *testing.T) {
 			protoBundle, err := signContent(signingConfig, token, test.content, test.rekorVersion, opts)
 			assert.NoError(t, err)
 
-			result, err := verifyBundle(protoBundle, oidcURL, defaultCertID, getDigest(artifactData), trustedRoot)
+			result, err := verifyBundle(protoBundle, issuerURL, defaultCertID, getDigest(artifactData), trustedRoot)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
