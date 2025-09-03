@@ -17,19 +17,21 @@
 package e2e
 
 import (
-	"crypto/sha256"
+	"crypto"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/sigstore/sigstore/pkg/signature/options"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -82,12 +84,16 @@ func TestSignVerify(t *testing.T) {
 		content            sign.Content
 		rekorVersion       uint32
 		expectedTimestamps int
+		signingAlg         protocommon.PublicKeyDetails // Defaults to ECDSA P-256 SHA-256
+		digestAlg          crypto.Hash
+		useKey             bool
 	}{
 		{
 			name: "hashedrekord_v001",
 			content: &sign.PlainData{
 				Data: artifactData,
 			},
+			digestAlg:          crypto.SHA256,
 			rekorVersion:       1,
 			expectedTimestamps: 2,
 		},
@@ -97,6 +103,7 @@ func TestSignVerify(t *testing.T) {
 				Data:        intotoData,
 				PayloadType: "application/vnd.in-toto+json",
 			},
+			digestAlg:          crypto.SHA256,
 			rekorVersion:       1,
 			expectedTimestamps: 2,
 		},
@@ -105,8 +112,41 @@ func TestSignVerify(t *testing.T) {
 			content: &sign.PlainData{
 				Data: artifactData,
 			},
+			digestAlg:          crypto.SHA256,
 			rekorVersion:       2,
 			expectedTimestamps: 1,
+		},
+		{
+			name: "hashedrekor_v002_key",
+			content: &sign.PlainData{
+				Data: artifactData,
+			},
+			digestAlg:          crypto.SHA256,
+			rekorVersion:       2,
+			expectedTimestamps: 1,
+			useKey:             true,
+		},
+		{
+			name: "hashedrekor_v002_ecdsa_p384",
+			content: &sign.PlainData{
+				Data: artifactData,
+			},
+			digestAlg:          crypto.SHA384,
+			rekorVersion:       2,
+			expectedTimestamps: 1,
+			signingAlg:         protocommon.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
+		},
+		{
+			name: "hashedrekor_v002_ed25519ph_key",
+			content: &sign.PlainData{
+				Data: artifactData,
+			},
+			digestAlg:          crypto.SHA512,
+			rekorVersion:       2,
+			expectedTimestamps: 1,
+			signingAlg:         protocommon.PublicKeyDetails_PKIX_ED25519_PH,
+			// when using ed25519, only self-managed keys are supported
+			useKey: true,
 		},
 		{
 			name: "dsse_v002",
@@ -114,35 +154,54 @@ func TestSignVerify(t *testing.T) {
 				Data:        intotoData,
 				PayloadType: "application/vnd.in-toto+json",
 			},
+			digestAlg:          crypto.SHA256,
 			rekorVersion:       2,
 			expectedTimestamps: 1,
+		},
+		{
+			name: "dsse_v002_ed25519",
+			content: &sign.DSSEData{
+				Data:        intotoData,
+				PayloadType: "application/vnd.in-toto+json",
+			},
+			digestAlg:          crypto.SHA256,
+			rekorVersion:       2,
+			expectedTimestamps: 1,
+			signingAlg:         protocommon.PublicKeyDetails_PKIX_ED25519,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			protoBundle, err := signContent(signingConfig, token, test.content, test.rekorVersion, opts)
+			keypair, err := sign.NewEphemeralKeypair(&sign.EphemeralKeypairOptions{Algorithm: test.signingAlg})
+			assert.NoError(t, err)
+			if test.useKey {
+				initTrustedRootWithKey(t, test.signingAlg, keypair.GetPublicKey(), &opts)
+			}
+
+			protoBundle, err := signContent(signingConfig, token, test.content, test.rekorVersion, keypair, test.useKey, opts)
 			assert.NoError(t, err)
 
-			result, err := verifyBundle(protoBundle, issuerURL, defaultCertID, getDigest(artifactData), trustedRoot)
+			result, err := verifyBundle(protoBundle, issuerURL, defaultCertID, getDigest(artifactData, test.digestAlg), test.useKey, opts.TrustedRoot)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 			assert.NotNil(t, result.Signature)
 			assert.Len(t, result.VerifiedTimestamps, test.expectedTimestamps)
-			assert.NotNil(t, result.VerifiedIdentity)
-			assert.Equal(t, result.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName, defaultCertID)
+			if !test.useKey {
+				assert.NotNil(t, result.VerifiedIdentity)
+				assert.Equal(t, result.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName, defaultCertID)
+			}
 		})
 	}
 }
 
-func signContent(signingConfig *root.SigningConfig, token string, content sign.Content, rekorVersion uint32, opts sign.BundleOptions) (*protobundle.Bundle, error) {
+func signContent(signingConfig *root.SigningConfig, token string, content sign.Content, rekorVersion uint32, keypair sign.Keypair, useKey bool, opts sign.BundleOptions) (*protobundle.Bundle, error) {
 	rekorServices, err := root.SelectServices(signingConfig.RekorLogURLs(), signingConfig.RekorLogURLsConfig(), []uint32{rekorVersion}, time.Now())
 	if err != nil {
 		return nil, err
 	}
 	for _, rekorService := range rekorServices {
-		log.Printf("using Rekor URL %s", rekorService.URL)
 		rekorOpts := &sign.RekorOptions{
 			BaseURL: rekorService.URL,
 			Timeout: time.Duration(90 * time.Second),
@@ -152,18 +211,20 @@ func signContent(signingConfig *root.SigningConfig, token string, content sign.C
 		opts.TransparencyLogs = append(opts.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
 
-	fulcioService, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	fulcioOpts := &sign.FulcioOptions{
-		BaseURL: fulcioService.URL,
-		Timeout: time.Duration(30 * time.Second),
-		Retries: 1,
-	}
-	opts.CertificateProvider = sign.NewFulcio(fulcioOpts)
-	opts.CertificateProviderOptions = &sign.CertificateProviderOptions{
-		IDToken: token,
+	if !useKey {
+		fulcioService, err := root.SelectService(signingConfig.FulcioCertificateAuthorityURLs(), []uint32{1}, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		fulcioOpts := &sign.FulcioOptions{
+			BaseURL: fulcioService.URL,
+			Timeout: time.Duration(30 * time.Second),
+			Retries: 1,
+		}
+		opts.CertificateProvider = sign.NewFulcio(fulcioOpts)
+		opts.CertificateProviderOptions = &sign.CertificateProviderOptions{
+			IDToken: token,
+		}
 	}
 
 	tsaServices, err := root.SelectServices(signingConfig.TimestampAuthorityURLs(), signingConfig.TimestampAuthorityURLsConfig(), []uint32{1}, time.Now())
@@ -179,28 +240,30 @@ func signContent(signingConfig *root.SigningConfig, token string, content sign.C
 		opts.TimestampAuthorities = append(opts.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
 	}
 
-	keypair, err := sign.NewEphemeralKeypair(nil)
-	if err != nil {
-		return nil, err
-	}
-
 	return sign.Bundle(content, keypair, opts)
 }
 
-func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, trustedRoot root.TrustedMaterial) (*verify.VerificationResult, error) {
+func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, useKey bool, trustedRoot root.TrustedMaterial) (*verify.VerificationResult, error) {
 	bundleObj := bundle.Bundle{Bundle: b}
 
 	verifierConfig := []verify.VerifierOption{
-		verify.WithSignedCertificateTimestamps(1),
 		verify.WithTransparencyLog(1),
 		verify.WithObserverTimestamps(1),
 	}
+	var identityPolicies []verify.PolicyOption
 
-	certID, err := verify.NewShortCertificateIdentity(issuer, "", san, "")
-	if err != nil {
-		return nil, err
+	if !useKey {
+		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+
+		certID, err := verify.NewShortCertificateIdentity(issuer, "", san, "")
+		if err != nil {
+			return nil, err
+		}
+		identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
+	} else {
+		identityPolicies = append(identityPolicies, verify.WithKey())
 	}
-	identityPolicies := []verify.PolicyOption{verify.WithCertificateIdentity(certID)}
+
 	artifactPolicy := verify.WithArtifactDigest("sha256", digest)
 
 	signedEntityVerifier, err := verify.NewVerifier(trustedRoot, verifierConfig...)
@@ -211,8 +274,10 @@ func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, trus
 	return signedEntityVerifier.Verify(&bundleObj, verify.NewPolicy(artifactPolicy, identityPolicies...))
 }
 
-func getDigest(artifact []byte) []byte {
-	digest := sha256.Sum256(artifact)
+func getDigest(artifact []byte, hf crypto.Hash) []byte {
+	hasher := hf.New()
+	hasher.Write(artifact)
+	digest := hasher.Sum(nil)
 	return digest[:]
 }
 
@@ -228,4 +293,32 @@ func getOIDCToken(issuer string) (string, error) {
 		return "", err
 	}
 	return string(body), nil
+}
+
+func initTrustedRootWithKey(t *testing.T, alg protocommon.PublicKeyDetails, pubKey crypto.PublicKey, opts *sign.BundleOptions) {
+	var defaultOpts []signature.LoadOption
+	if alg == protocommon.PublicKeyDetails_PKIX_ED25519_PH {
+		defaultOpts = []signature.LoadOption{options.WithED25519ph()}
+	}
+	verifier, err := signature.LoadDefaultVerifier(pubKey, defaultOpts...)
+	assert.NoError(t, err)
+
+	key := root.NewExpiringKey(verifier, time.Time{}, time.Time{})
+	keyTrustedMaterial := root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+		return key, nil
+	})
+	trustedMaterial := &verifyTrustedMaterial{
+		TrustedMaterial:    opts.TrustedRoot,
+		keyTrustedMaterial: keyTrustedMaterial,
+	}
+	opts.TrustedRoot = trustedMaterial
+}
+
+type verifyTrustedMaterial struct {
+	root.TrustedMaterial
+	keyTrustedMaterial root.TrustedMaterial
+}
+
+func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstrainedVerifier, error) {
+	return v.keyTrustedMaterial.PublicKeyVerifier(hint)
 }
