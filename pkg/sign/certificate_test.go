@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 )
 
@@ -156,4 +157,14 @@ func Test_GetCertificate(t *testing.T) {
 	cert, err = detachedFulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.NotNil(t, cert)
 	assert.NoError(t, err)
+
+	t.Run("ed25519ph unsupported", func(t *testing.T) {
+		// Test that Ed25519ph is rejected
+		keypair, err := NewEphemeralKeypair(&EphemeralKeypairOptions{Algorithm: protocommon.PublicKeyDetails_PKIX_ED25519_PH})
+		assert.Nil(t, err)
+		certOpts.IDToken = "idtoken.eyJzdWIiOiJzdWJqZWN0In0K.stuff" // #nosec G101
+		cert, err = fulcio.GetCertificate(ctx, keypair, certOpts)
+		assert.Nil(t, cert)
+		assert.ErrorContains(t, err, "ed25519ph unsupported by Fulcio")
+	})
 }

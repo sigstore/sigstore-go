@@ -16,6 +16,8 @@ package sign
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -37,6 +39,8 @@ import (
 	"github.com/sigstore/rekor/pkg/types/dsse"
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
 	rekorUtil "github.com/sigstore/rekor/pkg/util"
+	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/sigstore/sigstore/pkg/signature/options"
 
 	// To initialize rekor types
 	_ "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
@@ -123,19 +127,47 @@ func (r *Rekor) getRekorV2TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 	bundleCertificate := verificationMaterial.GetCertificate()
 
 	block, _ := pem.Decode(keyOrCertPEM)
-	keyDER := block.Bytes
+	keyOrCertDER := block.Bytes
 
-	verifier := &rekortilespb.Verifier{KeyDetails: protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256}
+	// Determine the signing algorithm for the public key
+	var pubKey crypto.PublicKey
+	var err error
+	switch block.Type {
+	case "PUBLIC KEY":
+		pubKey, err = x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+	case "CERTIFICATE":
+		c, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		pubKey = c.PublicKey
+	default:
+		return nil, fmt.Errorf("unknown key type: %s", block.Type)
+	}
+	var opts []signature.LoadOption
+	// When signing with ed25519, only the prehash variant is supported for hashedrekord
+	if messageSignature != nil {
+		opts = append(opts, options.WithED25519ph())
+	}
+	algoDetails, err := signature.GetDefaultAlgorithmDetails(pubKey, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("getting algorithm details: %w", err)
+	}
+
+	verifier := &rekortilespb.Verifier{KeyDetails: algoDetails.GetSignatureAlgorithm()}
 	if bundleCertificate != nil {
 		verifier.Verifier = &rekortilespb.Verifier_X509Certificate{
 			X509Certificate: &protocommon.X509Certificate{
-				RawBytes: keyDER,
+				RawBytes: keyOrCertDER,
 			},
 		}
 	} else {
 		verifier.Verifier = &rekortilespb.Verifier_PublicKey{
 			PublicKey: &rekortilespb.PublicKey{
-				RawBytes: keyDER,
+				RawBytes: keyOrCertDER,
 			},
 		}
 	}

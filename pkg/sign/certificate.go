@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/util"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 )
@@ -129,6 +130,11 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 	subject, err := oauthflow.SubjectFromUnverifiedToken(jwtString)
 	if err != nil {
 		return nil, err
+	}
+
+	// Fulcio doesn't support verifying Ed25519ph signatures currently.
+	if keypair.GetSigningAlgorithm() == protocommon.PublicKeyDetails_PKIX_ED25519_PH {
+		return nil, fmt.Errorf("ed25519ph unsupported by Fulcio")
 	}
 
 	// Sign JWT subject for proof of possession

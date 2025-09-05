@@ -748,6 +748,11 @@ func (v *Verifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationR
 		result.Signature = &SignatureVerificationResult{
 			Certificate: &certSummary,
 		}
+	} else {
+		pubKeyID := []byte(verificationContent.PublicKey().Hint())
+		result.Signature = &SignatureVerificationResult{
+			PublicKeyID: &pubKeyID,
+		}
 	}
 
 	// SignatureContent can be either an Envelope or a MessageSignature.
