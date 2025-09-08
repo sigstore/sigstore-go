@@ -18,50 +18,89 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/elliptic"
+	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	_ "crypto/sha512" // if user chooses SHA2-384 or SHA2-512 for hash
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
+	"fmt"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Keypair interface {
 	GetHashAlgorithm() protocommon.HashAlgorithm
+	GetSigningAlgorithm() protocommon.PublicKeyDetails
 	GetHint() []byte
 	GetKeyAlgorithm() string
+	GetPublicKey() crypto.PublicKey
 	GetPublicKeyPem() (string, error)
 	SignData(ctx context.Context, data []byte) ([]byte, []byte, error)
 }
 
 type EphemeralKeypairOptions struct {
-	// Optional hint of for signing key
+	// Optional fingerprint for public key
 	Hint []byte
-	// TODO: support additional key algorithms
+	// Optional algorithm for generating signing key
+	Algorithm protocommon.PublicKeyDetails
 }
 
 type EphemeralKeypair struct {
-	options       *EphemeralKeypairOptions
-	privateKey    *ecdsa.PrivateKey
-	hashAlgorithm protocommon.HashAlgorithm
+	options    *EphemeralKeypairOptions
+	privKey    crypto.Signer
+	algDetails signature.AlgorithmDetails
 }
 
+// NewEphemeralKeypair generates a signing key to be used for a single signature generation.
+// Defaults to ECDSA P-256 SHA-256 with a SHA-256 key hint.
 func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, error) {
 	if opts == nil {
 		opts = &EphemeralKeypairOptions{}
 	}
 
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// Default signing algorithm is ECDSA P-256 SHA-256
+	if opts.Algorithm == protocommon.PublicKeyDetails_PUBLIC_KEY_DETAILS_UNSPECIFIED {
+		opts.Algorithm = protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256
+	}
+	algDetails, err := signature.GetAlgorithmDetails(opts.Algorithm)
 	if err != nil {
 		return nil, err
 	}
+	var privKey crypto.Signer
+	switch kt := algDetails.GetKeyType(); kt {
+	case signature.ECDSA:
+		curve, err := algDetails.GetECDSACurve()
+		if err != nil {
+			return nil, err
+		}
+		privKey, err = ecdsa.GenerateKey(*curve, rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+	case signature.RSA:
+		bitSize, err := algDetails.GetRSAKeySize()
+		if err != nil {
+			return nil, err
+		}
+		privKey, err = rsa.GenerateKey(rand.Reader, int(bitSize))
+		if err != nil {
+			return nil, err
+		}
+	case signature.ED25519:
+		_, privKey, err = ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported key type: %T", kt)
+	}
 
 	if opts.Hint == nil {
-		pubKeyBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(privKey.Public())
 		if err != nil {
 			return nil, err
 		}
@@ -70,28 +109,52 @@ func NewEphemeralKeypair(opts *EphemeralKeypairOptions) (*EphemeralKeypair, erro
 	}
 
 	ephemeralKeypair := EphemeralKeypair{
-		options:       opts,
-		privateKey:    privateKey,
-		hashAlgorithm: protocommon.HashAlgorithm_SHA2_256,
+		options:    opts,
+		privKey:    privKey,
+		algDetails: algDetails,
 	}
 
 	return &ephemeralKeypair, nil
 }
 
+// GetHashAlgorithm returns the hash algorithm to compute the digest to sign.
 func (e *EphemeralKeypair) GetHashAlgorithm() protocommon.HashAlgorithm {
-	return e.hashAlgorithm
+	return e.algDetails.GetProtoHashType()
 }
 
+// GetSigningAlgorithm returns the signing algorithm of the key.
+func (e *EphemeralKeypair) GetSigningAlgorithm() protocommon.PublicKeyDetails {
+	return e.algDetails.GetSignatureAlgorithm()
+}
+
+// GetHint returns the fingerprint of the public key.
 func (e *EphemeralKeypair) GetHint() []byte {
 	return e.options.Hint
 }
 
+// GetKeyAlgorithm returns the top-level key algorithm, used as part of requests
+// to Fulcio. Prefer PublicKeyDetails for a more precise algorithm.
 func (e *EphemeralKeypair) GetKeyAlgorithm() string {
-	return "ECDSA"
+	switch e.algDetails.GetKeyType() {
+	case signature.ECDSA:
+		return "ECDSA"
+	case signature.RSA:
+		return "RSA"
+	case signature.ED25519:
+		return "ED25519"
+	default:
+		return ""
+	}
 }
 
+// GetPublicKey returns the public key.
+func (e *EphemeralKeypair) GetPublicKey() crypto.PublicKey {
+	return e.privKey.Public()
+}
+
+// GetPublicKeyPem returns the public key in PEM format.
 func (e *EphemeralKeypair) GetPublicKeyPem() (string, error) {
-	pubKeyBytes, err := cryptoutils.MarshalPublicKeyToPEM(e.privateKey.Public())
+	pubKeyBytes, err := cryptoutils.MarshalPublicKeyToPEM(e.privKey.Public())
 	if err != nil {
 		return "", err
 	}
@@ -99,34 +162,20 @@ func (e *EphemeralKeypair) GetPublicKeyPem() (string, error) {
 	return string(pubKeyBytes), nil
 }
 
-func getHashFunc(hashAlgorithm protocommon.HashAlgorithm) (crypto.Hash, error) {
-	switch hashAlgorithm {
-	case protocommon.HashAlgorithm_SHA2_256:
-		return crypto.Hash(crypto.SHA256), nil
-	case protocommon.HashAlgorithm_SHA2_384:
-		return crypto.Hash(crypto.SHA384), nil
-	case protocommon.HashAlgorithm_SHA2_512:
-		return crypto.Hash(crypto.SHA512), nil
-	default:
-		var hash crypto.Hash
-		return hash, errors.New("unsupported hash algorithm")
-	}
-}
-
+// SignData returns the signature and the data to sign, which is a digest except when
+// signing with Ed25519.
 func (e *EphemeralKeypair) SignData(_ context.Context, data []byte) ([]byte, []byte, error) {
-	hashFunc, err := getHashFunc(e.hashAlgorithm)
+	hf := e.algDetails.GetHashType()
+	dataToSign := data
+	// RSA, ECDSA, and Ed25519ph sign a digest, while pure Ed25519's interface takes data and hashes during signing
+	if hf != crypto.Hash(0) {
+		hasher := hf.New()
+		hasher.Write(data)
+		dataToSign = hasher.Sum(nil)
+	}
+	signature, err := e.privKey.Sign(rand.Reader, dataToSign, hf)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	hasher := hashFunc.New()
-	hasher.Write(data)
-	digest := hasher.Sum(nil)
-
-	signature, err := e.privateKey.Sign(rand.Reader, digest, hashFunc)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return signature, digest, nil
+	return signature, dataToSign, nil
 }
