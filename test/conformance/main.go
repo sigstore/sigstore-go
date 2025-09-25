@@ -40,10 +40,11 @@ var certSAN *string
 var identityToken *string
 var staging = false
 var trustedRootPath *string
+var signingConfigPath *string
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Printf("\t%s sign-bundle --identity-token TOKEN --bundle FILE [--staging] FILE", os.Args[0])
+	fmt.Printf("\t%s sign-bundle --identity-token TOKEN --bundle FILE [--signing-config FILE] [--trusted-root FILE] [--staging] FILE", os.Args[0])
 	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 }
 
@@ -107,13 +108,16 @@ func parseArgs() {
 		case "--trusted-root":
 			trustedRootPath = &os.Args[i+1]
 			i += 2
+		case "--signing-config":
+			signingConfigPath = &os.Args[i+1]
+			i += 2
 		default:
 			i++
 		}
 	}
 }
 
-func signBundle(withRekor bool) (*protobundle.Bundle, error) {
+func signBundle() (*protobundle.Bundle, error) {
 	timeout := time.Duration(60 * time.Second)
 
 	signingOptions := sign.BundleOptions{}
@@ -123,8 +127,53 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 		instance = "sigstage"
 	}
 
+	var sc *root.SigningConfig
+	if signingConfigPath != nil {
+		var err error
+		sc, err = root.NewSigningConfigFromPath(*signingConfigPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var fulcioURL string
+	var rekorVersion uint32
+	var rekorURLs []string
+	var tsaURLs []string
+	if sc != nil {
+		fulcioService, err := root.SelectService(sc.FulcioCertificateAuthorityURLs(), sign.FulcioAPIVersions, time.Now())
+		fulcioURL = fulcioService.URL
+		if err != nil {
+			return nil, err
+		}
+
+		rekorServices, err := root.SelectServices(sc.RekorLogURLs(),
+			sc.RekorLogURLsConfig(), sign.RekorAPIVersions, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		for _, rekorService := range rekorServices {
+			rekorURLs = append(rekorURLs, rekorService.URL)
+			// root.SelectServices will only select one API version
+			rekorVersion = rekorService.MajorAPIVersion
+		}
+
+		tsaServices, err := root.SelectServices(sc.TimestampAuthorityURLs(),
+			sc.TimestampAuthorityURLsConfig(), sign.TimestampAuthorityAPIVersions, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		for _, tsaService := range tsaServices {
+			tsaURLs = append(tsaURLs, tsaService.URL)
+		}
+	} else {
+		fulcioURL = fmt.Sprintf("https://fulcio.%s.dev", instance)
+		rekorURLs = append(rekorURLs, fmt.Sprintf("https://rekor.%s.dev", instance))
+		tsaURLs = append(tsaURLs, fmt.Sprintf("https://timestamp.%s.dev/api/v1/timestamp", instance))
+	}
+
 	fulcioOpts := &sign.FulcioOptions{
-		BaseURL: fmt.Sprintf("https://fulcio.%s.dev", instance),
+		BaseURL: fulcioURL,
 		Timeout: timeout,
 	}
 	signingOptions.CertificateProvider = sign.NewFulcio(fulcioOpts)
@@ -132,18 +181,24 @@ func signBundle(withRekor bool) (*protobundle.Bundle, error) {
 		IDToken: *identityToken,
 	}
 
-	if withRekor {
-		rekorOpts := &sign.RekorOptions{
-			BaseURL: fmt.Sprintf("https://rekor.%s.dev", instance),
+	for _, tsaURL := range tsaURLs {
+		tsaOpts := &sign.TimestampAuthorityOptions{
+			URL:     tsaURL,
 			Timeout: timeout,
+		}
+		signingOptions.TimestampAuthorities = append(signingOptions.TimestampAuthorities, sign.NewTimestampAuthority(tsaOpts))
+	}
+
+	for _, rekorURL := range rekorURLs {
+		rekorOpts := &sign.RekorOptions{
+			BaseURL: rekorURL,
+			Timeout: timeout,
+			Version: rekorVersion,
 		}
 		signingOptions.TransparencyLogs = append(signingOptions.TransparencyLogs, sign.NewRekor(rekorOpts))
 	}
 
-	if withRekor {
-		// Verification will only work with Rekor
-		signingOptions.TrustedRoot = getTrustedRoot(staging)
-	}
+	signingOptions.TrustedRoot = getTrustedRoot(staging)
 
 	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
 	if err != nil {
@@ -173,7 +228,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "sign-bundle":
-		bundle, err := signBundle(true)
+		bundle, err := signBundle()
 		if err != nil {
 			log.Fatal(err)
 		}
