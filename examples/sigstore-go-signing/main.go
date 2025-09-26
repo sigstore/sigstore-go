@@ -138,6 +138,12 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
+		// Note to developers: When fetching services from the public-good instance's
+		// SigningConfig, you may retrieve a service with a higher API version than
+		// clients that verify support, e.g. uploading to Rekor v2, but verifying with
+		// a client that only supports Rekor v1. If you are not able to keep verifying
+		// clients up-to-date, you may want to select specific API versions when calling
+		// root.SelectService.
 		signingConfig, err = root.GetSigningConfig(stagingTUFClient)
 		if err != nil {
 			log.Fatal(err)
