@@ -1155,8 +1155,8 @@ github.com/sigstore/protobuf-specs v0.5.0 h1:F8YTI65xOHw70NrvPwJ5PhAzsvTnuJMGLkA
 github.com/sigstore/protobuf-specs v0.5.0/go.mod h1:+gXR+38nIa2oEupqDdzg4qSBT0Os+sP7oYv6alWewWc=
 github.com/sigstore/rekor v1.4.2 h1:Lx2xby7loviFYdg2C9pB1mESk2QU/LqcYSGsqqZwmg8=
 github.com/sigstore/rekor v1.4.2/go.mod h1:nX/OYaLqpTeCOuMEt7ELE0+5cVjZWFnFKM+cZ+3hQRA=
-github.com/sigstore/rekor-tiles/v2 v2.0.0-rc2 h1:6Jr9jbGIZD6Wsx/jrC8O8Lh0o+oJlx5EVWRstg9aSFo=
-github.com/sigstore/rekor-tiles/v2 v2.0.0-rc2/go.mod h1:1HyDsS2pQg36OoEZ0SeGmQIGflxK5W3nWW1Z+G6IWA8=
+github.com/sigstore/rekor-tiles/v2 v2.0.0 h1:RDi03W/k7TOB+1StMOVdUaufKqtFImrh0KpOEPwsiV0=
+github.com/sigstore/rekor-tiles/v2 v2.0.0/go.mod h1:1HyDsS2pQg36OoEZ0SeGmQIGflxK5W3nWW1Z+G6IWA8=
 github.com/sigstore/sigstore v1.9.6-0.20250729224751-181c5d3339b3 h1:IEhSeWfhTd0kaBpHUXniWU2Tl5K5OUACN69mi1WGd+8=
 github.com/sigstore/sigstore v1.9.6-0.20250729224751-181c5d3339b3/go.mod h1:JuqyPRJYnkNl6OTnQiG503EUnKih4P5EV6FUw+1B0iA=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.9.5 h1:qp2VFyKuFQvTGmZwk5Q7m5nE4NwnF9tHwkyz0gtWAck=
