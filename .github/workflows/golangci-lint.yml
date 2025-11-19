@@ -37,7 +37,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47 # v9.0.0
         with:
-          version: v2.4
+          version: v2.6
           args: --verbose
           # sometimes the pkg cache gets corrupted, skipping cache avoids this
           # https://github.com/golangci/golangci-lint-action/issues/23
