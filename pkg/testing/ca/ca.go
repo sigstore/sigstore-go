@@ -54,7 +54,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
-	tsx509 "github.com/sigstore/timestamp-authority/pkg/x509"
+	tsx509 "github.com/sigstore/timestamp-authority/v2/pkg/x509"
 )
 
 type VirtualSigstore struct {
