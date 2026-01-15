@@ -416,6 +416,7 @@ func (entry *Entry) TransparencyLogEntry() *v1.TransparencyLogEntry {
 }
 
 // VerifyInclusion verifies a Rekor v1-style checkpoint and the entry's inclusion in the Rekor v1 log.
+// Prefer verify.VerifyTlogEntry, which also compares the log entry against a provided bundle.
 func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {
 	hashes := make([]string, len(entry.tle.InclusionProof.Hashes))
 	for i, b := range entry.tle.InclusionProof.Hashes {
@@ -453,6 +454,7 @@ func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {
 
 // VerifyCheckpointAndInclusion verifies a checkpoint and the entry's inclusion in the transparency log.
 // This function is compatible with Rekor v1 and Rekor v2.
+// Prefer verify.VerifyTlogEntry, which also compares the log entry against a provided bundle.
 func VerifyCheckpointAndInclusion(entry *Entry, verifier signature.Verifier, origin string) error {
 	noteVerifier, err := note.NewNoteVerifier(origin, verifier)
 	if err != nil {
@@ -466,6 +468,8 @@ func VerifyCheckpointAndInclusion(entry *Entry, verifier signature.Verifier, ori
 	return nil
 }
 
+// VerifySET verifies the inclusion promise, aka the Signed Entry Timestamp.
+// Prefer verify.VerifyTlogEntry, which also compares the log entry against a provided bundle.
 func VerifySET(entry *Entry, verifiers map[string]*root.TransparencyLog) error {
 	if entry.rekorV1Entry == nil {
 		return fmt.Errorf("can only verify SET for Rekor v1 entry")
