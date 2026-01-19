@@ -15,6 +15,7 @@
 package tlog
 
 import (
+	"bytes"
 	"testing"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
@@ -308,6 +309,12 @@ func TestNewTlogEntryRejectsRekorV2WithEmptySpec(t *testing.T) {
 
 	_, err := NewTlogEntry(&tle)
 	assert.Error(t, err)
+}
+
+func TestUnmarshalRekorV2EntryRejectsWrongApiVersionForEntryType(t *testing.T) {
+	body := bytes.Replace(entryBodyV2, []byte(`"apiVersion": "0.0.2"`), []byte(`"apiVersion": "0.0.1"`), 1)
+	_, err := unmarshalRekorV2Entry(body)
+	assert.ErrorIs(t, err, ErrInvalidRekorV2Entry)
 }
 
 func TestValidateEntryRejectsRekorV2WhenSpecIsUnset(t *testing.T) {

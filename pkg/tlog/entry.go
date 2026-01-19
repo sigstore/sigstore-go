@@ -536,13 +536,18 @@ func unmarshalRekorV2Entry(body []byte) (*rekortilespb.Entry, error) {
 	if err := protojson.Unmarshal(body, &logEntryBody); err != nil {
 		return nil, ErrInvalidRekorV2Entry
 	}
-	if logEntryBody.GetApiVersion() != "0.0.2" {
-		return nil, ErrInvalidRekorV2Entry
-	}
-	switch logEntryBody.GetSpec().GetSpec().(type) {
+
+	spec := logEntryBody.GetSpec().GetSpec()
+	allowedAPIVersion := ""
+	switch spec.(type) {
 	case *rekortilespb.Spec_HashedRekordV002, *rekortilespb.Spec_DsseV002:
-		return &logEntryBody, nil
+		allowedAPIVersion = "0.0.2"
 	default:
 		return nil, ErrInvalidRekorV2Entry
 	}
+	if logEntryBody.GetApiVersion() != allowedAPIVersion {
+		return nil, ErrInvalidRekorV2Entry
+	}
+
+	return &logEntryBody, nil
 }
