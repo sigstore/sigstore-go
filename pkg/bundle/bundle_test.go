@@ -35,7 +35,7 @@ import (
 
 func buildBundleJSONWithTlogEntries(count int) []byte {
 	var b bytes.Buffer
-	b.WriteString(`{"verificationMaterial":{"tlogEntries":[`)
+	b.WriteString(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":[`)
 	for i := 0; i < count; i++ {
 		if i > 0 {
 			b.WriteByte(',')
@@ -68,21 +68,21 @@ func TestBundleUnmarshalJSON_TlogEntriesAtLimitDoesNotTripCap(t *testing.T) {
 
 func TestBundleUnmarshalJSON_TlogEntriesAbsentDoesNotTripCap(t *testing.T) {
 	var b Bundle
-	err := b.UnmarshalJSON([]byte(`{"verificationMaterial":{}}`))
+	err := b.UnmarshalJSON([]byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{}}`))
 	require.Error(t, err)
 	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
 }
 
 func TestBundleUnmarshalJSON_TlogEntriesNullDoesNotTripCap(t *testing.T) {
 	var b Bundle
-	err := b.UnmarshalJSON([]byte(`{"verificationMaterial":{"tlogEntries":null}}`))
+	err := b.UnmarshalJSON([]byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":null}}`))
 	require.Error(t, err)
 	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
 }
 
 func TestBundleUnmarshalJSON_TlogEntriesEmptyArrayDoesNotTripCap(t *testing.T) {
 	var b Bundle
-	err := b.UnmarshalJSON([]byte(`{"verificationMaterial":{"tlogEntries":[]}}`))
+	err := b.UnmarshalJSON([]byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":[]}}`))
 	require.Error(t, err)
 	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
 }

@@ -15,10 +15,8 @@
 package bundle
 
 import (
-	"bytes"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -48,7 +46,7 @@ var ErrDecodingB64 = fmt.Errorf("%w: decoding base64", ErrInvalidAttestation)
 
 const mediaTypeBase = "application/vnd.dev.sigstore.bundle"
 
-// defense-in-depth: bound attacker-controlled counts during parse.
+// defense-in-depth: bound the number of tlog entries processed from a bundle.
 // note: callers should still enforce overall bundle byte-size limits at ingestion.
 const maxAllowedTlogEntries = 100
 
@@ -231,129 +229,7 @@ func (b *Bundle) MarshalJSON() ([]byte, error) {
 	return protojson.Marshal(b.Bundle)
 }
 
-func skipJSONValue(dec *json.Decoder) error {
-	tok, err := dec.Token()
-	if err != nil {
-		return err
-	}
-
-	delim, ok := tok.(json.Delim)
-	if !ok {
-		return nil
-	}
-
-	switch delim {
-	case '{':
-		for dec.More() {
-			if _, err := dec.Token(); err != nil { // key
-				return err
-			}
-			if err := skipJSONValue(dec); err != nil { // value
-				return err
-			}
-		}
-		_, err := dec.Token() // '}'
-		return err
-	case '[':
-		for dec.More() {
-			if err := skipJSONValue(dec); err != nil {
-				return err
-			}
-		}
-		_, err := dec.Token() // ']'
-		return err
-	default:
-		return nil
-	}
-}
-
-// enforceTlogEntriesBound fails closed once verificationMaterial.tlogEntries exceeds the limit.
-// this runs before protojson.Unmarshal to avoid materializing attacker-sized slices during parse.
-func enforceTlogEntriesBound(data []byte, limit int) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-
-	tok, err := dec.Token()
-	if err != nil {
-		// preserve prior behavior for invalid JSON (protojson.Unmarshal will surface the decode error).
-		return nil
-	}
-	if tok != json.Delim('{') {
-		return nil
-	}
-
-	for dec.More() {
-		keyTok, err := dec.Token()
-		if err != nil {
-			return nil
-		}
-		key, _ := keyTok.(string)
-		if key != "verificationMaterial" {
-			if err := skipJSONValue(dec); err != nil {
-				return nil
-			}
-			continue
-		}
-
-		vmTok, err := dec.Token()
-		if err != nil {
-			return nil
-		}
-		if vmTok == nil {
-			return nil
-		}
-		if vmTok != json.Delim('{') {
-			return nil
-		}
-
-		for dec.More() {
-			vmKeyTok, err := dec.Token()
-			if err != nil {
-				return nil
-			}
-			vmKey, _ := vmKeyTok.(string)
-			if vmKey != "tlogEntries" {
-				if err := skipJSONValue(dec); err != nil {
-					return nil
-				}
-				continue
-			}
-
-			tlogTok, err := dec.Token()
-			if err != nil {
-				return nil
-			}
-			if tlogTok == nil {
-				return nil
-			}
-			if tlogTok != json.Delim('[') {
-				return nil
-			}
-
-			count := 0
-			for dec.More() {
-				if err := skipJSONValue(dec); err != nil {
-					return nil
-				}
-				count++
-				if count > limit {
-					return fmt.Errorf("too many verificationMaterial.tlogEntries: got=%d max=%d", count, limit)
-				}
-			}
-			return nil
-		}
-
-		return nil
-	}
-
-	return nil
-}
-
 func (b *Bundle) UnmarshalJSON(data []byte) error {
-	if err := enforceTlogEntriesBound(data, maxAllowedTlogEntries); err != nil {
-		return ErrValidationError(err)
-	}
-
 	b.Bundle = new(protobundle.Bundle)
 	err := protojson.Unmarshal(data, b.Bundle)
 	if err != nil {
@@ -427,6 +303,14 @@ func (b *Bundle) HasInclusionProof() bool {
 func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 	if b.VerificationMaterial == nil {
 		return nil, nil
+	}
+
+	if len(b.VerificationMaterial.TlogEntries) > maxAllowedTlogEntries {
+		return nil, ErrValidationError(fmt.Errorf(
+			"too many verificationMaterial.tlogEntries: got=%d max=%d",
+			len(b.VerificationMaterial.TlogEntries),
+			maxAllowedTlogEntries,
+		))
 	}
 
 	tlogEntries := make([]*tlog.Entry, len(b.VerificationMaterial.TlogEntries))
