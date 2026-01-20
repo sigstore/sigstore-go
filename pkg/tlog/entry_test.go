@@ -15,10 +15,12 @@
 package tlog
 
 import (
+	"bytes"
 	"testing"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
+	rekortilespb "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -249,4 +251,81 @@ func TestPublicKeyUnsupportedEntryType(t *testing.T) {
 	// PublicKey() should not panic even with missing verifier
 	pk := entry.PublicKey()
 	assert.Nil(t, pk, "expected nil PublicKey for entry with no verifier")
+}
+
+func TestNewTlogEntryFallbacksToV1WhenBodyIsRekorV1(t *testing.T) {
+	tle := v1.TransparencyLogEntry{
+		LogIndex: 1,
+		LogId: &protocommon.LogId{
+			KeyId: []byte("logID"),
+		},
+		KindVersion: &v1.KindVersion{
+			Kind:    "apple",
+			Version: "alpha",
+		},
+		CanonicalizedBody: entryBodyV1,
+		InclusionProof: &v1.InclusionProof{
+			LogIndex: 1,
+			TreeSize: 2,
+			RootHash: rootHash,
+			Checkpoint: &v1.Checkpoint{
+				Envelope: string(rootHash),
+			},
+		},
+	}
+
+	entry, err := NewTlogEntry(&tle)
+	assert.NoError(t, err)
+	assert.NotNil(t, entry.rekorV1Entry)
+	assert.Nil(t, entry.rekorV2Entry)
+}
+
+func TestNewTlogEntryRejectsRekorV2WithEmptySpec(t *testing.T) {
+	body := []byte(`{
+  "apiVersion": "0.0.2",
+  "kind": "hashedrekord",
+  "spec": {}
+}`)
+
+	tle := v1.TransparencyLogEntry{
+		LogIndex: 1,
+		LogId: &protocommon.LogId{
+			KeyId: []byte("logID"),
+		},
+		KindVersion: &v1.KindVersion{
+			Kind:    "apple",
+			Version: "alpha",
+		},
+		CanonicalizedBody: body,
+		InclusionProof: &v1.InclusionProof{
+			LogIndex: 1,
+			TreeSize: 2,
+			RootHash: rootHash,
+			Checkpoint: &v1.Checkpoint{
+				Envelope: string(rootHash),
+			},
+		},
+	}
+
+	_, err := NewTlogEntry(&tle)
+	assert.Error(t, err)
+}
+
+func TestUnmarshalRekorV2EntryRejectsWrongApiVersionForEntryType(t *testing.T) {
+	body := bytes.Replace(entryBodyV2, []byte(`"apiVersion": "0.0.2"`), []byte(`"apiVersion": "0.0.1"`), 1)
+	_, err := unmarshalRekorV2Entry(body)
+	assert.ErrorIs(t, err, ErrInvalidRekorV2Entry)
+}
+
+func TestValidateEntryRejectsRekorV2WhenSpecIsUnset(t *testing.T) {
+	entry := &Entry{
+		rekorV2Entry: &rekortilespb.Entry{
+			ApiVersion: "0.0.2",
+			Kind:       "hashedrekord",
+			Spec:       &rekortilespb.Spec{},
+		},
+	}
+
+	err := ValidateEntry(entry)
+	assert.Error(t, err)
 }

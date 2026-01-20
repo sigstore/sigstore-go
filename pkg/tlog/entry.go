@@ -280,6 +280,8 @@ func ValidateEntry(entry *Entry) error {
 			if err != nil {
 				return err
 			}
+		default:
+			return fmt.Errorf("unsupported rekor v2 entry type: %T", e)
 		}
 	}
 	return nil
@@ -531,9 +533,21 @@ func unmarshalRekorV1Entry(body []byte) (types.EntryImpl, error) {
 
 func unmarshalRekorV2Entry(body []byte) (*rekortilespb.Entry, error) {
 	logEntryBody := rekortilespb.Entry{}
-	err := protojson.Unmarshal(body, &logEntryBody)
-	if err != nil {
+	if err := protojson.Unmarshal(body, &logEntryBody); err != nil {
 		return nil, ErrInvalidRekorV2Entry
 	}
+
+	spec := logEntryBody.GetSpec().GetSpec()
+	allowedAPIVersion := ""
+	switch spec.(type) {
+	case *rekortilespb.Spec_HashedRekordV002, *rekortilespb.Spec_DsseV002:
+		allowedAPIVersion = "0.0.2"
+	default:
+		return nil, ErrInvalidRekorV2Entry
+	}
+	if logEntryBody.GetApiVersion() != allowedAPIVersion {
+		return nil, ErrInvalidRekorV2Entry
+	}
+
 	return &logEntryBody, nil
 }
