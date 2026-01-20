@@ -147,3 +147,106 @@ func TestParseTransparencyLogEntry(t *testing.T) {
 	_, err := ParseTransparencyLogEntry(&tle)
 	assert.NoError(t, err)
 }
+
+// TestPublicKeyMalformedPEM ensures that PublicKey() does not panic when given
+// malformed or invalid PEM data. This is a regression test for a nil pointer
+// dereference that could occur when pem.Decode returns nil.
+func TestPublicKeyMalformedPEM(t *testing.T) {
+	tests := []struct {
+		name      string
+		publicKey string // base64-encoded value for the publicKey field
+	}{
+		{
+			name:      "invalid PEM data",
+			publicKey: "bm90IHZhbGlkIHBlbSBkYXRh", // "not valid pem data"
+		},
+		{
+			name:      "empty PEM",
+			publicKey: "", // empty string
+		},
+		{
+			name:      "garbage bytes",
+			publicKey: "////", // invalid base64 that decodes to garbage
+		},
+		{
+			name:      "partial PEM header",
+			publicKey: "LS0tLS1CRUdJTg==", // "-----BEGIN"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create an intoto v0.0.2 entry with the test publicKey value
+			body := []byte(`{
+				"kind": "intoto",
+				"apiVersion": "0.0.2",
+				"spec": {
+					"content": {
+						"envelope": {
+							"payloadType": "application/vnd.in-toto+json",
+							"signatures": [{
+								"publicKey": "` + tt.publicKey + `",
+								"sig": "dGVzdA=="
+							}]
+						},
+						"hash": {"algorithm": "sha256", "value": "abc123"},
+						"payloadHash": {"algorithm": "sha256", "value": "def456"}
+					}
+				}
+			}`)
+
+			tle := &v1.TransparencyLogEntry{
+				LogIndex:          1,
+				LogId:             &protocommon.LogId{KeyId: []byte("test")},
+				KindVersion:       &v1.KindVersion{Kind: "intoto", Version: "0.0.2"},
+				CanonicalizedBody: body,
+			}
+
+			entry, err := NewTlogEntry(tle)
+			if err != nil {
+				t.Fatalf("NewTlogEntry failed: %v", err)
+			}
+
+			// PublicKey() should not panic - it should return nil for invalid PEM
+			pk := entry.PublicKey()
+			assert.Nil(t, pk, "expected nil PublicKey for malformed PEM")
+		})
+	}
+}
+
+// TestPublicKeyUnsupportedEntryType ensures that PublicKey() does not panic
+// when called on an entry type that is not handled by the switch statement.
+func TestPublicKeyUnsupportedEntryType(t *testing.T) {
+	// Use a Rekor v2 entry with no verifier set (nil verifier)
+	body := []byte(`{
+		"apiVersion": "0.0.2",
+		"kind": "hashedrekord",
+		"spec": {
+			"hashedRekordV002": {
+				"data": {
+					"algorithm": "SHA2_256",
+					"digest": "dyj4ednYHjN4/zsjjBeeLahS9slp97Z67LTAVxjrjXw="
+				},
+				"signature": {
+					"content": "MEQCIB+YPa9o3SN0sQ4uduGf+mZxwFfOhFZ0Cgy+p7Vt1o2SAiAPFDHqOAJLYmvtCWOsDyNY1H4V3zm4NEDYs3NyvHh1Pg=="
+				}
+			}
+		}
+	}`)
+
+	tle := &v1.TransparencyLogEntry{
+		LogIndex:          1,
+		LogId:             &protocommon.LogId{KeyId: []byte("test")},
+		KindVersion:       &v1.KindVersion{Kind: "hashedrekord", Version: "0.0.2"},
+		CanonicalizedBody: body,
+	}
+
+	entry, err := NewTlogEntry(tle)
+	if err != nil {
+		t.Fatalf("NewTlogEntry failed: %v", err)
+	}
+
+	// PublicKey() should not panic even with missing verifier
+	pk := entry.PublicKey()
+	assert.Nil(t, pk, "expected nil PublicKey for entry with no verifier")
+}

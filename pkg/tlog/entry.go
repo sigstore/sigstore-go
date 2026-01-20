@@ -361,6 +361,9 @@ func (entry *Entry) PublicKey() any {
 			pemString = []byte(*e.IntotoObj.Content.Envelope.Signatures[0].PublicKey)
 		}
 		certBlock, _ := pem.Decode(pemString)
+		if certBlock == nil {
+			return nil
+		}
 		certBytes = certBlock.Bytes
 	} else if entry.rekorV2Entry != nil {
 		var verifier *rekortilespb.Verifier
@@ -369,6 +372,9 @@ func (entry *Entry) PublicKey() any {
 			verifier = e.HashedRekordV002.GetSignature().GetVerifier()
 		case *rekortilespb.Spec_DsseV002:
 			verifier = e.DsseV002.GetSignatures()[0].GetVerifier()
+		}
+		if verifier == nil {
+			return nil
 		}
 		switch verifier.Verifier.(type) {
 		case *rekortilespb.Verifier_PublicKey:
