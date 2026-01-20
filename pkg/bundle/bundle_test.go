@@ -46,45 +46,67 @@ func buildBundleJSONWithTlogEntries(count int) []byte {
 	return b.Bytes()
 }
 
-func TestBundleUnmarshalJSON_TlogEntriesOverLimitFailsClosed(t *testing.T) {
-	var b Bundle
-	data := buildBundleJSONWithTlogEntries(maxAllowedTlogEntries + 1)
+func TestBundleUnmarshalJSON_TlogEntriesBound(t *testing.T) {
+	tooManyMsg := "too many transparency log entries in the bundle"
 
-	err := b.UnmarshalJSON(data)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "too many verificationMaterial.tlogEntries")
-	require.Contains(t, err.Error(), fmt.Sprintf("max=%d", maxAllowedTlogEntries))
-	require.Contains(t, err.Error(), fmt.Sprintf("got=%d", maxAllowedTlogEntries+1))
-}
+	tests := []struct {
+		name        string
+		data        []byte
+		contains    []string
+		notContains []string
+	}{
+		{
+			name: "over limit fails closed",
+			data: buildBundleJSONWithTlogEntries(maxAllowedTlogEntries + 1),
+			contains: []string{
+				tooManyMsg,
+				fmt.Sprintf("max=%d", maxAllowedTlogEntries),
+				fmt.Sprintf("got=%d", maxAllowedTlogEntries+1),
+			},
+		},
+		{
+			name: "at limit does not trip cap",
+			data: buildBundleJSONWithTlogEntries(maxAllowedTlogEntries),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+		{
+			name: "tlogEntries absent does not trip cap",
+			data: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{}}`),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+		{
+			name: "tlogEntries null does not trip cap",
+			data: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":null}}`),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+		{
+			name: "tlogEntries empty array does not trip cap",
+			data: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":[]}}`),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+	}
 
-func TestBundleUnmarshalJSON_TlogEntriesAtLimitDoesNotTripCap(t *testing.T) {
-	var b Bundle
-	data := buildBundleJSONWithTlogEntries(maxAllowedTlogEntries)
-
-	err := b.UnmarshalJSON(data)
-	require.Error(t, err)
-	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
-}
-
-func TestBundleUnmarshalJSON_TlogEntriesAbsentDoesNotTripCap(t *testing.T) {
-	var b Bundle
-	err := b.UnmarshalJSON([]byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{}}`))
-	require.Error(t, err)
-	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
-}
-
-func TestBundleUnmarshalJSON_TlogEntriesNullDoesNotTripCap(t *testing.T) {
-	var b Bundle
-	err := b.UnmarshalJSON([]byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":null}}`))
-	require.Error(t, err)
-	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
-}
-
-func TestBundleUnmarshalJSON_TlogEntriesEmptyArrayDoesNotTripCap(t *testing.T) {
-	var b Bundle
-	err := b.UnmarshalJSON([]byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":[]}}`))
-	require.Error(t, err)
-	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var b Bundle
+			err := b.UnmarshalJSON(tt.data)
+			require.Error(t, err)
+			for _, s := range tt.contains {
+				require.Contains(t, err.Error(), s)
+			}
+			for _, s := range tt.notContains {
+				require.False(t, strings.Contains(err.Error(), s))
+			}
+		})
+	}
 }
 
 func Test_getBundleVersion(t *testing.T) {

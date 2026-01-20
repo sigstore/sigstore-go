@@ -307,7 +307,7 @@ func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 
 	if len(b.VerificationMaterial.TlogEntries) > maxAllowedTlogEntries {
 		return nil, ErrValidationError(fmt.Errorf(
-			"too many verificationMaterial.tlogEntries: got=%d max=%d",
+			"too many transparency log entries in the bundle: got=%d max=%d",
 			len(b.VerificationMaterial.TlogEntries),
 			maxAllowedTlogEntries,
 		))
