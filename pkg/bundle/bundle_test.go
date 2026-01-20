@@ -15,12 +15,14 @@
 package bundle
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -30,6 +32,39 @@ import (
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
 	"github.com/stretchr/testify/require"
 )
+
+func buildBundleJSONWithTlogEntries(count int) []byte {
+	var b bytes.Buffer
+	b.WriteString(`{"verificationMaterial":{"tlogEntries":[`)
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(`{}`)
+	}
+	b.WriteString(`]}}`)
+	return b.Bytes()
+}
+
+func TestBundleUnmarshalJSON_TlogEntriesOverLimitFailsClosed(t *testing.T) {
+	var b Bundle
+	data := buildBundleJSONWithTlogEntries(maxAllowedTlogEntries + 1)
+
+	err := b.UnmarshalJSON(data)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "too many verificationMaterial.tlogEntries")
+	require.Contains(t, err.Error(), fmt.Sprintf("max=%d", maxAllowedTlogEntries))
+	require.Contains(t, err.Error(), fmt.Sprintf("got=%d", maxAllowedTlogEntries+1))
+}
+
+func TestBundleUnmarshalJSON_TlogEntriesAtLimitDoesNotTripCap(t *testing.T) {
+	var b Bundle
+	data := buildBundleJSONWithTlogEntries(maxAllowedTlogEntries)
+
+	err := b.UnmarshalJSON(data)
+	require.Error(t, err)
+	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
+}
 
 func Test_getBundleVersion(t *testing.T) {
 	tests := []struct {
