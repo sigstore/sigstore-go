@@ -267,7 +267,7 @@ func skipJSONValue(dec *json.Decoder) error {
 	}
 }
 
-// enforceTlogEntriesBound fails closed once verificationMaterial.tlogEntries exceeds max.
+// enforceTlogEntriesBound fails closed once verificationMaterial.tlogEntries exceeds the limit.
 // this runs before protojson.Unmarshal to avoid materializing attacker-sized slices during parse.
 func enforceTlogEntriesBound(data []byte, limit int) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -303,9 +303,6 @@ func enforceTlogEntriesBound(data []byte, limit int) error {
 			return nil
 		}
 		if vmTok != json.Delim('{') {
-			if err := skipJSONValue(dec); err != nil {
-				return nil
-			}
 			return nil
 		}
 
@@ -330,9 +327,6 @@ func enforceTlogEntriesBound(data []byte, limit int) error {
 				return nil
 			}
 			if tlogTok != json.Delim('[') {
-				if err := skipJSONValue(dec); err != nil {
-					return nil
-				}
 				return nil
 			}
 

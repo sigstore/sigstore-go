@@ -80,6 +80,13 @@ func TestBundleUnmarshalJSON_TlogEntriesNullDoesNotTripCap(t *testing.T) {
 	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
 }
 
+func TestBundleUnmarshalJSON_TlogEntriesEmptyArrayDoesNotTripCap(t *testing.T) {
+	var b Bundle
+	err := b.UnmarshalJSON([]byte(`{"verificationMaterial":{"tlogEntries":[]}}`))
+	require.Error(t, err)
+	require.False(t, strings.Contains(err.Error(), "too many verificationMaterial.tlogEntries"))
+}
+
 func Test_getBundleVersion(t *testing.T) {
 	tests := []struct {
 		mediaType string
