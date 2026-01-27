@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -239,7 +240,7 @@ func (e *tooManyTimestampsEntity) Timestamps() ([][]byte, error) {
 		return nil, err
 	}
 
-	for i := 0; i < 32; i++ {
+	for i := 0; i < limits.MaxAllowedTimestamps; i++ {
 		timestamps = append(timestamps, timestamps[0])
 	}
 

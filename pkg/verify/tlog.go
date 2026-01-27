@@ -24,12 +24,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
-
-const maxAllowedTlogEntries = 32
 
 // VerifyTlogEntry verifies that the given entity has been logged
 // in the transparency log and that the log entry is valid.
@@ -43,8 +42,8 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 	}
 
 	// limit the number of tlog entries to prevent DoS
-	if len(entries) > maxAllowedTlogEntries {
-		return nil, fmt.Errorf("too many tlog entries: %d > %d", len(entries), maxAllowedTlogEntries)
+	if len(entries) > limits.MaxAllowedTlogEntries {
+		return nil, fmt.Errorf("too many tlog entries: %d > %d", len(entries), limits.MaxAllowedTlogEntries)
 	}
 
 	// disallow duplicate entries, as a malicious actor could use duplicates to bypass the threshold
