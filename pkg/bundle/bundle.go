@@ -29,6 +29,7 @@ import (
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
@@ -45,10 +46,6 @@ var ErrDecodingJSON = fmt.Errorf("%w: decoding json", ErrInvalidAttestation)
 var ErrDecodingB64 = fmt.Errorf("%w: decoding base64", ErrInvalidAttestation)
 
 const mediaTypeBase = "application/vnd.dev.sigstore.bundle"
-
-// defense-in-depth: bound the number of tlog entries processed from a bundle.
-// note: callers should still enforce overall bundle byte-size limits at ingestion.
-const maxAllowedTlogEntries = 100
 
 func ErrValidationError(err error) error {
 	return fmt.Errorf("%w: %w", ErrValidation, err)
@@ -305,11 +302,14 @@ func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 		return nil, nil
 	}
 
-	if len(b.VerificationMaterial.TlogEntries) > maxAllowedTlogEntries {
+	// Note: this bound is enforced after protojson.Unmarshal, so it does not cap
+	// allocations during JSON decoding; callers should still enforce bundle size
+	// limits at ingestion.
+	if len(b.VerificationMaterial.TlogEntries) > limits.MaxAllowedTlogEntries {
 		return nil, ErrValidationError(fmt.Errorf(
 			"too many transparency log entries in the bundle: got=%d max=%d",
 			len(b.VerificationMaterial.TlogEntries),
-			maxAllowedTlogEntries,
+			limits.MaxAllowedTlogEntries,
 		))
 	}
 
