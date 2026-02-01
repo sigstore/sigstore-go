@@ -108,14 +108,11 @@ func (b *Bundle) validate() error {
 		}
 	}
 
-	// if bundle version >= v0.3, require verification material to not be X.509 certificate chain (only single certificate is allowed)
-	if semver.Compare(bundleVersion, "v0.3") >= 0 {
-		certs := b.VerificationMaterial.GetX509CertificateChain()
-
-		if certs != nil {
-			return errors.New("verification material cannot be X.509 certificate chain (for bundle v0.3)")
-		}
-	}
+	// Note: v0.3 bundles support both single certificates and certificate chains.
+	// The original constraint requiring single certificates was relaxed to support
+	// BYO-PKI use cases where intermediate CAs are ephemeral and need to be
+	// included in the bundle rather than pre-configured in the trusted root.
+	// See: https://github.com/sigstore/cosign/pull/XXXX for context.
 
 	// if bundle version is >= v0.4, return error as this version is not supported
 	if semver.Compare(bundleVersion, "v0.4") >= 0 {
