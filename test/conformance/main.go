@@ -41,10 +41,11 @@ var identityToken *string
 var staging = false
 var trustedRootPath *string
 var signingConfigPath *string
+var inToto = false
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Printf("\t%s sign-bundle --identity-token TOKEN --bundle FILE [--signing-config FILE] [--trusted-root FILE] [--staging] FILE", os.Args[0])
+	fmt.Printf("\t%s sign-bundle [--in-toto] [--identity-token TOKEN --bundle FILE [--signing-config FILE] [--trusted-root FILE] [--staging] FILE", os.Args[0])
 	fmt.Printf("\t%s verify-bundle --bundle FILE --certificate-identity IDENTITY --certificate-oidc-issuer URL [--trusted-root FILE] [--staging] FILE\n", os.Args[0])
 }
 
@@ -111,6 +112,9 @@ func parseArgs() {
 		case "--signing-config":
 			signingConfigPath = &os.Args[i+1]
 			i += 2
+		case "--in-toto":
+			inToto = true
+			i++
 		default:
 			i++
 		}
@@ -204,7 +208,19 @@ func signBundle() (*protobundle.Bundle, error) {
 	if err != nil {
 		return nil, err
 	}
-	content := &sign.PlainData{Data: fileBytes}
+
+	var content sign.Content
+	if inToto {
+		content = &sign.DSSEData{
+			Data:        fileBytes,
+			PayloadType: "application/vnd.in-toto+json",
+		}
+	} else {
+		content = &sign.PlainData{
+			Data: fileBytes,
+		}
+	}
+
 	keypair, err := sign.NewEphemeralKeypair(nil)
 	if err != nil {
 		return nil, err
