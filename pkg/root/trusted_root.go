@@ -504,11 +504,13 @@ func NewLiveTrustedRootFromTargetWithPeriod(opts *tuf.Options, target string, rf
 			client, err = tuf.New(opts)
 			if err != nil {
 				log.Printf("error creating TUF client: %v", err)
+				continue
 			}
 
 			b, err := client.GetTarget(target)
 			if err != nil {
 				log.Printf("error fetching trusted root: %v", err)
+				continue
 			}
 
 			newTr, err := NewTrustedRootFromJSON(b)
