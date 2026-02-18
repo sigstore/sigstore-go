@@ -29,13 +29,20 @@ import (
 
 	ct "github.com/google/certificate-transparency-go"
 	"github.com/google/certificate-transparency-go/tls"
-	"github.com/google/certificate-transparency-go/trillian/ctfe"
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	ctx509util "github.com/google/certificate-transparency-go/x509util"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 )
+
+func getCTLogID(pub any) ([32]byte, error) {
+	der, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(der), nil
+}
 
 func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -56,7 +63,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	}
 	caCert := createBaseCert(t, privateKey, skid, big.NewInt(1))
 	anotherCACert := createBaseCert(t, anotherPrivateKey, anotherSKID, big.NewInt(99))
-	logID, err := ctfe.GetCTLogID(&privateKey.PublicKey)
+	logID, err := getCTLogID(&privateKey.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
