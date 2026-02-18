@@ -13,7 +13,7 @@ require (
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/secure-systems-lab/go-securesystemslib v0.10.0
 	github.com/sigstore/protobuf-specs v0.5.0
-	github.com/sigstore/rekor v1.4.3
+	github.com/sigstore/rekor v1.5.0
 	github.com/sigstore/rekor-tiles/v2 v2.1.0
 	github.com/sigstore/sigstore v1.10.4
 	github.com/sigstore/timestamp-authority/v2 v2.0.4
@@ -36,11 +36,11 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.24.1 // indirect
-	github.com/go-openapi/errors v0.22.5 // indirect
+	github.com/go-openapi/errors v0.22.6 // indirect
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect
 	github.com/go-openapi/jsonreference v0.21.4 // indirect
 	github.com/go-openapi/loads v0.23.2 // indirect
-	github.com/go-openapi/spec v0.22.2 // indirect
+	github.com/go-openapi/spec v0.22.3 // indirect
 	github.com/go-openapi/swag v0.25.4 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
