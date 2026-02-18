@@ -29,6 +29,7 @@ import (
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
@@ -299,6 +300,17 @@ func (b *Bundle) HasInclusionProof() bool {
 func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 	if b.VerificationMaterial == nil {
 		return nil, nil
+	}
+
+	// Note: this bound is enforced after protojson.Unmarshal, so it does not cap
+	// allocations during JSON decoding; callers should still enforce bundle size
+	// limits at ingestion.
+	if len(b.VerificationMaterial.TlogEntries) > limits.MaxAllowedTlogEntries {
+		return nil, ErrValidationError(fmt.Errorf(
+			"too many transparency log entries in the bundle: got=%d max=%d",
+			len(b.VerificationMaterial.TlogEntries),
+			limits.MaxAllowedTlogEntries,
+		))
 	}
 
 	tlogEntries := make([]*tlog.Entry, len(b.VerificationMaterial.TlogEntries))

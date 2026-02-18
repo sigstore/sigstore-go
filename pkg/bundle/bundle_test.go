@@ -15,12 +15,14 @@
 package bundle
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -28,8 +30,85 @@ import (
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	rekorv1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/stretchr/testify/require"
 )
+
+func buildBundleJSONWithTlogEntries(count int) []byte {
+	var b bytes.Buffer
+	b.WriteString(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":[`)
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(`{}`)
+	}
+	b.WriteString(`]}}`)
+	return b.Bytes()
+}
+
+func TestBundleUnmarshalJSON_TlogEntriesBound(t *testing.T) {
+	tooManyMsg := "too many transparency log entries in the bundle"
+
+	tests := []struct {
+		name        string
+		data        []byte
+		contains    []string
+		notContains []string
+	}{
+		{
+			name: "over limit fails closed",
+			data: buildBundleJSONWithTlogEntries(limits.MaxAllowedTlogEntries + 1),
+			contains: []string{
+				tooManyMsg,
+				fmt.Sprintf("max=%d", limits.MaxAllowedTlogEntries),
+				fmt.Sprintf("got=%d", limits.MaxAllowedTlogEntries+1),
+			},
+		},
+		{
+			name: "at limit does not trip cap",
+			data: buildBundleJSONWithTlogEntries(limits.MaxAllowedTlogEntries),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+		{
+			name: "tlogEntries absent does not trip cap",
+			data: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{}}`),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+		{
+			name: "tlogEntries null does not trip cap",
+			data: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":null}}`),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+		{
+			name: "tlogEntries empty array does not trip cap",
+			data: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.1","verificationMaterial":{"tlogEntries":[]}}`),
+			notContains: []string{
+				tooManyMsg,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var b Bundle
+			err := b.UnmarshalJSON(tt.data)
+			require.Error(t, err)
+			for _, s := range tt.contains {
+				require.Contains(t, err.Error(), s)
+			}
+			for _, s := range tt.notContains {
+				require.False(t, strings.Contains(err.Error(), s))
+			}
+		})
+	}
+}
 
 func Test_getBundleVersion(t *testing.T) {
 	tests := []struct {

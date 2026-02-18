@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
@@ -204,7 +205,7 @@ func (e *tooManyTlogEntriesEntity) TlogEntries() ([]*tlog.Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < 32; i++ {
+	for i := 0; i < limits.MaxAllowedTlogEntries; i++ {
 		entries = append(entries, entries[0])
 	}
 
