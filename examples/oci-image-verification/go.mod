@@ -1,6 +1,6 @@
 module github.com/sigstore/sigstore-go/examples/oci-image-verification
 
-go 1.25.0
+go 1.25.5
 
 replace github.com/sigstore/sigstore-go => ../../
 
@@ -64,7 +64,7 @@ require (
 	github.com/sigstore/rekor-tiles/v2 v2.1.0 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.0.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/theupdateframework/go-tuf/v2 v2.3.0 // indirect
+	github.com/theupdateframework/go-tuf/v2 v2.4.1 // indirect
 	github.com/transparency-dev/formats v0.0.0-20251017110053-404c0d5b696c // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	github.com/vbatts/tar-split v0.12.2 // indirect
