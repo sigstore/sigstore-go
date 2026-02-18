@@ -204,7 +204,7 @@ func signBundle() (*protobundle.Bundle, error) {
 
 	signingOptions.TrustedRoot = getTrustedRoot(staging)
 
-	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1])
+	fileBytes, err := os.ReadFile(os.Args[len(os.Args)-1]) // #nosec G703 -- CLI argument
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func main() {
 			}
 			artifactPolicyOption = verify.WithArtifactDigest(alg, digest)
 		} else {
-			file, err := os.Open(fileOrDigest)
+			file, err := os.Open(fileOrDigest) // #nosec G703 -- CLI argument
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -333,6 +333,6 @@ func main() {
 			log.Fatal(err)
 		}
 	default:
-		log.Fatalf("Unsupported command %s", os.Args[1])
+		log.Fatalf("Unsupported command %s", os.Args[1]) // #nosec G706 -- CLI argument
 	}
 }

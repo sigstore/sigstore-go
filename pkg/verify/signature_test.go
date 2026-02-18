@@ -26,12 +26,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
+	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/common"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var SkipArtifactAndIdentitiesPolicy = verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe())
@@ -126,9 +127,9 @@ func TestTooManySubjects(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	tooManySubjectsStatement := in_toto.Statement{}
+	tooManySubjectsStatement := &in_toto.Statement{}
 	for i := 0; i < 1025; i++ {
-		tooManySubjectsStatement.Subject = append(tooManySubjectsStatement.Subject, in_toto.Subject{
+		tooManySubjectsStatement.Subject = append(tooManySubjectsStatement.Subject, &in_toto.ResourceDescriptor{
 			Name: fmt.Sprintf("subject-%d", i),
 			Digest: map[string]string{
 				"sha256": "", // actual content of digest does not matter for this test
@@ -136,7 +137,7 @@ func TestTooManySubjects(t *testing.T) {
 		})
 	}
 
-	tooManySubjectsStatementBytes, err := json.Marshal(tooManySubjectsStatement)
+	tooManySubjectsStatementBytes, err := protojson.Marshal(tooManySubjectsStatement)
 	assert.NoError(t, err)
 
 	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
@@ -154,8 +155,8 @@ func TestTooManyDigests(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	tooManyDigestsStatement := in_toto.Statement{}
-	tooManyDigestsStatement.Subject = []in_toto.Subject{
+	tooManyDigestsStatement := &in_toto.Statement{}
+	tooManyDigestsStatement.Subject = []*in_toto.ResourceDescriptor{
 		{
 			Name:   "subject",
 			Digest: make(common.DigestSet),
@@ -166,7 +167,7 @@ func TestTooManyDigests(t *testing.T) {
 		tooManyDigestsStatement.Subject[0].Digest[fmt.Sprintf("digest-%d", i)] = ""
 	}
 
-	tooManySubjectsStatementBytes, err := json.Marshal(tooManyDigestsStatement)
+	tooManySubjectsStatementBytes, err := protojson.Marshal(tooManyDigestsStatement)
 	assert.NoError(t, err)
 
 	tooManySubjectsEntity, err := virtualSigstore.Attest("foo@example.com", "issuer", tooManySubjectsStatementBytes)
@@ -184,12 +185,12 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	subjects := make([]in_toto.Subject, 10)
+	subjects := make([]*in_toto.ResourceDescriptor, 10)
 	artifacts := make([]io.Reader, 10)
 	artifactDigests := make([]verify.ArtifactDigest, 10)
 	// Create ten test subjects
 	for i := range 10 {
-		s := in_toto.Subject{
+		s := &in_toto.ResourceDescriptor{
 			Name: fmt.Sprintf("subject-%d", i),
 		}
 		subjectBody := fmt.Sprintf("Hi, I am a subject! #%d", i)
