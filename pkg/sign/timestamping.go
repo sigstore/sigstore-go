@@ -87,7 +87,7 @@ func (ta *TimestampAuthority) GetTimestamp(ctx context.Context, signature []byte
 		request.Header.Add("Content-Type", "application/timestamp-query")
 		request.Header.Add("User-Agent", util.ConstructUserAgent())
 
-		response, err = ta.client.Do(request)
+		response, err = ta.client.Do(request) // #nosec G704 -- Client controls the URL
 		if err != nil {
 			return nil, err
 		}

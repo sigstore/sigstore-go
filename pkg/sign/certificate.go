@@ -180,7 +180,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 		request.Header.Add("Content-Type", "application/json")
 		request.Header.Add("User-Agent", util.ConstructUserAgent())
 
-		response, err = f.client.Do(request)
+		response, err = f.client.Do(request) // #nosec G704 -- Client controls the URL
 		if err != nil {
 			return nil, err
 		}
