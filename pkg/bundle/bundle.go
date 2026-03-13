@@ -57,7 +57,7 @@ type Bundle struct {
 	allowCertificateChain bool
 }
 
-func NewBundle(pbundle *protobundle.Bundle, opts ...BundleOption) (*Bundle, error) {
+func NewBundle(pbundle *protobundle.Bundle, opts ...Option) (*Bundle, error) {
 	bundle := &Bundle{
 		Bundle:              pbundle,
 		hasInclusionPromise: false,
@@ -211,7 +211,7 @@ func validateBundle(b *protobundle.Bundle) error {
 	return nil
 }
 
-func LoadJSONFromPath(path string, opts ...BundleOption) (*Bundle, error) {
+func LoadJSONFromPath(path string, opts ...Option) (*Bundle, error) {
 	var bundle Bundle
 	bundle.Bundle = new(protobundle.Bundle)
 

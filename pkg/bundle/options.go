@@ -14,13 +14,13 @@
 
 package bundle
 
-// BundleOption configures optional behaviour when constructing a Bundle.
-type BundleOption func(*Bundle)
+// Option configures optional behaviour when constructing a Bundle.
+type Option func(*Bundle)
 
 // AllowCertificateChain permits bundles with version >= v0.3 to contain
 // X.509 certificate chains in their verification material. By default,
 // v0.3+ bundles require a single certificate rather than a chain.
-func AllowCertificateChain() BundleOption {
+func AllowCertificateChain() Option {
 	return func(b *Bundle) {
 		b.allowCertificateChain = true
 	}

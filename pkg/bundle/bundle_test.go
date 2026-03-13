@@ -1039,6 +1039,42 @@ func TestTimestamps(t *testing.T) {
 	}
 }
 
+func TestNewBundleWithAllowCertificateChain(t *testing.T) {
+	t.Parallel()
+
+	v03BundleWithCertChain := &protobundle.Bundle{
+		MediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+		VerificationMaterial: &protobundle.VerificationMaterial{
+			Content: &protobundle.VerificationMaterial_X509CertificateChain{
+				X509CertificateChain: &protocommon.X509CertificateChain{},
+			},
+		},
+		Content: &protobundle.Bundle_MessageSignature{},
+	}
+
+	for _, tc := range []struct {
+		name    string
+		opts    []Option
+		wantErr bool
+	}{
+		{"v0.3 with cert chain without option", nil, true},
+		{"v0.3 with cert chain with AllowCertificateChain", []Option{AllowCertificateChain()}, false},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			bundle, err := NewBundle(v03BundleWithCertChain, tc.opts...)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "verification material cannot be X.509 certificate chain")
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, bundle)
+			}
+		})
+	}
+}
+
 func Test_BundleValidation(t *testing.T) {
 	tests := []struct {
 		name    string
