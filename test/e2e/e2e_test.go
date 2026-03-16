@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"crypto"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -41,7 +42,7 @@ const (
 
 var (
 	artifactData = []byte("hello world")
-	intotoData   = []byte(`{"_type":"https://in-toto.io/Statement/v0.1","subject":[{"name":"hello_world.txt","digest":{"sha256":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}}],"predicateType":"something","predicate":{}}`)
+	intotoData   = []byte(`{"_type":"https://in-toto.io/Statement/v0.1","subject":[{"name":"hello_world.txt","digest":{"sha256":"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", "sha512":"309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f"}}],"predicateType":"something","predicate":{}}`)
 )
 
 func TestSignVerify(t *testing.T) {
@@ -164,10 +165,12 @@ func TestSignVerify(t *testing.T) {
 				Data:        intotoData,
 				PayloadType: "application/vnd.in-toto+json",
 			},
-			digestAlg:          crypto.SHA256,
+			digestAlg:          crypto.SHA512,
 			rekorVersion:       2,
 			expectedTimestamps: 1,
-			signingAlg:         protocommon.PublicKeyDetails_PKIX_ED25519,
+			signingAlg:         protocommon.PublicKeyDetails_PKIX_ED25519_PH,
+			// when using ed25519, only self-managed keys are supported
+			useKey: true,
 		},
 	}
 
@@ -182,7 +185,7 @@ func TestSignVerify(t *testing.T) {
 			protoBundle, err := signContent(signingConfig, token, test.content, test.rekorVersion, keypair, test.useKey, opts)
 			assert.NoError(t, err)
 
-			result, err := verifyBundle(protoBundle, issuerURL, defaultCertID, getDigest(artifactData, test.digestAlg), test.useKey, opts.TrustedRoot)
+			result, err := verifyBundle(protoBundle, issuerURL, defaultCertID, artifactData, test.digestAlg, test.useKey, opts.TrustedRoot)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
@@ -243,7 +246,7 @@ func signContent(signingConfig *root.SigningConfig, token string, content sign.C
 	return sign.Bundle(content, keypair, opts)
 }
 
-func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, useKey bool, trustedRoot root.TrustedMaterial) (*verify.VerificationResult, error) {
+func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, digestAlg crypto.Hash, useKey bool, trustedRoot root.TrustedMaterial) (*verify.VerificationResult, error) {
 	bundleObj := bundle.Bundle{Bundle: b}
 
 	verifierConfig := []verify.VerifierOption{
@@ -264,7 +267,18 @@ func verifyBundle(b *protobundle.Bundle, issuer, san string, digest []byte, useK
 		identityPolicies = append(identityPolicies, verify.WithKey())
 	}
 
-	artifactPolicy := verify.WithArtifactDigest("sha256", digest)
+	var algName string
+	switch digestAlg {
+	case crypto.SHA256:
+		algName = "sha256"
+	case crypto.SHA384:
+		algName = "sha384"
+	case crypto.SHA512:
+		algName = "sha512"
+	default:
+		return nil, fmt.Errorf("unsupported digest alg: %s", digestAlg)
+	}
+	artifactPolicy := verify.WithArtifactDigest(algName, getDigest(digest, digestAlg))
 
 	signedEntityVerifier, err := verify.NewVerifier(trustedRoot, verifierConfig...)
 	if err != nil {

@@ -150,9 +150,7 @@ func (r *Rekor) getRekorV2TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 	}
 	var opts []signature.LoadOption
 	// When signing with ed25519, only the prehash variant is supported for hashedrekord
-	if messageSignature != nil {
-		opts = append(opts, options.WithED25519ph())
-	}
+	opts = append(opts, options.WithED25519ph())
 	algoDetails, err := signature.GetDefaultAlgorithmDetails(pubKey, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("getting algorithm details: %w", err)
@@ -176,9 +174,30 @@ func (r *Rekor) getRekorV2TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 	var req any
 	switch {
 	case dsseEnvelope != nil:
-		req = &rekortilespb.DSSERequestV002{
-			Envelope:  dsseEnvelope,
-			Verifiers: []*rekortilespb.Verifier{verifier},
+		if l := len(dsseEnvelope.Signatures); l != 1 {
+			return nil, fmt.Errorf("dsse envelope must contain only one signature, had %d signatures", l)
+		}
+		// compute PAE digest for Rekor entry digest
+		pae := fmt.Sprintf("DSSEv1 %d %s %d %s",
+			len(dsseEnvelope.PayloadType), dsseEnvelope.PayloadType,
+			len(dsseEnvelope.Payload), dsseEnvelope.Payload)
+		algDetails, err := signature.GetAlgorithmDetails(verifier.GetKeyDetails())
+		if err != nil {
+			return nil, fmt.Errorf("getting algorithm details logging to Rekor: %w", err)
+		}
+		hf := algDetails.GetHashType()
+		if hf == crypto.Hash(0) {
+			return nil, fmt.Errorf("hash algorithm required for hashedrekord. If using ed25519, must use ed25519ph")
+		}
+		hasher := hf.New()
+		hasher.Write([]byte(pae))
+
+		req = &rekortilespb.HashedRekordRequestV002{
+			Signature: &rekortilespb.Signature{
+				Content:  dsseEnvelope.Signatures[0].Sig,
+				Verifier: verifier,
+			},
+			Digest: hasher.Sum(nil),
 		}
 	case messageSignature != nil:
 		req = &rekortilespb.HashedRekordRequestV002{
