@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
@@ -195,6 +196,13 @@ func (c *Client) GetTarget(target string) ([]byte, error) {
 	}
 
 	return tb, nil
+}
+
+// GetTopLevelTargets returns the top-level target files from the TUF
+// repository metadata. This can be used to enumerate available targets
+// and inspect their metadata (e.g. custom fields) without downloading them.
+func (c *Client) GetTopLevelTargets() map[string]*metadata.TargetFiles {
+	return c.up.GetTopLevelTargets()
 }
 
 // URLToPath converts a URL to a filename-compatible string

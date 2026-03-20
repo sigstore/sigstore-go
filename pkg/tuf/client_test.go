@@ -449,6 +449,37 @@ func (r *testRepo) SetTimestamp(date time.Time) {
 	}
 }
 
+func TestGetTopLevelTargets(t *testing.T) {
+	r := newTestRepo(t)
+	r.AddTarget("foo.txt", []byte("foo content"))
+	r.AddTarget("bar.txt", []byte("bar content"))
+	rootJSON, err := r.roles.Root().ToBytes(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL("https://testing.local").
+		WithRoot(rootJSON).
+		WithCachePath(t.TempDir()).
+		WithFetcher(r).
+		WithDisableLocalCache()
+	c, err := New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	targets := c.GetTopLevelTargets()
+	assert.Len(t, targets, 2)
+	assert.Contains(t, targets, "foo.txt")
+	assert.Contains(t, targets, "bar.txt")
+
+	// Verify target metadata has expected fields
+	for name, tf := range targets {
+		assert.Greater(t, tf.Length, int64(0), "target %s should have non-zero length", name)
+		assert.NotEmpty(t, tf.Hashes, "target %s should have hashes", name)
+	}
+}
+
 func TestURLToPath(t *testing.T) {
 	tests := []struct {
 		name string
