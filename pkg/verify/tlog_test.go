@@ -204,7 +204,7 @@ func (e *tooManyTlogEntriesEntity) TlogEntries() ([]*tlog.Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		entries = append(entries, entries[0])
 	}
 

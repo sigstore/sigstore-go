@@ -634,7 +634,7 @@ func (e *TestEntity) TlogEntries() ([]*tlog.Entry, error) {
 
 // Much of the following code is adapted from cosign/test/cert_utils.go
 
-func createCertificate(template *x509.Certificate, parent *x509.Certificate, pub interface{}, priv crypto.Signer) (*x509.Certificate, error) {
+func createCertificate(template *x509.Certificate, parent *x509.Certificate, pub any, priv crypto.Signer) (*x509.Certificate, error) {
 	certBytes, err := x509.CreateCertificate(rand.Reader, template, parent, pub, priv)
 	if err != nil {
 		return nil, err

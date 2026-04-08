@@ -239,7 +239,7 @@ func (e *tooManyTimestampsEntity) Timestamps() ([][]byte, error) {
 		return nil, err
 	}
 
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		timestamps = append(timestamps, timestamps[0])
 	}
 

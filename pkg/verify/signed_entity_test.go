@@ -413,7 +413,7 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	rawJSON, err := json.Marshal(res)
 	assert.Nil(t, err)
 
-	var unmarshaledJSON interface{}
+	var unmarshaledJSON any
 
 	err = json.Unmarshal(rawJSON, &unmarshaledJSON)
 	assert.Nil(t, err)
@@ -421,16 +421,16 @@ func TestThatAllTheJSONKeysStartWithALowerCase(t *testing.T) {
 	ensureKeysBeginWithLowercase(t, unmarshaledJSON)
 }
 
-func ensureKeysBeginWithLowercase(t *testing.T, obj interface{}) {
+func ensureKeysBeginWithLowercase(t *testing.T, obj any) {
 	switch v := obj.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		for key, val := range v {
 			r := []rune(key)
 
 			assert.Equal(t, string(unicode.ToLower(r[0]))+string(r[1:]), key)
 			ensureKeysBeginWithLowercase(t, val)
 		}
-	case []interface{}:
+	case []any:
 		for _, val := range v {
 			ensureKeysBeginWithLowercase(t, val)
 		}

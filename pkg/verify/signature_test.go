@@ -74,7 +74,7 @@ func TestEnvelopeSubject(t *testing.T) {
 	digest := digest256[:]
 	digest256hex := hex.EncodeToString(digest)
 
-	statement := []byte(fmt.Sprintf(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"%s"}}],"predicate":{}}`, digest256hex))
+	statement := fmt.Appendf(nil, `{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"%s"}}],"predicate":{}}`, digest256hex)
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
@@ -128,7 +128,7 @@ func TestTooManySubjects(t *testing.T) {
 	assert.NoError(t, err)
 
 	tooManySubjectsStatement := &in_toto.Statement{}
-	for i := 0; i < 1025; i++ {
+	for i := range 1025 {
 		tooManySubjectsStatement.Subject = append(tooManySubjectsStatement.Subject, &in_toto.ResourceDescriptor{
 			Name: fmt.Sprintf("subject-%d", i),
 			Digest: map[string]string{
@@ -163,7 +163,7 @@ func TestTooManyDigests(t *testing.T) {
 		},
 	}
 	tooManyDigestsStatement.Subject[0].Digest["sha512"] = "" // verifier requires that at least one known hash algorithm is present in the digest map
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		tooManyDigestsStatement.Subject[0].Digest[fmt.Sprintf("digest-%d", i)] = ""
 	}
 
@@ -227,7 +227,7 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 	jsonSubjects, err := json.Marshal(subjects)
 	assert.NoError(t, err)
 
-	statement := []byte(fmt.Sprintf(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":%s,"predicate":{}}`, string(jsonSubjects)))
+	statement := fmt.Appendf(nil, `{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":%s,"predicate":{}}`, string(jsonSubjects))
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
