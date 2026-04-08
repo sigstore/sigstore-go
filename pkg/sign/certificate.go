@@ -190,6 +190,8 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 			break
 		}
 
+		response.Body.Close()
+
 		delay := time.Duration(math.Pow(2, float64(attempts)))
 		timer := time.NewTimer(delay * time.Second)
 		select {
@@ -200,8 +202,11 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 		}
 		attempts++
 	}
+	if response != nil && response.Body != nil {
+		defer response.Body.Close()
+	}
 
-	body, err := io.ReadAll(response.Body)
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
 		return nil, err
 	}
