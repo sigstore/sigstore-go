@@ -16,11 +16,16 @@ package tlog
 
 import (
 	"bytes"
+	"encoding/hex"
 	"testing"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	rekortilespb "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
+	"github.com/sigstore/rekor/pkg/generated/models"
+	dsse_v001 "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
+	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
+	intoto_v002 "github.com/sigstore/rekor/pkg/types/intoto/v0.0.2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -317,6 +322,15 @@ func TestUnmarshalRekorV2EntryRejectsWrongApiVersionForEntryType(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidRekorV2Entry)
 }
 
+func TestUnmarshalRekorV2EntryWithEmptyBody(t *testing.T) {
+	var body = []byte("{}")
+
+	re, err := unmarshalRekorV2Entry(body)
+
+	assert.Error(t, err)
+	assert.Nil(t, re)
+}
+
 func TestValidateEntryRejectsRekorV2WhenSpecIsUnset(t *testing.T) {
 	entry := &Entry{
 		rekorV2Entry: &rekortilespb.Entry{
@@ -328,4 +342,199 @@ func TestValidateEntryRejectsRekorV2WhenSpecIsUnset(t *testing.T) {
 
 	err := ValidateEntry(entry)
 	assert.Error(t, err)
+}
+
+func TestGetDssePayloadHash(t *testing.T) {
+	payloadHash := []byte("dummy payload hash")
+	payloadHashHex := hex.EncodeToString(payloadHash)
+
+	tests := []struct {
+		name       string
+		entry      *Entry
+		wantDigest []byte
+		wantOk     bool
+	}{
+		{
+			name: "dsse 0.0.2",
+			entry: &Entry{
+				rekorV2Entry: &rekortilespb.Entry{
+					Spec: &rekortilespb.Spec{
+						Spec: &rekortilespb.Spec_DsseV002{
+							DsseV002: &rekortilespb.DSSELogEntryV002{
+								PayloadHash: &protocommon.HashOutput{
+									Digest: payloadHash,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantDigest: payloadHash,
+			wantOk:     true,
+		},
+		{
+			name: "dsse 0.0.1",
+			entry: &Entry{
+				rekorV1Entry: &dsse_v001.V001Entry{
+					DSSEObj: models.DSSEV001Schema{
+						PayloadHash: &models.DSSEV001SchemaPayloadHash{
+							Value: &payloadHashHex,
+						},
+					},
+				},
+			},
+			wantDigest: payloadHash,
+			wantOk:     true,
+		},
+		{
+			name: "intoto 0.0.2",
+			entry: &Entry{
+				rekorV1Entry: &intoto_v002.V002Entry{
+					IntotoObj: models.IntotoV002Schema{
+						Content: &models.IntotoV002SchemaContent{
+							PayloadHash: &models.IntotoV002SchemaContentPayloadHash{
+								Value: &payloadHashHex,
+							},
+						},
+					},
+				},
+			},
+			wantDigest: payloadHash,
+			wantOk:     true,
+		},
+		{
+			name:       "Nil Entry",
+			entry:      &Entry{},
+			wantDigest: nil,
+			wantOk:     false,
+		},
+		{
+			name: "V2 DSSE Nil Spec",
+			entry: &Entry{
+				rekorV2Entry: &rekortilespb.Entry{},
+			},
+			wantDigest: nil,
+			wantOk:     false,
+		},
+		{
+			name:       "Nil Receiver",
+			entry:      nil,
+			wantDigest: nil,
+			wantOk:     false,
+		},
+		{
+			name: "V2 DSSE Empty Spec",
+			entry: &Entry{
+				rekorV2Entry: &rekortilespb.Entry{
+					Spec: &rekortilespb.Spec{},
+				},
+			},
+			wantDigest: nil,
+			wantOk:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			digest, ok := tt.entry.GetDssePayloadHash()
+			assert.Equal(t, tt.wantOk, ok)
+			assert.Equal(t, tt.wantDigest, digest)
+		})
+	}
+}
+
+func TestGetHashedRekordDigest(t *testing.T) {
+	digest := []byte("dummy digest")
+	digestHex := hex.EncodeToString(digest)
+	algo := "sha256"
+
+	tests := []struct {
+		name          string
+		entry         *Entry
+		wantDigest    []byte
+		wantAlgorithm string
+		wantOk        bool
+	}{
+		{
+			name: "hashedrekord 0.0.1",
+			entry: &Entry{
+				rekorV1Entry: &hashedrekord_v001.V001Entry{
+					HashedRekordObj: models.HashedrekordV001Schema{
+						Data: &models.HashedrekordV001SchemaData{
+							Hash: &models.HashedrekordV001SchemaDataHash{
+								Value:     &digestHex,
+								Algorithm: &algo,
+							},
+						},
+					},
+				},
+			},
+			wantDigest:    digest,
+			wantAlgorithm: algo,
+			wantOk:        true,
+		},
+		{
+			name: "hashedrekord 0.0.2",
+			entry: &Entry{
+				rekorV2Entry: &rekortilespb.Entry{
+					Spec: &rekortilespb.Spec{
+						Spec: &rekortilespb.Spec_HashedRekordV002{
+							HashedRekordV002: &rekortilespb.HashedRekordLogEntryV002{
+								Data: &protocommon.HashOutput{
+									Digest:    digest,
+									Algorithm: protocommon.HashAlgorithm_SHA2_256,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantDigest:    digest,
+			wantAlgorithm: "SHA2_256",
+			wantOk:        true,
+		},
+		{
+			name: "V2 HashedRekord Nil Spec",
+			entry: &Entry{
+				rekorV2Entry: &rekortilespb.Entry{},
+			},
+			wantDigest:    nil,
+			wantAlgorithm: "",
+			wantOk:        false,
+		},
+		{
+			name:          "Nil Receiver",
+			entry:         nil,
+			wantDigest:    nil,
+			wantAlgorithm: "",
+			wantOk:        false,
+		},
+		{
+			name: "V2 HashedRekord Empty Spec",
+			entry: &Entry{
+				rekorV2Entry: &rekortilespb.Entry{
+					Spec: &rekortilespb.Spec{},
+				},
+			},
+			wantDigest:    nil,
+			wantAlgorithm: "",
+			wantOk:        false,
+		},
+		{
+			name:          "Nil Entry",
+			entry:         &Entry{},
+			wantDigest:    nil,
+			wantAlgorithm: "",
+			wantOk:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDigest, gotAlgo, ok := tt.entry.GetHashedRekordDigest()
+			assert.Equal(t, tt.wantOk, ok)
+			assert.Equal(t, tt.wantAlgorithm, gotAlgo)
+			assert.Equal(t, tt.wantDigest, gotDigest)
+		})
+	}
 }

@@ -17,6 +17,8 @@ package verify
 import (
 	"bytes"
 	"crypto"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -136,7 +138,53 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 			return nil, errors.New("transparency log certificate does not match")
 		}
 
-		// TODO: if you have access to artifact, check that it matches body subject
+		// Ensure that the digest/payload in the bundle matches the tlog entry
+		switch {
+		case sigContent.MessageSignatureContent() != nil:
+			// This message digest must be compared to the provided artifact
+			msgSig := sigContent.MessageSignatureContent()
+			entityDigest := msgSig.Digest()
+			entityAlgo := msgSig.DigestAlgorithm()
+
+			entryDigest, entryAlgo, ok := entry.GetHashedRekordDigest()
+			if !ok {
+				return nil, errors.New("transparency log entry is not a hashedrekord or missing digest")
+			}
+			entityHashFunc, err := algStringToHashFunc(entityAlgo)
+			if err != nil {
+				return nil, err
+			}
+			entryHashFunc, err := algStringToHashFunc(entryAlgo)
+			if err != nil {
+				return nil, err
+			}
+			if entityHashFunc != entryHashFunc {
+				return nil, fmt.Errorf("transparency log hashedrekord entry digest algorithm mismatch: %s != %s", entityAlgo, entryAlgo)
+			}
+			if !bytes.Equal(entityDigest, entryDigest) {
+				return nil, fmt.Errorf("transparency log hashedrekord entry digest %s does not match artifact %s", hex.EncodeToString(entryDigest), hex.EncodeToString(entityDigest))
+			}
+		case sigContent.EnvelopeContent() != nil:
+			envContent := sigContent.EnvelopeContent()
+			env := envContent.RawEnvelope()
+			if env == nil {
+				return nil, errors.New("bundle envelope is missing")
+			}
+			payloadBytes, err := base64.StdEncoding.DecodeString(env.Payload)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode envelope payload: %w", err)
+			}
+			payloadHash := sha256.Sum256(payloadBytes) // SHA256 is hardcoded in Rekor v1 and v2 for payload hash
+			entryDigest, ok := entry.GetDssePayloadHash()
+			if !ok {
+				return nil, errors.New("transparency log entry is not a dsse or intoto entry or missing payload hash")
+			}
+			if !bytes.Equal(payloadHash[:], entryDigest) {
+				return nil, fmt.Errorf("transparency log dsse/intoto entry payload hash %s does not match envelope payload hash %s", hex.EncodeToString(payloadHash[:]), hex.EncodeToString(entryDigest))
+			}
+		default:
+			return nil, errors.New("bundle must contain either a message signature or an envelope")
+		}
 
 		// Check tlog entry time against bundle certificates
 		if !entry.IntegratedTime().IsZero() {

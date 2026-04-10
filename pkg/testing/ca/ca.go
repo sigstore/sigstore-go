@@ -43,6 +43,7 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
 	"github.com/sigstore/rekor/pkg/types"
+	dsseEntry "github.com/sigstore/rekor/pkg/types/dsse"
 	"github.com/sigstore/rekor/pkg/types/hashedrekord"
 	"github.com/sigstore/rekor/pkg/types/intoto"
 	"github.com/sigstore/rekor/pkg/types/rekord"
@@ -326,8 +327,7 @@ func (ca *VirtualSigstore) GenerateTlogEntry(leafCert *x509.Certificate, envelop
 	if err != nil {
 		return nil, err
 	}
-
-	rekorBody, err := generateRekorEntry(intoto.KIND, intoto.New().DefaultVersion(), envelopeBytes, leafCertPem, sig, ca.signingAlgorithmDetails)
+	rekorBody, err := generateRekorEntry(dsseEntry.KIND, dsseEntry.New().DefaultVersion(), envelopeBytes, leafCertPem, sig, ca.signingAlgorithmDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +461,7 @@ func createEntry(ctx context.Context, kind, apiVersion string, blobBytes, certBy
 		PKIFormat:      string(pki.X509),
 	}
 	switch kind {
-	case rekord.KIND, intoto.KIND:
+	case rekord.KIND, intoto.KIND, dsseEntry.KIND:
 		props.ArtifactBytes = blobBytes
 		props.SignatureBytes = sigBytes
 	case hashedrekord.KIND:
