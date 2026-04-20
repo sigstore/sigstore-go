@@ -423,6 +423,72 @@ func (entry *Entry) TransparencyLogEntry() *v1.TransparencyLogEntry {
 	return entry.tle
 }
 
+func (entry *Entry) GetHashedRekordDigest() (digest []byte, algorithm string, ok bool) {
+	if entry == nil {
+		return nil, "", false
+	}
+	if entry.rekorV1Entry != nil {
+		if e, ok := entry.rekorV1Entry.(*hashedrekord_v001.V001Entry); ok {
+			if e.HashedRekordObj.Data != nil && e.HashedRekordObj.Data.Hash != nil {
+				hashBytes, err := hex.DecodeString(*e.HashedRekordObj.Data.Hash.Value)
+				if err != nil {
+					return nil, "", false
+				}
+				return hashBytes, *e.HashedRekordObj.Data.Hash.Algorithm, true
+			}
+		}
+	}
+	if entry.rekorV2Entry != nil {
+		spec := entry.rekorV2Entry.GetSpec()
+		if spec != nil {
+			if e, ok := spec.GetSpec().(*rekortilespb.Spec_HashedRekordV002); ok {
+				if e.HashedRekordV002 != nil && e.HashedRekordV002.GetData() != nil {
+					return e.HashedRekordV002.GetData().GetDigest(), e.HashedRekordV002.GetData().GetAlgorithm().String(), true
+				}
+			}
+		}
+	}
+	return nil, "", false
+}
+
+func (entry *Entry) GetDssePayloadHash() (digest []byte, ok bool) {
+	if entry == nil {
+		return nil, false
+	}
+	if entry.rekorV2Entry != nil {
+		spec := entry.rekorV2Entry.GetSpec()
+		if spec != nil {
+			if e, ok := spec.GetSpec().(*rekortilespb.Spec_DsseV002); ok {
+				if e.DsseV002 != nil && e.DsseV002.GetPayloadHash() != nil {
+					return e.DsseV002.GetPayloadHash().Digest, true
+				}
+			}
+		}
+	} else if entry.rekorV1Entry != nil {
+		switch e := entry.rekorV1Entry.(type) {
+		case *dsse_v001.V001Entry:
+			if e.DSSEObj.PayloadHash.Value != nil {
+				hashStr := *e.DSSEObj.PayloadHash.Value
+				hashBytes, err := hex.DecodeString(hashStr)
+				if err != nil {
+					return nil, false
+				}
+				return hashBytes, true
+			}
+		case *intoto_v002.V002Entry:
+			if e.IntotoObj.Content != nil && e.IntotoObj.Content.PayloadHash != nil && e.IntotoObj.Content.PayloadHash.Value != nil {
+				hashStr := *e.IntotoObj.Content.PayloadHash.Value
+				hashBytes, err := hex.DecodeString(hashStr)
+				if err != nil {
+					return nil, false
+				}
+				return hashBytes, true
+			}
+		}
+	}
+	return nil, false
+}
+
 // VerifyInclusion verifies a Rekor v1-style checkpoint and the entry's inclusion in the Rekor v1 log.
 // Prefer verify.VerifyTlogEntry, which also compares the log entry against a provided bundle.
 func VerifyInclusion(entry *Entry, verifier signature.Verifier) error {

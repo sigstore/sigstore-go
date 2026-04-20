@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
@@ -247,4 +248,117 @@ func TestInclusionProofAuditPath(t *testing.T) {
 
 	_, err = verify.VerifyTlogEntry(entity, virtualSigstore, 1, true)
 	assert.NoError(t, err)
+}
+
+func TestTlogEntryDigestMismatch(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	artifact := []byte("hello world")
+	entity, err := virtualSigstore.Sign("foo@example.com", "issuer", artifact)
+	assert.NoError(t, err)
+
+	// Verify should succeed normally
+	_, err = verify.VerifyTlogEntry(entity, virtualSigstore, 1, true)
+	assert.NoError(t, err)
+
+	// Now create an entity with mismatching digest
+	fakeDigest := strings.Repeat("a", 32) // 32 bytes for sha256
+	mismatchEntity := &mismatchDigestEntity{TestEntity: entity, fakeDigest: []byte(fakeDigest)}
+	_, err = verify.VerifyTlogEntry(mismatchEntity, virtualSigstore, 1, true)
+	assert.ErrorContains(t, err, "does not match artifact")
+}
+
+type mismatchDigestEntity struct {
+	*ca.TestEntity
+	fakeDigest []byte
+}
+
+func (e *mismatchDigestEntity) SignatureContent() (verify.SignatureContent, error) {
+	sigContent, err := e.TestEntity.SignatureContent()
+	if err != nil {
+		return nil, err
+	}
+	return &mismatchSignatureContent{sigContent, e.fakeDigest}, nil
+}
+
+type mismatchSignatureContent struct {
+	verify.SignatureContent
+	fakeDigest []byte
+}
+
+func (c *mismatchSignatureContent) MessageSignatureContent() verify.MessageSignatureContent {
+	msgSig := c.SignatureContent.MessageSignatureContent()
+	if msgSig == nil {
+		return nil
+	}
+	return &mismatchMessageSignatureContent{msgSig, c.fakeDigest}
+}
+
+type mismatchMessageSignatureContent struct {
+	verify.MessageSignatureContent
+	fakeDigest []byte
+}
+
+func (c *mismatchMessageSignatureContent) Digest() []byte {
+	return c.fakeDigest
+}
+
+func TestTlogEntryDssePayloadHashMismatch(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[],"predicate":{}}`)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	// Verify should succeed normally
+	_, err = verify.VerifyTlogEntry(entity, virtualSigstore, 1, true)
+	assert.NoError(t, err)
+
+	// Now create an entity with mismatching envelope payload
+	mismatchEntity := &mismatchEnvelopeEntity{TestEntity: entity}
+	_, err = verify.VerifyTlogEntry(mismatchEntity, virtualSigstore, 1, true)
+	assert.ErrorContains(t, err, "does not match envelope payload hash")
+}
+
+type mismatchEnvelopeEntity struct {
+	*ca.TestEntity
+}
+
+func (e *mismatchEnvelopeEntity) SignatureContent() (verify.SignatureContent, error) {
+	sigContent, err := e.TestEntity.SignatureContent()
+	if err != nil {
+		return nil, err
+	}
+	return &mismatchEnvelopeSignatureContent{sigContent}, nil
+}
+
+type mismatchEnvelopeSignatureContent struct {
+	verify.SignatureContent
+}
+
+func (c *mismatchEnvelopeSignatureContent) EnvelopeContent() verify.EnvelopeContent {
+	envContent := c.SignatureContent.EnvelopeContent()
+	if envContent == nil {
+		return nil
+	}
+	return &mismatchEnvelopeContentWrapper{envContent}
+}
+
+type mismatchEnvelopeContentWrapper struct {
+	verify.EnvelopeContent
+}
+
+func (c *mismatchEnvelopeContentWrapper) RawEnvelope() *dsse.Envelope {
+	env := c.EnvelopeContent.RawEnvelope()
+	if env == nil {
+		return nil
+	}
+	clone := &dsse.Envelope{
+		Payload:     base64.StdEncoding.EncodeToString([]byte("fake payload")),
+		PayloadType: env.PayloadType,
+		Signatures:  env.Signatures,
+	}
+	return clone
 }

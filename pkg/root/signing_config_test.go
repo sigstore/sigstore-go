@@ -32,7 +32,7 @@ func servicesEqual(got []Service, want []Service) bool {
 		return false
 	}
 	for i, g := range got {
-		w := want[i]
+		w := want[i] //nolint:gosec
 		if g.URL != w.URL || g.MajorAPIVersion != w.MajorAPIVersion ||
 			!g.ValidityPeriodStart.Equal(w.ValidityPeriodStart) ||
 			!g.ValidityPeriodEnd.Equal(w.ValidityPeriodEnd) ||
