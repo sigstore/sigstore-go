@@ -248,6 +248,9 @@ func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error
 }
 
 func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeContent, artifacts []io.Reader) error {
+	if len(artifacts) == 0 {
+		return fmt.Errorf("no artifacts provided for verification")
+	}
 	if err := verifyEnvelope(verifier, envelope); err != nil {
 		return err
 	}
@@ -327,6 +330,9 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 }
 
 func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope EnvelopeContent, digests []ArtifactDigest) error {
+	if len(digests) == 0 {
+		return fmt.Errorf("no artifact digests provided for verification")
+	}
 	if err := verifyEnvelope(verifier, envelope); err != nil {
 		return err
 	}

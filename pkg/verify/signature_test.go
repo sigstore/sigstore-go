@@ -252,6 +252,12 @@ func TestVerifyEnvelopeWithMultipleArtifactsAndArtifactDigests(t *testing.T) {
 	}
 	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests(noMatchingArtifactDigests), verify.WithoutIdentitiesUnsafe()))
 	assert.Error(t, err)
+
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifacts([]io.Reader{}), verify.WithoutIdentitiesUnsafe()))
+	assert.ErrorContains(t, err, "no artifacts provided for verification")
+
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifactDigests([]verify.ArtifactDigest{}), verify.WithoutIdentitiesUnsafe()))
+	assert.ErrorContains(t, err, "no artifact digests provided for verification")
 }
 
 func TestCompatibilityAlgorithms(t *testing.T) {
