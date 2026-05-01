@@ -566,21 +566,130 @@ func Test_validate(t *testing.T) {
 	}
 }
 
-func TestVerificationContent(t *testing.T) {
-	t.Parallel()
-	caCert := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-	}
-	leafCert := &x509.Certificate{
-		SerialNumber: big.NewInt(2),
-	}
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+func createTestCertChain(t *testing.T) (rootDer, intermediateDer, leafDer []byte) {
+	t.Helper()
+	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	intermediateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	caDer, err := x509.CreateCertificate(rand.Reader, caCert, caCert, &caKey.PublicKey, caKey)
+
+	rootCert := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	intermediateCert := &x509.Certificate{
+		SerialNumber:          big.NewInt(2),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	leafCertTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(3),
+	}
+
+	rootDer, err = x509.CreateCertificate(rand.Reader, rootCert, rootCert, &rootKey.PublicKey, rootKey)
 	require.NoError(t, err)
-	leafDer, err := x509.CreateCertificate(rand.Reader, leafCert, caCert, &leafKey.PublicKey, caKey)
+	intermediateDer, err = x509.CreateCertificate(rand.Reader, intermediateCert, rootCert, &intermediateKey.PublicKey, rootKey)
+	require.NoError(t, err)
+	leafDer, err = x509.CreateCertificate(rand.Reader, leafCertTmpl, intermediateCert, &leafKey.PublicKey, intermediateKey)
+	require.NoError(t, err)
+	return
+}
+
+func TestIntermediateCertificateAuthorities(t *testing.T) {
+	t.Parallel()
+	rootDer, intermediateDer, leafDer := createTestCertChain(t)
+	tests := []struct {
+		name      string
+		b         Bundle
+		wantCount int
+	}{
+		{
+			name:      "nil verification material",
+			b:         Bundle{Bundle: &protobundle.Bundle{}},
+			wantCount: 0,
+		},
+		{
+			name: "single certificate (no chain)",
+			b: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_Certificate{
+						Certificate: &protocommon.X509Certificate{RawBytes: leafDer},
+					},
+				},
+			}},
+			wantCount: 0,
+		},
+		{
+			name: "chain with leaf and intermediate",
+			b: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+								{RawBytes: intermediateDer},
+							},
+						},
+					},
+				},
+			}},
+			wantCount: 1,
+		},
+		{
+			name: "chain with leaf intermediate and root",
+			b: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+								{RawBytes: intermediateDer},
+								{RawBytes: rootDer},
+							},
+						},
+					},
+				},
+			}},
+			wantCount: 2,
+		},
+		{
+			name: "chain with only leaf",
+			b: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+							},
+						},
+					},
+				},
+			}},
+			wantCount: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.b.IntermediateContent()
+			require.Len(t, got, tt.wantCount)
+			for _, cert := range got {
+				require.True(t, cert.IsCA)
+			}
+		})
+	}
+}
+
+func TestVerificationContent(t *testing.T) {
+	t.Parallel()
+	_, _, leafDer := createTestCertChain(t)
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	caCert := &x509.Certificate{SerialNumber: big.NewInt(100)}
+	caDer, err := x509.CreateCertificate(rand.Reader, caCert, caCert, &caKey.PublicKey, caKey)
 	require.NoError(t, err)
 	tests := []struct {
 		name            string
@@ -1054,7 +1163,6 @@ func TestNewBundleWithAllowCertificateChain(t *testing.T) {
 		{"v0.3 with cert chain without option", nil, true},
 		{"v0.3 with cert chain with AllowCertificateChain", []Option{AllowCertificateChain()}, false},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			bundle, err := NewBundle(v03BundleWithCertChain, tc.opts...)

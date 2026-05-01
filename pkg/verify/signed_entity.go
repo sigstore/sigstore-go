@@ -663,10 +663,16 @@ func (v *Verifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationR
 			leafCert.UnhandledCriticalExtensions = unhandledExts
 		}
 
+		// If the bundle verification material contains an X509CertificateChain,
+		// extract the Intermediate CA certificates to use during certificate path validation.
+		var intermediates []*x509.Certificate
+		if cip, ok := entity.(IntermediateCAProvider); ok {
+			intermediates = cip.IntermediateContent()
+		}
+
 		var chains [][]*x509.Certificate
 		for _, verifiedTs := range verifiedTimestamps {
-			// verify the leaf certificate against the root
-			chains, err = VerifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial)
+			chains, err = verifyLeafCertificate(verifiedTs.Timestamp, leafCert, v.trustedMaterial, intermediates)
 			if err != nil {
 				return nil, fmt.Errorf("failed to verify leaf certificate: %w", err)
 			}

@@ -18,10 +18,60 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestVerifyLeafCertificateWithIntermediateCertificateAuthorities(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	leaf, _, err := virtualSigstore.GenerateLeafCert("example@example.com", "issuer")
+	assert.NoError(t, err)
+
+	cas := virtualSigstore.FulcioCertificateAuthorities()
+	assert.Greater(t, len(cas), 0)
+	fca := cas[0].(*root.FulcioCertificateAuthority)
+
+	strippedCA := *fca
+	strippedCA.Intermediates = nil
+
+	tests := []struct {
+		name    string
+		ca      *root.FulcioCertificateAuthority
+		wantErr bool
+	}{
+		{
+			name:    "full CA verifies",
+			ca:      fca,
+			wantErr: false,
+		},
+		{
+			name:    "stripped CA fails",
+			ca:      &strippedCA,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.ca.Verify(leaf, time.Now())
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+
+	// Verify that adding intermediates back to a stripped CA fixes verification.
+	// This is the path exercised when a bundle provides intermediate certificate authorities.
+	restoredCA := strippedCA
+	restoredCA.Intermediates = fca.Intermediates
+	_, err = restoredCA.Verify(leaf, time.Now())
+	assert.NoError(t, err)
+}
 
 func TestVerifyValidityPeriod(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()

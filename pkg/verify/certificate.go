@@ -23,8 +23,18 @@ import (
 )
 
 func VerifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certificate, trustedMaterial root.TrustedMaterial) ([][]*x509.Certificate, error) { // nolint: revive
+	return verifyLeafCertificate(observerTimestamp, leafCert, trustedMaterial, nil)
+}
+
+func verifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certificate, trustedMaterial root.TrustedMaterial, intermediates []*x509.Certificate) ([][]*x509.Certificate, error) {
 	for _, ca := range trustedMaterial.FulcioCertificateAuthorities() {
-		chains, err := ca.Verify(leafCert, observerTimestamp)
+		caToVerify := ca
+		if fca, ok := ca.(*root.FulcioCertificateAuthority); ok && len(intermediates) > 0 {
+			withIntermediates := *fca
+			withIntermediates.Intermediates = append(fca.Intermediates, intermediates...)
+			caToVerify = &withIntermediates
+		}
+		chains, err := caToVerify.Verify(leafCert, observerTimestamp)
 		if err == nil {
 			return chains, nil
 		}
