@@ -559,7 +559,6 @@ func Test_validate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.pb.validate()
 			if (got != nil) != tt.wantErr {
@@ -807,7 +806,6 @@ func TestVerificationContent(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, gotErr := tt.pb.VerificationContent()
 			if tt.wantErr {
@@ -894,7 +892,6 @@ func TestSignatureContent(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, gotErr := tt.pb.SignatureContent()
 			if tt.wantErr {
@@ -949,7 +946,6 @@ func TestEnvelope(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			_, gotErr := tt.pb.Envelope()
 			if tt.wantErr {
@@ -1027,7 +1023,6 @@ func TestTimestamps(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, gotErr := tt.pb.Timestamps()
 			if tt.wantErr {
@@ -1292,8 +1287,8 @@ func TestIntermediateContent(t *testing.T) {
 			wantCount: 2,
 		},
 	}
+
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := tt.b.IntermediateContent()
