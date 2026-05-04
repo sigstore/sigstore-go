@@ -211,9 +211,9 @@ func hashAlgorithmToProtobufHashAlgorithm(hashAlgorithm crypto.Hash) (protocommo
 		return protocommon.HashAlgorithm_SHA2_384, nil
 	case crypto.SHA512:
 		return protocommon.HashAlgorithm_SHA2_512, nil
-	case crypto.SHA3_256:
+	case crypto.SHA3_256: //nolint:staticcheck
 		return protocommon.HashAlgorithm_SHA3_256, nil
-	case crypto.SHA3_384:
+	case crypto.SHA3_384: //nolint:staticcheck
 		return protocommon.HashAlgorithm_SHA3_384, nil
 	default:
 		return 0, fmt.Errorf("unsupported hash algorithm for Merkle tree: %v", hashAlgorithm)
