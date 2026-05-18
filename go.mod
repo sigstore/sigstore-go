@@ -10,7 +10,7 @@ require (
 	github.com/go-openapi/swag/conv v0.25.5
 	github.com/google/certificate-transparency-go v1.3.2
 	github.com/in-toto/attestation v1.1.2
-	github.com/in-toto/in-toto-golang v0.10.0
+	github.com/in-toto/in-toto-golang v0.11.0
 	github.com/secure-systems-lab/go-securesystemslib v0.10.0
 	github.com/sigstore/protobuf-specs v0.5.0
 	github.com/sigstore/rekor v1.5.0
