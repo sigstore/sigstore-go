@@ -26,7 +26,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sigstore/sigstore-go/pkg/limits"
+	"github.com/sigstore/sigstore-go/internal/limits"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore/pkg/signature"

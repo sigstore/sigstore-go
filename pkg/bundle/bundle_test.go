@@ -28,7 +28,7 @@ import (
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	rekorv1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
-	"github.com/sigstore/sigstore-go/pkg/limits"
+	"github.com/sigstore/sigstore-go/internal/limits"
 	"github.com/stretchr/testify/require"
 )
 

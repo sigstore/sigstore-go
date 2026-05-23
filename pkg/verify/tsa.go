@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sigstore/sigstore-go/pkg/limits"
+	"github.com/sigstore/sigstore-go/internal/limits"
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
