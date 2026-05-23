@@ -28,6 +28,7 @@ import (
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	rekorv1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord"
+	"github.com/sigstore/sigstore-go/pkg/limits"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1102,5 +1103,59 @@ func Test_BundleValidation(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func TestTlogEntriesCountCap(t *testing.T) {
+	// Build a slice of entries that exceeds the shared cap. The individual
+	// entries here are intentionally bare (no KindVersion / no body) so
+	// that ParseTransparencyLogEntry would error out if it were reached.
+	// The cap check at the top of TlogEntries() must fire first, surfacing
+	// the count-based error rather than a per-entry parse error.
+	overLimit := limits.MaxAllowedTlogEntries + 1
+	entries := make([]*rekorv1.TransparencyLogEntry, 0, overLimit)
+	for i := 0; i < overLimit; i++ {
+		entries = append(entries, &rekorv1.TransparencyLogEntry{})
+	}
+
+	b := &Bundle{
+		Bundle: &protobundle.Bundle{
+			MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
+			VerificationMaterial: &protobundle.VerificationMaterial{
+				TlogEntries: entries,
+			},
+		},
+	}
+
+	got, err := b.TlogEntries()
+	require.Error(t, err)
+	require.Nil(t, got)
+	require.Contains(t, err.Error(), "too many tlog entries")
+	require.Contains(t, err.Error(), fmt.Sprintf("%d", overLimit))
+	require.Contains(t, err.Error(), fmt.Sprintf("%d", limits.MaxAllowedTlogEntries))
+}
+
+func TestTlogEntriesCountAtCap(t *testing.T) {
+	// At exactly the cap the count check must not fire. The slice here
+	// uses bare entries to avoid pulling in a full fixture, so the call
+	// is expected to fail downstream at per-entry parsing. The assertion
+	// is on the error shape: it must not be the count-based error.
+	entries := make([]*rekorv1.TransparencyLogEntry, 0, limits.MaxAllowedTlogEntries)
+	for i := 0; i < limits.MaxAllowedTlogEntries; i++ {
+		entries = append(entries, &rekorv1.TransparencyLogEntry{})
+	}
+
+	b := &Bundle{
+		Bundle: &protobundle.Bundle{
+			MediaType: "application/vnd.dev.sigstore.bundle+json;version=0.1",
+			VerificationMaterial: &protobundle.VerificationMaterial{
+				TlogEntries: entries,
+			},
+		},
+	}
+
+	_, err := b.TlogEntries()
+	if err != nil {
+		require.NotContains(t, err.Error(), "too many tlog entries")
 	}
 }
