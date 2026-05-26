@@ -302,11 +302,6 @@ func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
 		return nil, nil
 	}
 
-	// Bound the number of transparency log entries we will materialize
-	// before iterating and parsing each one. The same cap is later
-	// re-checked in pkg/verify, so enforcing it here keeps the parse
-	// step's work proportional to the configured limit instead of to
-	// the bundle's declared entry count.
 	if n := len(b.VerificationMaterial.TlogEntries); n > limits.MaxAllowedTlogEntries {
 		return nil, ErrValidationError(fmt.Errorf(
 			"too many tlog entries: %d > %d", n, limits.MaxAllowedTlogEntries))

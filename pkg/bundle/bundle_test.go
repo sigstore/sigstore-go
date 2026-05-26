@@ -1107,11 +1107,6 @@ func Test_BundleValidation(t *testing.T) {
 }
 
 func TestTlogEntriesCountCap(t *testing.T) {
-	// Build a slice of entries that exceeds the shared cap. The individual
-	// entries here are intentionally bare (no KindVersion / no body) so
-	// that ParseTransparencyLogEntry would error out if it were reached.
-	// The cap check at the top of TlogEntries() must fire first, surfacing
-	// the count-based error rather than a per-entry parse error.
 	overLimit := limits.MaxAllowedTlogEntries + 1
 	entries := make([]*rekorv1.TransparencyLogEntry, 0, overLimit)
 	for i := 0; i < overLimit; i++ {
@@ -1136,10 +1131,6 @@ func TestTlogEntriesCountCap(t *testing.T) {
 }
 
 func TestTlogEntriesCountAtCap(t *testing.T) {
-	// At exactly the cap the count check must not fire. The slice here
-	// uses bare entries to avoid pulling in a full fixture, so the call
-	// is expected to fail downstream at per-entry parsing. The assertion
-	// is on the error shape: it must not be the count-based error.
 	entries := make([]*rekorv1.TransparencyLogEntry, 0, limits.MaxAllowedTlogEntries)
 	for i := 0; i < limits.MaxAllowedTlogEntries; i++ {
 		entries = append(entries, &rekorv1.TransparencyLogEntry{})

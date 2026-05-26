@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package limits centralizes the per-bundle upper bounds that are shared
-// between the bundle parse path and the verify path. Keeping a single
-// source of truth avoids drift between the two layers and lets the parse
-// step short-circuit on counts that the verify step would later reject.
+// Package limits centralizes the per-bundle upper bounds shared between
+// the bundle parse path and the verify path.
 package limits
 
 // MaxAllowedTlogEntries is the upper bound on the number of transparency
-// log entries a bundle may carry. The value matches the historical cap
-// enforced inside VerifyTlogEntry.
+// log entries a bundle may carry.
 const MaxAllowedTlogEntries = 32
 
 // MaxAllowedTimestamps is the upper bound on the number of signed
-// timestamps a bundle may carry. The value matches the historical cap
-// enforced inside VerifySignedTimestamp.
+// timestamps a bundle may carry.
 const MaxAllowedTimestamps = 32
