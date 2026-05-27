@@ -67,6 +67,10 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	anotherLogID, err := getCTLogID(&anotherPrivateKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		name            string
 		getCertFn       func() *x509.Certificate
@@ -354,7 +358,7 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "threshold of 2 with 2 valid scts",
+			name: "threshold of 2 with 2 valid scts from same log (fails)",
 			getCertFn: func() *x509.Certificate {
 				return embedSCTs(t, privateKey, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
 					{
@@ -375,6 +379,41 @@ func TestVerifySignedCertificateTimestamp(t *testing.T) {
 				transparencyLog: map[string]*root.TransparencyLog{
 					hex.EncodeToString(logID[:]): {
 						PublicKey: &privateKey.PublicKey,
+					},
+				},
+				cas: []root.CertificateAuthority{
+					&root.FulcioCertificateAuthority{
+						Root: caCert,
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "threshold of 2 with 2 valid scts from different logs (succeeds)",
+			getCertFn: func() *x509.Certificate {
+				return embedSCTs(t, []*rsa.PrivateKey{privateKey, anotherPrivateKey}, skid, createBaseCert(t, privateKey, skid, big.NewInt(1)), []ct.SignedCertificateTimestamp{
+					{
+						SCTVersion: ct.V1,
+						Timestamp:  12345,
+						LogID:      ct.LogID{KeyID: logID},
+					},
+					{
+						SCTVersion: ct.V1,
+						Timestamp:  99,
+						LogID:      ct.LogID{KeyID: anotherLogID},
+					},
+				})
+			},
+			chain:     []*x509.Certificate{caCert},
+			threshold: 2,
+			trustedMaterial: &fakeTrustedMaterial{
+				transparencyLog: map[string]*root.TransparencyLog{
+					hex.EncodeToString(logID[:]): {
+						PublicKey: &privateKey.PublicKey,
+					},
+					hex.EncodeToString(anotherLogID[:]): {
+						PublicKey: &anotherPrivateKey.PublicKey,
 					},
 				},
 				cas: []root.CertificateAuthority{
@@ -415,9 +454,19 @@ func createBaseCert(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, seria
 	return parsedCert
 }
 
-func embedSCTs(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, preCert *x509.Certificate, sctInput []ct.SignedCertificateTimestamp) *x509.Certificate {
+func embedSCTs(t *testing.T, privateKeyOrKeys any, skid []byte, preCert *x509.Certificate, sctInput []ct.SignedCertificateTimestamp) *x509.Certificate {
+	var keys []*rsa.PrivateKey
+	switch k := privateKeyOrKeys.(type) {
+	case *rsa.PrivateKey:
+		keys = []*rsa.PrivateKey{k}
+	case []*rsa.PrivateKey:
+		keys = k
+	default:
+		t.Fatalf("unexpected type for privateKeyOrKeys: %T", privateKeyOrKeys)
+	}
+
 	scts := make([]*ct.SignedCertificateTimestamp, 0)
-	for _, s := range sctInput {
+	for i, s := range sctInput {
 		logEntry := ct.LogEntry{
 			Leaf: ct.MerkleTreeLeaf{
 				Version:  ct.V1,
@@ -437,7 +486,8 @@ func embedSCTs(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, preCert *x
 			t.Fatal(err)
 		}
 		h := sha256.Sum256(data)
-		signature, err := privateKey.Sign(rand.Reader, h[:], crypto.SHA256)
+		key := keys[i%len(keys)]
+		signature, err := key.Sign(rand.Reader, h[:], crypto.SHA256)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -477,7 +527,8 @@ func embedSCTs(t *testing.T, privateKey *rsa.PrivateKey, skid []byte, preCert *x
 			},
 		},
 	}
-	certDERBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
+	issuerKey := keys[0]
+	certDERBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &issuerKey.PublicKey, issuerKey)
 	if err != nil {
 		t.Fatal(err)
 	}
