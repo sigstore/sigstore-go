@@ -16,6 +16,7 @@ package verify_test
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"strings"
 	"testing"
 	"time"
@@ -194,6 +195,73 @@ func TestDuplicateTlogEntries(t *testing.T) {
 
 	_, err = verify.VerifyTlogEntry(&dupTlogEntity{entity}, virtualSigstore, 1, true)
 	assert.ErrorContains(t, err, "duplicate tlog entries found") // duplicate tlog entries should fail to verify
+}
+
+type sameLogIDDifferentIndexEntity struct {
+	*ca.TestEntity
+	VirtualSigstore *ca.VirtualSigstore
+}
+
+func (e *sameLogIDDifferentIndexEntity) TlogEntries() ([]*tlog.Entry, error) {
+	entries, err := e.TestEntity.TlogEntries()
+	if err != nil {
+		return nil, err
+	}
+	entry1 := entries[0]
+	body, err := base64.StdEncoding.DecodeString(entry1.Body().(string))
+	if err != nil {
+		return nil, err
+	}
+
+	rekorLogID, err := e.VirtualSigstore.RekorLogID()
+	if err != nil {
+		return nil, err
+	}
+	rekorLogIDRaw, err := hex.DecodeString(rekorLogID)
+	if err != nil {
+		return nil, err
+	}
+
+	b2 := tlog.RekorPayload{
+		LogID:          rekorLogID,
+		IntegratedTime: entry1.IntegratedTime().Unix(),
+		LogIndex:       entry1.LogIndex() + 1,
+		Body:           entry1.Body().(string),
+	}
+	set2, err := e.VirtualSigstore.RekorSignPayload(b2)
+	if err != nil {
+		return nil, err
+	}
+
+	entry2, err := tlog.NewEntry(body, entry1.IntegratedTime().Unix(), entry1.LogIndex()+1, rekorLogIDRaw, set2, nil) //nolint:staticcheck
+	if err != nil {
+		return nil, err
+	}
+	return []*tlog.Entry{entry1, entry2}, nil
+}
+
+func TestSameLogIDDifferentIndexTlogEntries(t *testing.T) {
+	virtualSigstore, err := ca.NewVirtualSigstore()
+	assert.NoError(t, err)
+
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
+	assert.NoError(t, err)
+
+	wrappedEntity := &sameLogIDDifferentIndexEntity{
+		TestEntity:      entity,
+		VirtualSigstore: virtualSigstore,
+	}
+
+	// Threshold of 1 should succeed with 2 entries from the same log
+	ts, err := verify.VerifyTlogEntry(wrappedEntity, virtualSigstore, 1, true)
+	assert.NoError(t, err)
+	// It must return exactly 1 observer timestamp (deduplicated)
+	assert.Len(t, ts, 1)
+
+	// Threshold of 2 should fail because both entries are from the same log (only 1 witness)
+	_, err = verify.VerifyTlogEntry(wrappedEntity, virtualSigstore, 2, true)
+	assert.ErrorContains(t, err, "not enough verified log entries from transparency log")
 }
 
 type tooManyTlogEntriesEntity struct {

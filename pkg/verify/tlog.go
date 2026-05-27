@@ -70,8 +70,9 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 		return nil, err
 	}
 
-	verifiedTimestamps := []root.Timestamp{}
-	logEntriesVerified := 0
+	var verifiedTimestamps []root.Timestamp
+	verifiedLogIDsMap := make(map[string]bool)
+	hasTimestampMap := make(map[string]bool)
 
 	for _, entry := range entries {
 		err := tlog.ValidateEntry(entry)
@@ -96,9 +97,6 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 			if err != nil {
 				// skip entries the trust root cannot verify
 				continue
-			}
-			if trustIntegratedTime {
-				verifiedTimestamps = append(verifiedTimestamps, root.Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
 			}
 		}
 		if entry.HasInclusionProof() {
@@ -194,11 +192,15 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 		}
 
 		// successful log entry verification
-		logEntriesVerified++
+		verifiedLogIDsMap[keyID] = true
+		if trustIntegratedTime && entry.HasInclusionPromise() && !hasTimestampMap[keyID] {
+			hasTimestampMap[keyID] = true
+			verifiedTimestamps = append(verifiedTimestamps, root.Timestamp{Time: entry.IntegratedTime(), URI: tlogVerifier.BaseURL})
+		}
 	}
 
-	if logEntriesVerified < logThreshold {
-		return nil, fmt.Errorf("not enough verified log entries from transparency log: %d < %d", logEntriesVerified, logThreshold)
+	if len(verifiedLogIDsMap) < logThreshold {
+		return nil, fmt.Errorf("not enough verified log entries from transparency log: %d < %d", len(verifiedLogIDsMap), logThreshold)
 	}
 
 	return verifiedTimestamps, nil
