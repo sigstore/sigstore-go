@@ -129,20 +129,15 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 				if err != nil {
 					return nil, fmt.Errorf("loading note verifier: %w", err)
 				}
-				// For hashedrekord entries, reconstruct the leaf hash from
-				// bundle contents instead of trusting the canonicalized body.
-				if _, _, ok := entry.GetHashedRekordDigest(); ok {
-					entryHash, err := reconstructV2EntryHash(sigContent, verificationContent, trustedMaterial, entitySignature)
-					if err != nil {
-						return nil, err
-					}
-					if err := rekorVerify.VerifyLogEntryWithHash(entry.TransparencyLogEntry(), noteVerifier, entryHash); err != nil {
-						return nil, fmt.Errorf("verifying log entry: %w", err)
-					}
-				} else {
-					if err := rekorVerify.VerifyLogEntry(entry.TransparencyLogEntry(), noteVerifier); err != nil {
-						return nil, fmt.Errorf("verifying log entry: %w", err)
-					}
+				if _, _, ok := entry.GetHashedRekordDigest(); !ok {
+					return nil, errors.New("rekor v2 entry must be a hashedrekord")
+				}
+				entryHash, err := reconstructV2EntryHash(sigContent, verificationContent, trustedMaterial, entitySignature)
+				if err != nil {
+					return nil, err
+				}
+				if err := rekorVerify.VerifyLogEntryWithHash(entry.TransparencyLogEntry(), noteVerifier, entryHash); err != nil {
+					return nil, fmt.Errorf("verifying log entry: %w", err)
 				}
 			}
 			// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
