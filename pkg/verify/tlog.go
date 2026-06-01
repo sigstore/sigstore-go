@@ -228,7 +228,7 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 }
 
 // reconstructV2EntryHash rebuilds a Rekor v2 hashedrekord entry hash from
-// bundle contents, so inclusion can be verified without trusting the
+// bundle contents, so inclusion can be verified without relying on the
 // canonicalized body returned by Rekor.
 func reconstructV2EntryHash(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, entitySignature []byte) ([]byte, error) {
 	var (
