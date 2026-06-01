@@ -322,6 +322,35 @@ func TestUnmarshalRekorV2EntryRejectsWrongApiVersionForEntryType(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidRekorV2Entry)
 }
 
+// Rekor v2 only supports hashedrekord, so a v2 entry with a DSSE spec must be rejected.
+func TestUnmarshalRekorV2EntryRejectsDsseKind(t *testing.T) {
+	body := []byte(`{
+  "apiVersion": "0.0.2",
+  "kind": "dsse",
+  "spec": {
+    "dsseV002": {
+      "payloadHash": {
+        "algorithm": "SHA2_256",
+        "digest": "dyj4ednYHjN4/zsjjBeeLahS9slp97Z67LTAVxjrjXw="
+      },
+      "signatures": [
+        {
+          "content": "MEQCIB+YPa9o3SN0sQ4uduGf+mZxwFfOhFZ0Cgy+p7Vt1o2SAiAPFDHqOAJLYmvtCWOsDyNY1H4V3zm4NEDYs3NyvHh1Pg==",
+          "verifier": {
+            "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+            "publicKey": {
+              "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2slOf8eZcj2moW2t4UFj7vCL6QpDzkDqqSUmm4OJCVvIauKLxm0aGs3VMPPfauMPaMutn0/s3jg0rroFxoicyg=="
+            }
+          }
+        }
+      ]
+    }
+  }
+}`)
+	_, err := unmarshalRekorV2Entry(body)
+	assert.ErrorIs(t, err, ErrInvalidRekorV2Entry)
+}
+
 func TestUnmarshalRekorV2EntryWithEmptyBody(t *testing.T) {
 	var body = []byte("{}")
 
@@ -354,24 +383,6 @@ func TestGetDssePayloadHash(t *testing.T) {
 		wantDigest []byte
 		wantOk     bool
 	}{
-		{
-			name: "dsse 0.0.2",
-			entry: &Entry{
-				rekorV2Entry: &rekortilespb.Entry{
-					Spec: &rekortilespb.Spec{
-						Spec: &rekortilespb.Spec_DsseV002{
-							DsseV002: &rekortilespb.DSSELogEntryV002{
-								PayloadHash: &protocommon.HashOutput{
-									Digest: payloadHash,
-								},
-							},
-						},
-					},
-				},
-			},
-			wantDigest: payloadHash,
-			wantOk:     true,
-		},
 		{
 			name: "dsse 0.0.1",
 			entry: &Entry{
@@ -409,26 +420,8 @@ func TestGetDssePayloadHash(t *testing.T) {
 			wantOk:     false,
 		},
 		{
-			name: "V2 DSSE Nil Spec",
-			entry: &Entry{
-				rekorV2Entry: &rekortilespb.Entry{},
-			},
-			wantDigest: nil,
-			wantOk:     false,
-		},
-		{
 			name:       "Nil Receiver",
 			entry:      nil,
-			wantDigest: nil,
-			wantOk:     false,
-		},
-		{
-			name: "V2 DSSE Empty Spec",
-			entry: &Entry{
-				rekorV2Entry: &rekortilespb.Entry{
-					Spec: &rekortilespb.Spec{},
-				},
-			},
 			wantDigest: nil,
 			wantOk:     false,
 		},

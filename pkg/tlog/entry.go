@@ -275,11 +275,6 @@ func ValidateEntry(entry *Entry) error {
 			if err != nil {
 				return err
 			}
-		case *rekortilespb.Spec_DsseV002:
-			err := validateDSSEV002Entry(e.DsseV002)
-			if err != nil {
-				return err
-			}
 		default:
 			return fmt.Errorf("unsupported rekor v2 entry type: %T", e)
 		}
@@ -298,16 +293,6 @@ func validateHashedRekordV002Entry(hr *rekortilespb.HashedRekordLogEntryV002) er
 		return fmt.Errorf("missing digest")
 	}
 	return typesverifier.Validate(hr.GetSignature().GetVerifier())
-}
-
-func validateDSSEV002Entry(d *rekortilespb.DSSELogEntryV002) error {
-	if d.GetPayloadHash() == nil {
-		return fmt.Errorf("missing payload")
-	}
-	if len(d.GetSignatures()) == 0 {
-		return fmt.Errorf("missing signatures")
-	}
-	return typesverifier.Validate(d.GetSignatures()[0].GetVerifier())
 }
 
 func (entry *Entry) IntegratedTime() time.Time {
@@ -337,11 +322,8 @@ func (entry *Entry) Signature() []byte {
 		}
 	}
 	if entry.rekorV2Entry != nil {
-		switch e := entry.rekorV2Entry.GetSpec().GetSpec().(type) {
-		case *rekortilespb.Spec_HashedRekordV002:
+		if e, ok := entry.rekorV2Entry.GetSpec().GetSpec().(*rekortilespb.Spec_HashedRekordV002); ok {
 			return e.HashedRekordV002.GetSignature().GetContent()
-		case *rekortilespb.Spec_DsseV002:
-			return e.DsseV002.GetSignatures()[0].GetContent()
 		}
 	}
 
@@ -369,11 +351,8 @@ func (entry *Entry) PublicKey() any {
 		certBytes = certBlock.Bytes
 	} else if entry.rekorV2Entry != nil {
 		var verifier *rekortilespb.Verifier
-		switch e := entry.rekorV2Entry.GetSpec().GetSpec().(type) {
-		case *rekortilespb.Spec_HashedRekordV002:
+		if e, ok := entry.rekorV2Entry.GetSpec().GetSpec().(*rekortilespb.Spec_HashedRekordV002); ok {
 			verifier = e.HashedRekordV002.GetSignature().GetVerifier()
-		case *rekortilespb.Spec_DsseV002:
-			verifier = e.DsseV002.GetSignatures()[0].GetVerifier()
 		}
 		if verifier == nil {
 			return nil
@@ -423,6 +402,10 @@ func (entry *Entry) TransparencyLogEntry() *v1.TransparencyLogEntry {
 	return entry.tle
 }
 
+func (entry *Entry) IsRekorV2() bool {
+	return entry != nil && entry.rekorV2Entry != nil
+}
+
 func (entry *Entry) GetHashedRekordDigest() (digest []byte, algorithm string, ok bool) {
 	if entry == nil {
 		return nil, "", false
@@ -455,16 +438,7 @@ func (entry *Entry) GetDssePayloadHash() (digest []byte, ok bool) {
 	if entry == nil {
 		return nil, false
 	}
-	if entry.rekorV2Entry != nil {
-		spec := entry.rekorV2Entry.GetSpec()
-		if spec != nil {
-			if e, ok := spec.GetSpec().(*rekortilespb.Spec_DsseV002); ok {
-				if e.DsseV002 != nil && e.DsseV002.GetPayloadHash() != nil {
-					return e.DsseV002.GetPayloadHash().Digest, true
-				}
-			}
-		}
-	} else if entry.rekorV1Entry != nil {
+	if entry.rekorV1Entry != nil {
 		switch e := entry.rekorV1Entry.(type) {
 		case *dsse_v001.V001Entry:
 			if e.DSSEObj.PayloadHash.Value != nil {
@@ -606,7 +580,7 @@ func unmarshalRekorV2Entry(body []byte) (*rekortilespb.Entry, error) {
 	spec := logEntryBody.GetSpec().GetSpec()
 	allowedAPIVersion := ""
 	switch spec.(type) {
-	case *rekortilespb.Spec_HashedRekordV002, *rekortilespb.Spec_DsseV002:
+	case *rekortilespb.Spec_HashedRekordV002:
 		allowedAPIVersion = "0.0.2"
 	default:
 		return nil, ErrInvalidRekorV2Entry
