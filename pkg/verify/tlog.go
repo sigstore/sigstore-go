@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -26,10 +27,17 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	rekortilespb "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
+	"github.com/sigstore/rekor-tiles/v2/pkg/note"
+	"github.com/sigstore/rekor-tiles/v2/pkg/types/hashedrekord"
+	rekorVerify "github.com/sigstore/rekor-tiles/v2/pkg/verify"
 	"github.com/sigstore/sigstore-go/internal/limits"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/sigstore/sigstore/pkg/signature/options"
 )
 
 // VerifyTlogEntry verifies that the given entity has been logged
@@ -106,6 +114,9 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 
 			if hasRekorV1STH(entry) {
 				err = tlog.VerifyInclusion(entry, *verifier)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				if tlogVerifier.BaseURL == "" {
 					return nil, fmt.Errorf("cannot verify Rekor v2 entry without baseUrl in transparency log's trusted root")
@@ -114,13 +125,24 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 				if err != nil {
 					return nil, err
 				}
-				err = tlog.VerifyCheckpointAndInclusion(entry, *verifier, u.Hostname())
+				noteVerifier, err := note.NewNoteVerifier(u.Hostname(), *verifier)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("loading note verifier: %w", err)
 				}
-			}
-			if err != nil {
-				return nil, err
+				if _, _, ok := entry.GetHashedRekordDigest(); ok {
+					entryHash, err := reconstructV2EntryHash(sigContent, verificationContent, trustedMaterial, entitySignature)
+					if err != nil {
+						return nil, err
+					}
+					if err := rekorVerify.VerifyLogEntryWithHash(entry.TransparencyLogEntry(), noteVerifier, entryHash); err != nil {
+						return nil, fmt.Errorf("verifying log entry: %w", err)
+					}
+				} else {
+					// TODO: once the sign path encodes DSSE envelopes as hashedrekord, require all v2 entries to be hashedrekord
+					if err := rekorVerify.VerifyLogEntry(entry.TransparencyLogEntry(), noteVerifier); err != nil {
+						return nil, fmt.Errorf("verifying log entry: %w", err)
+					}
+				}
 			}
 			// DO NOT use timestamp with only an inclusion proof, because it is not signed metadata
 		}
@@ -203,6 +225,81 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 	}
 
 	return verifiedTimestamps, nil
+}
+
+// reconstructV2EntryHash rebuilds a Rekor v2 hashedrekord entry hash from
+// bundle contents, so inclusion can be verified without relying on the
+// canonicalized body returned by Rekor.
+func reconstructV2EntryHash(sigContent SignatureContent, verificationContent VerificationContent, trustedMaterial root.TrustedMaterial, entitySignature []byte) ([]byte, error) {
+	var (
+		pubKey        crypto.PublicKey
+		verifierProto *rekortilespb.Verifier
+	)
+	if leafCert := verificationContent.Certificate(); leafCert != nil {
+		pubKey = leafCert.PublicKey
+		verifierProto = &rekortilespb.Verifier{
+			Verifier: &rekortilespb.Verifier_X509Certificate{
+				X509Certificate: &protocommon.X509Certificate{RawBytes: leafCert.Raw},
+			},
+		}
+	} else if pkp := verificationContent.PublicKey(); pkp != nil {
+		v, err := trustedMaterial.PublicKeyVerifier(pkp.Hint())
+		if err != nil {
+			return nil, fmt.Errorf("public key not found in trusted material: %w", err)
+		}
+		pk, err := v.PublicKey()
+		if err != nil {
+			return nil, fmt.Errorf("getting public key: %w", err)
+		}
+		pubKey = pk
+		rawBytes, err := x509.MarshalPKIXPublicKey(pk)
+		if err != nil {
+			return nil, fmt.Errorf("marshaling public key: %w", err)
+		}
+		verifierProto = &rekortilespb.Verifier{
+			Verifier: &rekortilespb.Verifier_PublicKey{
+				PublicKey: &rekortilespb.PublicKey{RawBytes: rawBytes},
+			},
+		}
+	} else {
+		return nil, errors.New("verification content has neither certificate nor public key")
+	}
+
+	algDetails, err := signature.GetDefaultAlgorithmDetails(pubKey, options.WithED25519ph())
+	if err != nil {
+		return nil, fmt.Errorf("getting algorithm details from bundle key: %w", err)
+	}
+	verifierProto.KeyDetails = algDetails.GetSignatureAlgorithm()
+
+	hf := algDetails.GetHashType()
+	if hf == crypto.Hash(0) {
+		return nil, errors.New("rekor v2 hashedrekord entries require a prehashing signature algorithm")
+	}
+
+	var digest []byte
+	switch {
+	case sigContent.MessageSignatureContent() != nil:
+		digest = sigContent.MessageSignatureContent().Digest()
+	case sigContent.EnvelopeContent() != nil:
+		env := sigContent.EnvelopeContent().RawEnvelope()
+		if env == nil {
+			return nil, errors.New("bundle envelope is missing")
+		}
+		payloadBytes, err := base64.StdEncoding.DecodeString(env.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode envelope payload: %w", err)
+		}
+		hasher := hf.New()
+		hasher.Write(dsse.PAE(env.PayloadType, payloadBytes))
+		digest = hasher.Sum(nil)
+	default:
+		return nil, errors.New("bundle must contain either a message signature or an envelope")
+	}
+
+	return hashedrekord.ToEntryHash(digest, &rekortilespb.Signature{
+		Content:  entitySignature,
+		Verifier: verifierProto,
+	})
 }
 
 func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.Verifier, error) {
