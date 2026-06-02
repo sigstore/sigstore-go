@@ -33,6 +33,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/sigstore/sigstore/pkg/signature/options"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -167,20 +168,21 @@ func TestSignVerify(t *testing.T) {
 			digestAlg:          crypto.SHA256,
 			rekorVersion:       2,
 			expectedTimestamps: 1,
-			signingAlg:         protocommon.PublicKeyDetails_PKIX_ED25519,
+			signingAlg:         protocommon.PublicKeyDetails_PKIX_ED25519_PH,
+			useKey:             true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			keypair, err := sign.NewEphemeralKeypair(&sign.EphemeralKeypairOptions{Algorithm: test.signingAlg})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if test.useKey {
 				initTrustedRootWithKey(t, test.signingAlg, keypair.GetPublicKey(), &opts)
 			}
 
 			protoBundle, err := signContent(signingConfig, token, test.content, test.rekorVersion, keypair, test.useKey, opts)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			result, err := verifyBundle(protoBundle, issuerURL, defaultCertID, getDigest(artifactData, test.digestAlg), test.useKey, opts.TrustedRoot)
 

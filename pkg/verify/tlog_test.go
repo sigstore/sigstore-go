@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
@@ -429,4 +430,35 @@ func (c *mismatchEnvelopeContentWrapper) RawEnvelope() *dsse.Envelope {
 		Signatures:  env.Signatures,
 	}
 	return clone
+}
+
+// TestTlogVerifierDSSEHashedRekordV2 verifies a DSSE envelope encoded as a Rekor v2 hashedrekord.
+func TestTlogVerifierDSSEHashedRekordV2(t *testing.T) {
+	statement := []byte(`{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"customFoo","subject":[{"name":"subject","digest":{"sha256":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}}],"predicate":{}}`)
+
+	for _, tc := range []struct {
+		name string
+		alg  v1.PublicKeyDetails
+	}{
+		{"sha256", v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256},
+		{"sha384", v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384},
+		{"sha512", v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512},
+		{"ed25519ph", v1.PublicKeyDetails_PKIX_ED25519_PH},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			virtualSigstore, err := ca.NewVirtualSigstoreWithSigningAlg(tc.alg)
+			assert.NoError(t, err)
+
+			entity, err := virtualSigstore.AttestHashedRekordV2("foo@example.com", "issuer", statement)
+			assert.NoError(t, err)
+
+			_, err = verify.VerifyTlogEntry(entity, virtualSigstore, 1, true)
+			assert.NoError(t, err)
+
+			// Tampering with the envelope changes the reconstructed leaf hash, failing inclusion proof.
+			mismatch := &mismatchEnvelopeEntity{TestEntity: entity}
+			_, err = verify.VerifyTlogEntry(mismatch, virtualSigstore, 1, true)
+			assert.ErrorContains(t, err, "verifying inclusion")
+		})
+	}
 }

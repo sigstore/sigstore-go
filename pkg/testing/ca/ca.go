@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -31,6 +32,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/url"
 	"strings"
 	"time"
 
@@ -40,6 +42,9 @@ import (
 	"github.com/go-openapi/swag/conv"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
+	rekortilespb "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
+	rekornote "github.com/sigstore/rekor-tiles/v2/pkg/note"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/pki"
 	"github.com/sigstore/rekor/pkg/types"
@@ -56,6 +61,10 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	sigdsse "github.com/sigstore/sigstore/pkg/signature/dsse"
 	tsx509 "github.com/sigstore/timestamp-authority/v2/pkg/x509"
+	f_log "github.com/transparency-dev/formats/log"
+	"github.com/transparency-dev/merkle/rfc6962"
+	"golang.org/x/mod/sumdb/note"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type VirtualSigstore struct {
@@ -192,6 +201,8 @@ func (ca *VirtualSigstore) GenerateLeafCert(identity, issuer string) (*x509.Cert
 			return nil, nil, err
 		}
 		privKey, err = rsa.GenerateKey(rand.Reader, int(keySize))
+	case signature.ED25519:
+		_, privKey, err = ed25519.GenerateKey(rand.Reader)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -254,6 +265,156 @@ func (ca *VirtualSigstore) AttestAtTime(identity, issuer string, envelopeBody []
 		envelope:    envelope,
 		tlogEntries: []*tlog.Entry{entry},
 	}, nil
+}
+
+// AttestHashedRekordV2 produces an attestation TestEntity with a Rekor v2 hashedrekord tlog entry.
+func (ca *VirtualSigstore) AttestHashedRekordV2(identity, issuer string, envelopeBody []byte) (*TestEntity, error) {
+	return ca.AttestAtTimeHashedRekordV2(identity, issuer, envelopeBody, time.Now().Add(5*time.Minute))
+}
+
+func (ca *VirtualSigstore) AttestAtTimeHashedRekordV2(identity, issuer string, envelopeBody []byte, integratedTime time.Time) (*TestEntity, error) {
+	leafCert, leafPrivKey, err := ca.GenerateLeafCert(identity, issuer)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := signature.LoadSignerFromAlgorithmDetails(leafPrivKey, ca.signingAlgorithmDetails)
+	if err != nil {
+		return nil, err
+	}
+
+	dsseSigner, err := dsse.NewEnvelopeSigner(&sigdsse.SignerAdapter{
+		SignatureSigner: signer,
+		Pub:             leafCert.PublicKey,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	envelope, err := dsseSigner.SignPayload(context.Background(), "application/vnd.in-toto+json", envelopeBody)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := base64.StdEncoding.DecodeString(envelope.Signatures[0].Sig)
+	if err != nil {
+		return nil, err
+	}
+
+	tsr, err := generateTimestampingResponse(sig, ca.tsaCA.Leaf, ca.tsaLeafKey)
+	if err != nil {
+		return nil, err
+	}
+
+	tlogEntry, err := ca.generateTlogEntryHashedRekordV2(leafCert, envelope.PayloadType, envelopeBody, sig, integratedTime.Unix())
+	if err != nil {
+		return nil, err
+	}
+
+	return &TestEntity{
+		certChain:   []*x509.Certificate{leafCert, ca.fulcioCA.Intermediates[0], ca.fulcioCA.Root},
+		timestamps:  [][]byte{tsr},
+		envelope:    envelope,
+		tlogEntries: []*tlog.Entry{tlogEntry},
+	}, nil
+}
+
+func (ca *VirtualSigstore) generateTlogEntryHashedRekordV2(leafCert *x509.Certificate, payloadType string, payload []byte, sig []byte, integratedTime int64) (*tlog.Entry, error) {
+	hf := ca.signingAlgorithmDetails.GetHashType()
+	hasher := hf.New()
+	hasher.Write(dsse.PAE(payloadType, payload))
+	digest := hasher.Sum(nil)
+
+	entryPB := &rekortilespb.Entry{
+		ApiVersion: "0.0.2",
+		Kind:       "hashedrekord",
+		Spec: &rekortilespb.Spec{
+			Spec: &rekortilespb.Spec_HashedRekordV002{
+				HashedRekordV002: &rekortilespb.HashedRekordLogEntryV002{
+					Data: &v1.HashOutput{
+						Algorithm: ca.signingAlgorithmDetails.GetProtoHashType(),
+						Digest:    digest,
+					},
+					Signature: &rekortilespb.Signature{
+						Content: sig,
+						Verifier: &rekortilespb.Verifier{
+							KeyDetails: ca.signingAlgorithmDetails.GetSignatureAlgorithm(),
+							Verifier: &rekortilespb.Verifier_X509Certificate{
+								X509Certificate: &v1.X509Certificate{
+									RawBytes: leafCert.Raw,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	serialized, err := protojson.Marshal(entryPB)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling rekor v2 entry: %w", err)
+	}
+	// Canonicalize to match the server-side pipeline.
+	body, err := jsoncanonicalizer.Transform(serialized)
+	if err != nil {
+		return nil, fmt.Errorf("canonicalizing rekor v2 entry: %w", err)
+	}
+
+	leafHash := rfc6962.DefaultHasher.HashLeaf(body)
+	rekorLogs := ca.RekorLogs()
+	rekorLogID, err := getLogID(ca.rekorKey.Public())
+	if err != nil {
+		return nil, err
+	}
+	rekorLog, ok := rekorLogs[rekorLogID]
+	if !ok {
+		return nil, fmt.Errorf("rekor log %s not found", rekorLogID)
+	}
+	u, err := url.Parse(rekorLog.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing rekor BaseURL: %w", err)
+	}
+	origin := u.Hostname()
+
+	sv, err := signature.LoadECDSASignerVerifier(ca.rekorKey, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	noteSigner, err := rekornote.NewNoteSigner(context.Background(), origin, sv)
+	if err != nil {
+		return nil, err
+	}
+	cpRaw := f_log.Checkpoint{
+		Origin: origin,
+		Size:   1,
+		Hash:   leafHash,
+	}.Marshal()
+	signedNote, err := note.Sign(&note.Note{Text: string(cpRaw)}, noteSigner)
+	if err != nil {
+		return nil, fmt.Errorf("signing checkpoint: %w", err)
+	}
+
+	rekorLogIDRaw, err := hex.DecodeString(rekorLogID)
+	if err != nil {
+		return nil, err
+	}
+
+	tle := &protorekor.TransparencyLogEntry{
+		LogIndex:       0,
+		LogId:          &v1.LogId{KeyId: rekorLogIDRaw},
+		KindVersion:    &protorekor.KindVersion{Kind: "hashedrekord", Version: "0.0.2"},
+		IntegratedTime: integratedTime,
+		InclusionProof: &protorekor.InclusionProof{
+			LogIndex:   0,
+			TreeSize:   1,
+			RootHash:   leafHash,
+			Hashes:     [][]byte{},
+			Checkpoint: &protorekor.Checkpoint{Envelope: string(signedNote)},
+		},
+		CanonicalizedBody: body,
+	}
+
+	return tlog.NewTlogEntry(tle)
 }
 
 func (ca *VirtualSigstore) Sign(identity, issuer string, artifact []byte) (*TestEntity, error) {
@@ -559,7 +720,10 @@ func (ca *VirtualSigstore) RekorLogs() map[string]*root.TransparencyLog {
 		panic(err)
 	}
 	verifiers[logID] = &root.TransparencyLog{
-		BaseURL:             "test",
+		// BaseURL must parse to a non-empty hostname for Rekor v2 verification,
+		// since the checkpoint origin is derived from url.Parse(BaseURL).Hostname().
+		// The hostname matches what GetInclusionProof signs for v1 checkpoints.
+		BaseURL:             "https://rekor.localhost",
 		ID:                  []byte(logID),
 		ValidityPeriodStart: time.Now().Add(-time.Hour),
 		ValidityPeriodEnd:   time.Now().Add(time.Hour),
