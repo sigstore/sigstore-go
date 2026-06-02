@@ -665,10 +665,7 @@ func (v *Verifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationR
 
 		// If the bundle verification material contains an X509CertificateChain,
 		// extract the Intermediate CA certificates to use during certificate path validation.
-		var intermediates []*x509.Certificate
-		if cip, ok := entity.(IntermediateCAProvider); ok {
-			intermediates = cip.IntermediateContent()
-		}
+		intermediates := verificationContent.Intermediates()
 
 		var chains [][]*x509.Certificate
 		for _, verifiedTs := range verifiedTimestamps {

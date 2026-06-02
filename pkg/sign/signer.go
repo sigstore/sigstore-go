@@ -78,7 +78,8 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 
 	// Add verification information to bundle
 	var verifierPEM []byte
-	if opts.CertificateChainProvider != nil {
+	switch {
+	case opts.CertificateChainProvider != nil:
 		certificateChain, err := opts.CertificateChainProvider.GetCertificateChain(opts.Context, keypair, opts.CertificateProviderOptions)
 		if err != nil {
 			return nil, err
@@ -103,7 +104,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			Type:  "CERTIFICATE",
 			Bytes: certificateChain[0],
 		})
-	} else if opts.CertificateProvider != nil {
+	case opts.CertificateProvider != nil:
 		pubKeyBytes, err := opts.CertificateProvider.GetCertificate(opts.Context, keypair, opts.CertificateProviderOptions)
 		if err != nil {
 			return nil, err
@@ -121,7 +122,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			Type:  "CERTIFICATE",
 			Bytes: pubKeyBytes,
 		})
-	} else {
+	default:
 		bundle.VerificationMaterial = &protobundle.VerificationMaterial{
 			Content: &protobundle.VerificationMaterial_PublicKey{
 				PublicKey: &protocommon.PublicKeyIdentifier{

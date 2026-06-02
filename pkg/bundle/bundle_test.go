@@ -1189,7 +1189,7 @@ func TestNewBundleWithAllowCertificateChain(t *testing.T) {
 	}
 }
 
-func TestIntermediateContent(t *testing.T) {
+func TestVerificationContentIntermediates(t *testing.T) {
 	t.Parallel()
 	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -1222,11 +1222,6 @@ func TestIntermediateContent(t *testing.T) {
 		b         Bundle
 		wantCount int
 	}{
-		{
-			name:      "nil verification material",
-			b:         Bundle{Bundle: &protobundle.Bundle{}},
-			wantCount: 0,
-		},
 		{
 			name: "single certificate (not a chain)",
 			b: Bundle{Bundle: &protobundle.Bundle{
@@ -1291,11 +1286,38 @@ func TestIntermediateContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.b.IntermediateContent()
+			vc, err := tt.b.VerificationContent()
+			require.NoError(t, err)
+			got := vc.Intermediates()
 			require.Len(t, got, tt.wantCount)
 			for _, cert := range got {
 				require.True(t, cert.IsCA)
 			}
 		})
 	}
+}
+
+func TestVerificationContentIntermediatesParseError(t *testing.T) {
+	t.Parallel()
+	leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	leafTmpl := &x509.Certificate{SerialNumber: big.NewInt(1)}
+	leafDer, err := x509.CreateCertificate(rand.Reader, leafTmpl, leafTmpl, &leafKey.PublicKey, leafKey)
+	require.NoError(t, err)
+
+	b := Bundle{Bundle: &protobundle.Bundle{
+		VerificationMaterial: &protobundle.VerificationMaterial{
+			Content: &protobundle.VerificationMaterial_X509CertificateChain{
+				X509CertificateChain: &protocommon.X509CertificateChain{
+					Certificates: []*protocommon.X509Certificate{
+						{RawBytes: leafDer},
+						{RawBytes: []byte("not a certificate")},
+					},
+				},
+			},
+		},
+	}}
+	_, err = b.VerificationContent()
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrValidation)
 }

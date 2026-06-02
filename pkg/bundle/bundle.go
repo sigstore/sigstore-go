@@ -270,8 +270,19 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 		if err != nil {
 			return nil, ErrValidationError(err)
 		}
+		var intermediates []*x509.Certificate
+		for _, certProto := range certs {
+			intermediate, err := x509.ParseCertificate(certProto.RawBytes)
+			if err != nil {
+				return nil, ErrValidationError(err)
+			}
+			if intermediate.IsCA {
+				intermediates = append(intermediates, intermediate)
+			}
+		}
 		cert := &Certificate{
-			certificate: parsedCert,
+			certificate:   parsedCert,
+			intermediates: intermediates,
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_Certificate:
@@ -298,29 +309,6 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 	default:
 		return nil, ErrMissingVerificationMaterial
 	}
-}
-
-func (b *Bundle) IntermediateContent() []*x509.Certificate {
-	if b.VerificationMaterial == nil {
-		return nil
-	}
-
-	chain := b.VerificationMaterial.GetX509CertificateChain()
-	if chain == nil {
-		return nil
-	}
-
-	var intermediates []*x509.Certificate
-	for _, certProto := range chain.Certificates {
-		cert, err := x509.ParseCertificate(certProto.RawBytes)
-		if err != nil {
-			continue
-		}
-		if cert.IsCA {
-			intermediates = append(intermediates, cert)
-		}
-	}
-	return intermediates
 }
 
 func (b *Bundle) HasInclusionPromise() bool {

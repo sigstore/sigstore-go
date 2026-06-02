@@ -31,7 +31,8 @@ func verifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certifica
 		caToVerify := ca
 		if fca, ok := ca.(*root.FulcioCertificateAuthority); ok && len(intermediates) > 0 {
 			withIntermediates := *fca
-			withIntermediates.Intermediates = append(fca.Intermediates, intermediates...)
+			withIntermediates.Intermediates = append([]*x509.Certificate{}, fca.Intermediates...)
+			withIntermediates.Intermediates = append(withIntermediates.Intermediates, intermediates...)
 			caToVerify = &withIntermediates
 		}
 		chains, err := caToVerify.Verify(leafCert, observerTimestamp)

@@ -65,17 +65,11 @@ type SignedEntity interface {
 	VersionProvider
 }
 
-// IntermediateCAProvider is an optional interface a SignedEntity can implement
-// to supply Intermediate CA certificates for path validation. Used for private
-// Fulcio deployments where the bundle carries an X509CertificateChain.
-type IntermediateCAProvider interface {
-	IntermediateContent() []*x509.Certificate
-}
-
 type VerificationContent interface {
 	CompareKey(any, root.TrustedMaterial) bool
 	ValidAtTime(time.Time, root.TrustedMaterial) bool
 	Certificate() *x509.Certificate
+	Intermediates() []*x509.Certificate
 	PublicKey() PublicKeyProvider
 }
 
