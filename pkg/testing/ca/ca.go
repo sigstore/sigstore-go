@@ -354,17 +354,12 @@ func (ca *VirtualSigstore) generateTlogEntryHashedRekordV2(leafCert *x509.Certif
 	if err != nil {
 		return nil, fmt.Errorf("marshaling rekor v2 entry: %w", err)
 	}
-	// Mirror the server-side pipeline (rekor-tiles internal/server/service.go):
-	// protojson.Marshal -> jsoncanonicalizer.Transform. Without canonicalizing,
-	// the leaf the verifier reconstructs from the bundle won't match this
-	// test fixture.
+	// Canonicalize to match the server-side pipeline.
 	body, err := jsoncanonicalizer.Transform(serialized)
 	if err != nil {
 		return nil, fmt.Errorf("canonicalizing rekor v2 entry: %w", err)
 	}
 
-	// Single-leaf tree: log index 0, tree size 1, root hash == leaf hash,
-	// no sibling hashes needed.
 	leafHash := rfc6962.DefaultHasher.HashLeaf(body)
 	rekorLogs := ca.RekorLogs()
 	rekorLogID, err := getLogID(ca.rekorKey.Public())
