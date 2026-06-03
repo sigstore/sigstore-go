@@ -23,6 +23,8 @@ import (
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	sigsig "github.com/sigstore/sigstore/pkg/signature"
 	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -37,6 +39,7 @@ import (
 var bundlePath *string
 var certOIDC *string
 var certSAN *string
+var keyPath *string
 var identityToken *string
 var staging = false
 var trustedRootPath *string
@@ -99,6 +102,9 @@ func parseArgs() {
 			i += 2
 		case "--certificate-identity":
 			certSAN = &os.Args[i+1]
+			i += 2
+		case "--key":
+			keyPath = &os.Args[i+1]
 			i += 2
 		case "--identity-token":
 			identityToken = &os.Args[i+1]
@@ -284,23 +290,52 @@ func main() {
 			artifactPolicyOption = verify.WithArtifact(file)
 		}
 
-		// Configure verification options
+		// Configure identity policy, trust material, and verifier options
 		identityPolicies := []verify.PolicyOption{}
-		if *certOIDC != "" || *certSAN != "" {
-			certID, err := verify.NewShortCertificateIdentity(*certOIDC, "", *certSAN, "")
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-
-			identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
-		}
-
-		// Load trust root
+		verifierConfig := []verify.VerifierOption{}
 		tr := getTrustedRoot(staging)
 
-		verifierConfig := []verify.VerifierOption{}
-		verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+		if keyPath != nil {
+			identityPolicies = append(identityPolicies, verify.WithKey())
+
+			keyPEM, err := os.ReadFile(*keyPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pubKey, err := cryptoutils.UnmarshalPEMToPublicKey(keyPEM)
+			if err != nil {
+				log.Fatal(err)
+			}
+			keyMaterial := root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+				verifier, err := sigsig.LoadDefaultVerifier(pubKey)
+				if err != nil {
+					return nil, err
+				}
+				return root.NewExpiringKey(verifier, time.Time{}, time.Time{}), nil
+			})
+			tr = root.TrustedMaterialCollection{keyMaterial, tr}
+		} else {
+			verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
+
+			if certOIDC != nil || certSAN != nil {
+				oidc := ""
+				if certOIDC != nil {
+					oidc = *certOIDC
+				}
+				san := ""
+				if certSAN != nil {
+					san = *certSAN
+				}
+				if oidc != "" || san != "" {
+					certID, err := verify.NewShortCertificateIdentity(oidc, "", san, "")
+					if err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
+					identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
+				}
+			}
+		}
 
 		// Check bundle and trusted root for signed timestamp information
 		bundleTimestamps, err := b.Timestamps()
