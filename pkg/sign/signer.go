@@ -17,6 +17,7 @@ package sign
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/pem"
 	"errors"
 
@@ -89,7 +90,17 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 		}
 
 		certificateChainProto := &protocommon.X509CertificateChain{}
-		for _, certBytes := range certificateChain {
+		certificateChainProto.Certificates = append(certificateChainProto.Certificates, &protocommon.X509Certificate{
+			RawBytes: certificateChain[0],
+		})
+		for _, certBytes := range certificateChain[1:] {
+			parsed, err := x509.ParseCertificate(certBytes)
+			if err != nil {
+				return nil, err
+			}
+			if verify.IsSelfSigned(parsed) {
+				return nil, errors.New("certificate chain must not contain a self-signed (root) certificate")
+			}
 			certificateChainProto.Certificates = append(certificateChainProto.Certificates, &protocommon.X509Certificate{
 				RawBytes: certBytes,
 			})

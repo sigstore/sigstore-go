@@ -271,13 +271,15 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 			return nil, ErrValidationError(err)
 		}
 		var intermediates []*x509.Certificate
-		for _, certProto := range certs {
-			intermediate, err := x509.ParseCertificate(certProto.RawBytes)
-			if err != nil {
-				return nil, ErrValidationError(err)
-			}
-			if intermediate.IsCA {
-				intermediates = append(intermediates, intermediate)
+		if b.allowCertificateChain {
+			for _, certificate := range certs[1:] {
+				intermediate, err := x509.ParseCertificate(certificate.RawBytes)
+				if err != nil {
+					return nil, ErrValidationError(err)
+				}
+				if intermediate.IsCA && !verify.IsSelfSigned(intermediate) {
+					intermediates = append(intermediates, intermediate)
+				}
 			}
 		}
 		cert := &Certificate{
