@@ -1150,3 +1150,226 @@ func TestTlogEntriesCountAtCap(t *testing.T) {
 		require.NotContains(t, err.Error(), "too many tlog entries")
 	}
 }
+
+func TestNewBundleWithAllowCertificateChain(t *testing.T) {
+	t.Parallel()
+
+	v03BundleWithCertChain := &protobundle.Bundle{
+		MediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+		VerificationMaterial: &protobundle.VerificationMaterial{
+			Content: &protobundle.VerificationMaterial_X509CertificateChain{
+				X509CertificateChain: &protocommon.X509CertificateChain{},
+			},
+		},
+		Content: &protobundle.Bundle_MessageSignature{},
+	}
+
+	for _, tc := range []struct {
+		name    string
+		opts    []Option
+		wantErr bool
+	}{
+		{"v0.3 with cert chain without option", nil, true},
+		{"v0.3 with cert chain with AllowCertificateChain", []Option{AllowCertificateChain()}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			bundle, err := NewBundle(v03BundleWithCertChain, tc.opts...)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "verification material cannot be X.509 certificate chain")
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, bundle)
+			}
+		})
+	}
+}
+
+func TestVerificationContentIntermediates(t *testing.T) {
+	t.Parallel()
+	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	intermediateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	subordinateIntermediateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	rootCert := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	intermediateCert := &x509.Certificate{
+		SerialNumber:          big.NewInt(2),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	subordinateIntermediateCert := &x509.Certificate{
+		SerialNumber:          big.NewInt(3),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	leafCert := &x509.Certificate{SerialNumber: big.NewInt(4)}
+
+	rootDer, err := x509.CreateCertificate(rand.Reader, rootCert, rootCert, &rootKey.PublicKey, rootKey)
+	require.NoError(t, err)
+	intermediateDer, err := x509.CreateCertificate(rand.Reader, intermediateCert, rootCert, &intermediateKey.PublicKey, rootKey)
+	require.NoError(t, err)
+	subordinateIntermediateDer, err := x509.CreateCertificate(rand.Reader, subordinateIntermediateCert, intermediateCert, &subordinateIntermediateKey.PublicKey, intermediateKey)
+	require.NoError(t, err)
+	leafDer, err := x509.CreateCertificate(rand.Reader, leafCert, subordinateIntermediateCert, &leafKey.PublicKey, subordinateIntermediateKey)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                  string
+		bundle                Bundle
+		allowCertificateChain bool
+		wantSerials           []*big.Int
+	}{
+		{
+			name: "single certificate verification material",
+			bundle: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_Certificate{
+						Certificate: &protocommon.X509Certificate{RawBytes: leafDer},
+					},
+				},
+			}},
+			allowCertificateChain: true,
+			wantSerials:           nil,
+		},
+		{
+			name: "certificate chain with leaf only",
+			bundle: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+							},
+						},
+					},
+				},
+			}},
+			allowCertificateChain: true,
+			wantSerials:           nil,
+		},
+		{
+			name: "certificate chain with leaf and intermediate",
+			bundle: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+								{RawBytes: subordinateIntermediateDer},
+							},
+						},
+					},
+				},
+			}},
+			allowCertificateChain: true,
+			wantSerials:           []*big.Int{subordinateIntermediateCert.SerialNumber},
+		},
+		{
+			name: "certificate chain with leaf and multiple intermediates",
+			bundle: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+								{RawBytes: subordinateIntermediateDer},
+								{RawBytes: intermediateDer},
+							},
+						},
+					},
+				},
+			}},
+			allowCertificateChain: true,
+			wantSerials:           []*big.Int{subordinateIntermediateCert.SerialNumber, intermediateCert.SerialNumber},
+		},
+		{
+			name: "certificate chain with intermediate but certificate chain option disabled",
+			bundle: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+								{RawBytes: subordinateIntermediateDer},
+							},
+						},
+					},
+				},
+			}},
+			allowCertificateChain: false,
+			wantSerials:           nil,
+		},
+		{
+			// https://github.com/sigstore/protobuf-specs/blob/4a31a816c74309e66a4c037c7e20f2500a588f8a/protos/sigstore_bundle.proto#L75-L79
+			name: "certificate chain with leaf, intermediate, and root ignores the root",
+			bundle: Bundle{Bundle: &protobundle.Bundle{
+				VerificationMaterial: &protobundle.VerificationMaterial{
+					Content: &protobundle.VerificationMaterial_X509CertificateChain{
+						X509CertificateChain: &protocommon.X509CertificateChain{
+							Certificates: []*protocommon.X509Certificate{
+								{RawBytes: leafDer},
+								{RawBytes: subordinateIntermediateDer},
+								{RawBytes: rootDer},
+							},
+						},
+					},
+				},
+			}},
+			allowCertificateChain: true,
+			wantSerials:           []*big.Int{subordinateIntermediateCert.SerialNumber},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tt.bundle.allowCertificateChain = tt.allowCertificateChain
+			vc, err := tt.bundle.VerificationContent()
+			require.NoError(t, err)
+			got := vc.Intermediates()
+			require.Len(t, got, len(tt.wantSerials))
+			for i, cert := range got {
+				require.True(t, cert.IsCA)
+				require.Equal(t, tt.wantSerials[i], cert.SerialNumber)
+			}
+		})
+	}
+}
+
+func TestVerificationContentIntermediatesParseError(t *testing.T) {
+	t.Parallel()
+	leafKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	leafTmpl := &x509.Certificate{SerialNumber: big.NewInt(1)}
+	leafDer, err := x509.CreateCertificate(rand.Reader, leafTmpl, leafTmpl, &leafKey.PublicKey, leafKey)
+	require.NoError(t, err)
+
+	bundle := Bundle{
+		Bundle: &protobundle.Bundle{
+			VerificationMaterial: &protobundle.VerificationMaterial{
+				Content: &protobundle.VerificationMaterial_X509CertificateChain{
+					X509CertificateChain: &protocommon.X509CertificateChain{
+						Certificates: []*protocommon.X509Certificate{
+							{RawBytes: leafDer},
+							{RawBytes: []byte("not a certificate")},
+						},
+					},
+				},
+			},
+		},
+		allowCertificateChain: true,
+	}
+	_, err = bundle.VerificationContent()
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrValidation)
+}
