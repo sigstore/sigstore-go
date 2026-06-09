@@ -15,16 +15,18 @@
 package data
 
 import (
+	"crypto"
 	"embed"
 	"path"
 	"testing"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed bundles/*.json trusted-roots/*.json
+//go:embed bundles/*.json public-keys/*.pem trusted-roots/*.json
 var embedded embed.FS
 
 // Bundle reads a file from the embedded file system and returns a *bundle.Bundle
@@ -48,4 +50,15 @@ func TrustedRoot(t *testing.T, filename string) *root.TrustedRoot {
 	assert.NoError(t, err)
 
 	return trustedRoot
+}
+
+// PublicKey reads a PEM-encoded public key from the embedded file system.
+func PublicKey(t *testing.T, filename string) crypto.PublicKey {
+	data, err := embedded.ReadFile(path.Join("public-keys", filename))
+	assert.NoError(t, err)
+
+	publicKey, err := cryptoutils.UnmarshalPEMToPublicKey(data)
+	assert.NoError(t, err)
+
+	return publicKey
 }

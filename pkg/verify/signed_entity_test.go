@@ -570,6 +570,31 @@ func TestNoTimestamp(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("key-signed with validity period", func(t *testing.T) {
+		keypair, err := sign.NewEphemeralKeypair(nil)
+		assert.NoError(t, err)
+
+		content := &sign.PlainData{Data: []byte("test content")}
+		pBundle, err := sign.Bundle(content, keypair, sign.BundleOptions{})
+		assert.NoError(t, err)
+		entity, err := bundle.NewBundle(pBundle)
+		assert.NoError(t, err)
+
+		signatureVerifier, err := signature.LoadDefaultVerifier(keypair.GetPublicKey())
+		assert.NoError(t, err)
+		expiredKey := root.NewExpiringKey(signatureVerifier, time.Unix(0, 0), time.Unix(1, 0))
+		trustedRoot := root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+			return expiredKey, nil
+		})
+
+		verifier, err := verify.NewVerifier(trustedRoot, verify.WithNoObserverTimestamps())
+		assert.NoError(t, err)
+
+		policy := verify.NewPolicy(verify.WithArtifact(bytes.NewReader(content.Data)), verify.WithKey())
+		_, err = verifier.Verify(entity, policy)
+		assert.NoError(t, err)
+	})
+
 	t.Run("certificate-signed", func(t *testing.T) {
 		// Test that verification fails with a certificate-signed entity without a timestamp
 		certEntity := data.Bundle(t, "sigstore.js@2.0.0-provenance.sigstore.json")
@@ -580,6 +605,26 @@ func TestNoTimestamp(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "must provide timestamp to verify certificate")
 	})
+}
+
+func TestPublicKeyValidityCheckedAgainstSignedTimestamp(t *testing.T) {
+	entity := data.Bundle(t, "public-key-validity.sigstore.json")
+	trustedRoot := data.TrustedRoot(t, "public-key-validity.json")
+	publicKey := data.PublicKey(t, "public-key-validity.pem")
+
+	signatureVerifier, err := signature.LoadDefaultVerifier(publicKey)
+	assert.NoError(t, err)
+	expiredKey := root.NewExpiringKey(signatureVerifier, time.Unix(0, 0), time.Unix(1, 0))
+	trustedPublicKey := root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+		return expiredKey, nil
+	})
+	trustedMaterial := root.TrustedMaterialCollection{trustedRoot, trustedPublicKey}
+
+	verifier, err := verify.NewVerifier(trustedMaterial, verify.WithSignedTimestamps(1))
+	assert.NoError(t, err)
+
+	_, err = verifier.Verify(entity, verify.NewPolicy(verify.WithArtifact(bytes.NewReader([]byte("test content"))), verify.WithKey()))
+	assert.ErrorContains(t, err, "signature time outside of public key validity window")
 }
 
 type keySignedEntityWrapper struct {
