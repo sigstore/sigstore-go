@@ -163,25 +163,34 @@ func (i IssuerMatcher) Verify(actualCert certificate.Summary) error {
 }
 
 func NewCertificateIdentity(sanMatcher SubjectAlternativeNameMatcher, issuerMatcher IssuerMatcher, extensions certificate.Extensions) (CertificateIdentity, error) {
-	if sanMatcher.SubjectAlternativeName == "" && sanMatcher.Regexp.String() == "" {
-		return CertificateIdentity{}, errors.New("when verifying a certificate identity, there must be subject alternative name criteria")
-	}
-
-	if issuerMatcher.Issuer == "" && issuerMatcher.Regexp.String() == "" {
-		return CertificateIdentity{}, errors.New("when verifying a certificate identity, must specify Issuer criteria")
-	}
-
-	if extensions.Issuer != "" {
-		return CertificateIdentity{}, errors.New("please specify issuer in IssuerMatcher, not Extensions")
-	}
-
 	certID := CertificateIdentity{
 		SubjectAlternativeName: sanMatcher,
 		Issuer:                 issuerMatcher,
 		Extensions:             extensions,
 	}
 
+	if err := certID.validate(); err != nil {
+		return CertificateIdentity{}, err
+	}
+
 	return certID, nil
+}
+
+// validate rejects an identity with no criteria, which would otherwise match any certificate.
+func (c CertificateIdentity) validate() error {
+	if c.SubjectAlternativeName.SubjectAlternativeName == "" && c.SubjectAlternativeName.Regexp.String() == "" {
+		return errors.New("when verifying a certificate identity, there must be subject alternative name criteria")
+	}
+
+	if c.Issuer.Issuer == "" && c.Issuer.Regexp.String() == "" {
+		return errors.New("when verifying a certificate identity, must specify Issuer criteria")
+	}
+
+	if c.Extensions.Issuer != "" {
+		return errors.New("please specify issuer in IssuerMatcher, not Extensions")
+	}
+
+	return nil
 }
 
 // NewShortCertificateIdentity provides a more convenient way of initializing
