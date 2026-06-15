@@ -438,6 +438,9 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 		if p.requireSigningKey {
 			return errors.New("can't use WithCertificateIdentity while using WithKey")
 		}
+		if err := identity.validate(); err != nil {
+			return err
+		}
 
 		p.certificateIdentities = append(p.certificateIdentities, identity)
 		return nil

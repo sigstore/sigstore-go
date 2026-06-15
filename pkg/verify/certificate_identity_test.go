@@ -132,6 +132,18 @@ func TestThatCertIDsAreFullySpecified(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestWithCertificateIdentityRejectsEmptyIdentity(t *testing.T) {
+	// an empty identity matches any certificate, so it must be rejected here too
+	pc := &PolicyConfig{}
+	assert.Error(t, WithCertificateIdentity(CertificateIdentity{})(pc))
+	assert.Empty(t, pc.certificateIdentities)
+
+	// A well-formed identity is still accepted.
+	valid, err := certIDForTesting(SigstoreSanValue, "", ActionsIssuerValue, "", "")
+	assert.NoError(t, err)
+	assert.NoError(t, WithCertificateIdentity(valid)(&PolicyConfig{}))
+}
+
 func certIDForTesting(sanValue, sanRegex, issuer, issuerRegex, runnerEnv string) (CertificateIdentity, error) {
 	san, err := NewSANMatcher(sanValue, sanRegex)
 	if err != nil {
