@@ -58,23 +58,27 @@ func TestCertificateIdentityVerify(t *testing.T) {
 	}
 
 	// First, let's test happy paths:
-	issuerOnlyID, _ := certIDForTesting("", "", ActionsIssuerValue, "", "")
-	assert.NoError(t, issuerOnlyID.Verify(actualCert))
+	values, _ := certIDForTesting(SigstoreSanValue, "", ActionsIssuerValue, "", "")
+	assert.NoError(t, values.Verify(actualCert))
 
-	issuerOnlyRegex, _ := certIDForTesting("", "", "", ActionsIssuerRegex, "")
-	assert.NoError(t, issuerOnlyRegex.Verify(actualCert))
-
-	sanValueOnly, _ := certIDForTesting(SigstoreSanValue, "", "", "", "")
-	assert.NoError(t, sanValueOnly.Verify(actualCert))
-
-	sanRegexOnly, _ := certIDForTesting("", SigstoreSanRegex, "", "", "")
-	assert.NoError(t, sanRegexOnly.Verify(actualCert))
+	regexMatches, _ := certIDForTesting("", SigstoreSanRegex, "", ActionsIssuerRegex, "")
+	assert.NoError(t, regexMatches.Verify(actualCert))
 
 	// multiple values can be specified
 	sanRegexAndIssuer, _ := certIDForTesting("", SigstoreSanRegex, ActionsIssuerValue, "", "github-hosted")
 	assert.NoError(t, sanRegexAndIssuer.Verify(actualCert))
 
 	// unhappy paths:
+	// ensure we error when underspecified
+	empty, _ := certIDForTesting("", "", "", "", "")
+	assert.Error(t, empty.Verify(actualCert))
+
+	justSan, _ := certIDForTesting(SigstoreSanValue, "", "", "", "")
+	assert.Error(t, justSan.Verify(actualCert))
+
+	justIssuerRegex, _ := certIDForTesting("", "", "", ActionsIssuerRegex, "")
+	assert.Error(t, justIssuerRegex.Verify(actualCert))
+
 	// wrong issuer
 	sanRegexAndWrongIssuer, _ := certIDForTesting("", SigstoreSanRegex, "https://token.actions.example.com", "", "")
 	errValueMismatch := &ErrValueMismatch{}
