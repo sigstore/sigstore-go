@@ -20,9 +20,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/go-openapi/strfmt"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
@@ -103,6 +106,10 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 	return created, nil
 }
 
+func (m *mockRekor) GetLogEntryByUUID(_ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+	return nil, errors.New("not implemented")
+}
+
 type mockRekorV2 struct{}
 
 func (m *mockRekorV2) Add(_ context.Context, _ any) (*protorekor.TransparencyLogEntry, error) {
@@ -166,6 +173,57 @@ func Test_GetTransparencyLogEntryRekorV2(t *testing.T) {
 	bundle.VerificationMaterial = &protobundle.VerificationMaterial{}
 
 	opts := &RekorOptions{Retries: 1, ClientV2: &mockRekorV2{}, Version: rekorV2}
+	rekor := NewRekor(opts)
+
+	pubkey, err := keypair.GetPublicKeyPem()
+	assert.Nil(t, err)
+
+	err = rekor.GetTransparencyLogEntry(ctx, []byte(pubkey), bundle)
+	assert.Nil(t, err)
+	assert.NotNil(t, bundle.VerificationMaterial.TlogEntries)
+}
+
+type mockRekorConflict struct {
+	mockRekor
+}
+
+func (m *mockRekorConflict) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
+	return nil, &entries.CreateLogEntryConflict{
+		Location: strfmt.URI("http://rekor.example.com/api/v1/log/entries/abcdef1234567890"),
+	}
+}
+
+func (m *mockRekorConflict) GetLogEntryByUUID(params *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+	if params.EntryUUID != "abcdef1234567890" {
+		return nil, fmt.Errorf("unexpected uuid: %s", params.EntryUUID)
+	}
+
+	created, err := m.mockRekor.CreateLogEntry(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &entries.GetLogEntryByUUIDOK{
+		Payload: created.Payload,
+	}, nil
+}
+
+func Test_GetTransparencyLogEntryConflictV1(t *testing.T) {
+	ctx := context.Background()
+
+	keypair, err := NewEphemeralKeypair(nil)
+	assert.Nil(t, err)
+
+	bundle := &protobundle.Bundle{MediaType: bundleV03MediaType}
+	content := DSSEData{Data: []byte("hello world"), PayloadType: "something"}
+	envelopeBody = content.PreAuthEncoding()
+	signature, digest, err := keypair.SignData(ctx, content.PreAuthEncoding())
+	assert.Nil(t, err)
+
+	content.Bundle(bundle, signature, digest, keypair.GetHashAlgorithm())
+	bundle.VerificationMaterial = &protobundle.VerificationMaterial{}
+
+	opts := &RekorOptions{Retries: 1, Client: &mockRekorConflict{}}
 	rekor := NewRekor(opts)
 
 	pubkey, err := keypair.GetPublicKeyPem()
