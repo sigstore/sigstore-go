@@ -1228,6 +1228,8 @@ func TestVerificationContentIntermediates(t *testing.T) {
 		bundle                Bundle
 		allowCertificateChain bool
 		wantSerials           []*big.Int
+		wantErr               bool
+		wantErrContains       string
 	}{
 		{
 			name: "single certificate verification material",
@@ -1310,9 +1312,9 @@ func TestVerificationContentIntermediates(t *testing.T) {
 			wantSerials:           nil,
 		},
 		{
-			// https://github.com/sigstore/protobuf-specs/blob/4a31a816c74309e66a4c037c7e20f2500a588f8a/protos/sigstore_bundle.proto#L75-L79
-			name: "certificate chain with leaf, intermediate, and root ignores the root",
+			name: "certificate chain with leaf, intermediate, and self-signed root is rejected",
 			bundle: Bundle{Bundle: &protobundle.Bundle{
+				MediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
 				VerificationMaterial: &protobundle.VerificationMaterial{
 					Content: &protobundle.VerificationMaterial_X509CertificateChain{
 						X509CertificateChain: &protocommon.X509CertificateChain{
@@ -1326,7 +1328,8 @@ func TestVerificationContentIntermediates(t *testing.T) {
 				},
 			}},
 			allowCertificateChain: true,
-			wantSerials:           []*big.Int{subordinateIntermediateCert.SerialNumber},
+			wantErr:               true,
+			wantErrContains:       "self-signed certificate found in certificate chain",
 		},
 	}
 
@@ -1335,6 +1338,13 @@ func TestVerificationContentIntermediates(t *testing.T) {
 			t.Parallel()
 			tt.bundle.allowCertificateChain = tt.allowCertificateChain
 			vc, err := tt.bundle.VerificationContent()
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.wantErrContains != "" {
+					require.ErrorContains(t, err, tt.wantErrContains)
+				}
+				return
+			}
 			require.NoError(t, err)
 			got := vc.Intermediates()
 			require.Len(t, got, len(tt.wantSerials))

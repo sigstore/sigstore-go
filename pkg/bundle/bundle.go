@@ -124,6 +124,8 @@ func (b *Bundle) validate() error {
 				return errors.New("verification material cannot be X.509 certificate chain (for bundle v0.3)")
 			}
 		}
+	} else if b.allowCertificateChain {
+		return errors.New("certificate chain verification is only supported for bundle v0.3 and later")
 	}
 
 	// if bundle version is >= v0.4, return error as this version is not supported
@@ -278,10 +280,8 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 				if err != nil {
 					return nil, ErrValidationError(err)
 				}
-				// protobuf-specs does not allow signers to include self-signed certificates,
-				// but allows verifiers to tolerate non-compliant bundles for backwards compatibility.
 				if certificate.IsSelfSigned(intermediate) {
-					continue
+					return nil, ErrValidationError(errors.New("self-signed certificate found in certificate chain"))
 				}
 				if !intermediate.IsCA {
 					return nil, ErrValidationError(errors.New("non-CA certificate found in certificate chain"))
