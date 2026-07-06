@@ -29,6 +29,7 @@ import (
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/sigstore/sigstore-go/internal/certificate"
 	"github.com/sigstore/sigstore-go/internal/limits"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -272,14 +273,20 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 		}
 		var intermediates []*x509.Certificate
 		if b.allowCertificateChain {
-			for _, certificate := range certs[1:] {
-				intermediate, err := x509.ParseCertificate(certificate.RawBytes)
+			for _, cert := range certs[1:] {
+				intermediate, err := x509.ParseCertificate(cert.RawBytes)
 				if err != nil {
 					return nil, ErrValidationError(err)
 				}
-				if intermediate.IsCA && !verify.IsSelfSigned(intermediate) {
-					intermediates = append(intermediates, intermediate)
+				// protobuf-specs does not allow signers to include self-signed certificates,
+				// but allows verifiers to tolerate non-compliant bundles for backwards compatibility.
+				if certificate.IsSelfSigned(intermediate) {
+					continue
 				}
+				if !intermediate.IsCA {
+					return nil, ErrValidationError(errors.New("non-CA certificate found in certificate chain"))
+				}
+				intermediates = append(intermediates, intermediate)
 			}
 		}
 		cert := &Certificate{

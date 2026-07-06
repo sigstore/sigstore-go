@@ -15,7 +15,6 @@
 package verify
 
 import (
-	"bytes"
 	"crypto/x509"
 	"errors"
 	"time"
@@ -42,11 +41,4 @@ func verifyLeafCertificate(observerTimestamp time.Time, leafCert *x509.Certifica
 	}
 
 	return nil, errors.New("leaf certificate verification failed")
-}
-
-func IsSelfSigned(certificate *x509.Certificate) bool {
-	if !bytes.Equal(certificate.RawSubject, certificate.RawIssuer) {
-		return false
-	}
-	return certificate.CheckSignatureFrom(certificate) == nil
 }

@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bundle
+package certificate
 
-// Option configures optional behaviour when constructing a Bundle.
-type Option func(*Bundle)
+import (
+	"bytes"
+	"crypto/x509"
+)
 
-// AllowCertificateChain permits bundles with version >= v0.3 to contain
-// X.509 certificate chains in their verification material. By default,
-// v0.3+ bundles require a single certificate rather than a chain.
-func AllowCertificateChain() Option {
-	return func(b *Bundle) {
-		b.allowCertificateChain = true
+func IsSelfSigned(certificate *x509.Certificate) bool {
+	if !bytes.Equal(certificate.RawSubject, certificate.RawIssuer) {
+		return false
 	}
+	return certificate.CheckSignatureFrom(certificate) == nil
 }

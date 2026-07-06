@@ -24,6 +24,7 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 
+	"github.com/sigstore/sigstore-go/internal/certificate"
 	verifyBundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -98,7 +99,7 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 			if err != nil {
 				return nil, err
 			}
-			if verify.IsSelfSigned(parsed) {
+			if certificate.IsSelfSigned(parsed) {
 				return nil, errors.New("certificate chain must not contain a self-signed (root) certificate")
 			}
 			certificateChainProto.Certificates = append(certificateChainProto.Certificates, &protocommon.X509Certificate{
