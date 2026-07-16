@@ -330,12 +330,12 @@ func (b *Bundle) HasInclusionProof() bool {
 }
 
 func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
-	if b == nil {
-		return nil, errors.New("Cannot retrieve tlog entries from a nil bundle")
+	if b.VerificationMaterial == nil {
+		return nil, ErrMissingVerificationMaterial
 	}
 
-	if b.VerificationMaterial == nil {
-		return nil, errors.New("bundle verification material is uninitialized or nil")
+	if len(b.VerificationMaterial.TlogEntries) == 0 {
+		return nil, nil
 	}
 
 	if n := len(b.VerificationMaterial.TlogEntries); n > limits.MaxAllowedTlogEntries {
