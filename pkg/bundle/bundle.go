@@ -97,6 +97,11 @@ func (b *Bundle) validate() error {
 		return fmt.Errorf("%w: bundle version %s is not supported", ErrUnsupportedMediaType, bundleVersion)
 	}
 
+	err = validateBundle(b.Bundle)
+	if err != nil {
+		return fmt.Errorf("invalid bundle: %w", err)
+	}
+
 	// fetch tlog entries, as next check needs to check them for inclusion proof/promise
 	entries, err := b.TlogEntries()
 	if err != nil {
@@ -133,10 +138,6 @@ func (b *Bundle) validate() error {
 		return fmt.Errorf("%w: bundle version %s is not yet supported", ErrUnsupportedMediaType, bundleVersion)
 	}
 
-	err = validateBundle(b.Bundle)
-	if err != nil {
-		return fmt.Errorf("invalid bundle: %w", err)
-	}
 	return nil
 }
 
@@ -329,8 +330,12 @@ func (b *Bundle) HasInclusionProof() bool {
 }
 
 func (b *Bundle) TlogEntries() ([]*tlog.Entry, error) {
+	if b == nil {
+		return nil, errors.New("Cannot retrieve tlog entries from a nil bundle")
+	}
+
 	if b.VerificationMaterial == nil {
-		return nil, nil
+		return nil, errors.New("bundle verification material is uninitialized or nil")
 	}
 
 	if n := len(b.VerificationMaterial.TlogEntries); n > limits.MaxAllowedTlogEntries {
