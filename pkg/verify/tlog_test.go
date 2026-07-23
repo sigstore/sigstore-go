@@ -165,11 +165,11 @@ func TestNoTLogEntries(t *testing.T) {
 	entity, err := virtualSigstore.Attest("foo@example.com", "issuer", statement)
 	assert.NoError(t, err)
 
-	// failure: empty log entry lists now return a direct error instead of falling through to threshold handling
+	// failure: threshold of 1 is not met with no entries
 	_, err = verify.VerifyTlogEntry(&noTLogEntity{entity}, virtualSigstore, 1, true)
 	assert.Error(t, err)
-	if !strings.Contains(err.Error(), "no transparency log entries found to verify") {
-		t.Errorf("expected error with no tlog entries, got: %v", err.Error())
+	if !strings.Contains(err.Error(), "not enough verified log entries from transparency log") {
+		t.Errorf("expected error with timestamp threshold, got: %v", err.Error())
 	}
 }
 
