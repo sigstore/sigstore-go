@@ -50,9 +50,6 @@ func VerifyTlogEntry(entity SignedEntity, trustedMaterial root.TrustedMaterial, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve transparency log entries: %w", err)
 	}
-	if len(entries) == 0 {
-		return nil, errors.New("no transparency log entries found to verify")
-	}
 
 	// limit the number of tlog entries to prevent DoS
 	if len(entries) > limits.MaxAllowedTlogEntries {
