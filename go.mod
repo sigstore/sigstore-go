@@ -3,6 +3,7 @@ module github.com/sigstore/sigstore-go
 go 1.27
 
 require (
+	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7
 	github.com/go-openapi/runtime v0.33.3
@@ -85,3 +86,7 @@ require (
 	google.golang.org/grpc v1.84.0 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
+
+replace github.com/sigstore/protobuf-specs => github.com/kommendorkapten/protobuf-specs v0.0.0-20260708130507-5d7899d513d6
+
+replace github.com/sigstore/rekor-tiles/v2 => github.com/Hayden-IO/rekor-tiles/v2 v2.0.0-20260727231736-50079c8e12be

@@ -40,6 +40,7 @@ import (
 	"github.com/digitorus/timestamp"
 	"github.com/go-openapi/runtime"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	rekortilespb "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
@@ -761,6 +762,10 @@ type TestEntity struct {
 
 func (e *TestEntity) VerificationContent() (verify.VerificationContent, error) {
 	return bundle.NewCertificate(e.certChain[0]), nil
+}
+
+func (e *TestEntity) TlogProofs() ([]*bundleV2.TlogProof, error) {
+	return nil, nil
 }
 
 func (e *TestEntity) HasInclusionPromise() bool {

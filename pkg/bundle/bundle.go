@@ -24,6 +24,7 @@ import (
 
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	"golang.org/x/mod/semver"
@@ -447,4 +448,8 @@ func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {
 		output.Signatures[i].Sig = base64.StdEncoding.EncodeToString(sig.GetSig())
 	}
 	return &Envelope{Envelope: output}, nil
+}
+
+func (b *Bundle) TlogProofs() ([]*bundleV2.TlogProof, error) {
+	return nil, ErrUnimplemented
 }
