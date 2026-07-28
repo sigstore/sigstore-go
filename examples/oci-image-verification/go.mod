@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -82,3 +83,7 @@ require (
 	gotest.tools/v3 v3.5.2 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
+
+replace github.com/sigstore/protobuf-specs => github.com/kommendorkapten/protobuf-specs v0.0.0-20260708130507-5d7899d513d6
+
+replace github.com/sigstore/rekor-tiles/v2 => github.com/Hayden-IO/rekor-tiles/v2 v2.0.0-20260727231736-50079c8e12be
