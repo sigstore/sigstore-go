@@ -103,7 +103,7 @@ func TestSignatureVerifierMessageSignature(t *testing.T) {
 	virtualSigstore, err := ca.NewVirtualSigstore()
 	assert.NoError(t, err)
 
-	artifact := "Hi, I am an artifact!" //nolint:goconst
+	artifact := "Hi, I am an artifact!"
 	entity, err := virtualSigstore.Sign("foo@example.com", "issuer", []byte(artifact))
 	assert.NoError(t, err)
 
@@ -146,7 +146,7 @@ func TestTooManySubjects(t *testing.T) {
 	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	artifact := "Hi, I am an artifact!" //nolint:goconst
+	artifact := "Hi, I am an artifact!"
 	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.ErrorContains(t, err, "too many subjects")
 }
@@ -176,7 +176,7 @@ func TestTooManyDigests(t *testing.T) {
 	verifier, err := verify.NewVerifier(virtualSigstore, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	assert.NoError(t, err)
 
-	artifact := "Hi, I am an artifact!" //nolint:goconst
+	artifact := "Hi, I am an artifact!"
 	_, err = verifier.Verify(tooManySubjectsEntity, verify.NewPolicy(verify.WithArtifact(bytes.NewBufferString(artifact)), verify.WithoutIdentitiesUnsafe()))
 	assert.ErrorContains(t, err, "too many digests")
 }
@@ -321,7 +321,7 @@ func TestCompatibilityAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Create a test artifact
-			artifact := "Hi, I am an artifact!" //nolint:goconst
+			artifact := "Hi, I am an artifact!"
 			h := tt.hash.New()
 			h.Write([]byte(artifact))
 			digest := h.Sum(nil)

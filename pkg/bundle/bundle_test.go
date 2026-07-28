@@ -1109,7 +1109,7 @@ func Test_BundleValidation(t *testing.T) {
 func TestTlogEntriesCountCap(t *testing.T) {
 	overLimit := limits.MaxAllowedTlogEntries + 1
 	entries := make([]*rekorv1.TransparencyLogEntry, 0, overLimit)
-	for i := 0; i < overLimit; i++ {
+	for range overLimit {
 		entries = append(entries, &rekorv1.TransparencyLogEntry{})
 	}
 
@@ -1132,7 +1132,7 @@ func TestTlogEntriesCountCap(t *testing.T) {
 
 func TestTlogEntriesCountAtCap(t *testing.T) {
 	entries := make([]*rekorv1.TransparencyLogEntry, 0, limits.MaxAllowedTlogEntries)
-	for i := 0; i < limits.MaxAllowedTlogEntries; i++ {
+	for range limits.MaxAllowedTlogEntries {
 		entries = append(entries, &rekorv1.TransparencyLogEntry{})
 	}
 

@@ -16,7 +16,6 @@ version: "2"
 linters:
   enable:
     - errorlint
-    - goconst
     - gocritic
     - gosec
     - misspell
