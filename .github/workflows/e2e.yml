@@ -63,4 +63,31 @@ jobs:
       - name: Set up Sigstore
         uses: sigstore/scaffolding/actions/setup-sigstore-env@main
       - name: Run e2e tests
-        run: go test -v -tags=e2e ./test/e2e
+        run: go test -v -tags=e2e -skip=TestIdentitySignVerify ./test/e2e
+
+  e2e-identity:
+    runs-on: ubuntu-24.04-firewall
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Setup PQC Rekor
+        run: |
+          git clone https://github.com/sigstore/rekor-tiles.git /tmp/rekor-tiles
+          cd /tmp/rekor-tiles
+          git fetch origin pull/879/head:pqc-rekor
+          git checkout pqc-rekor
+          docker compose -f identity-posix-compose.yml up -d --build --wait --wait-timeout 120
+      - name: Run e2e tests
+        env:
+          IDENTITY_REKOR_URL: http://localhost:3006
+          IDENTITY_OIDC_URL: http://localhost:8080
+          PQC_REKOR_PUB_KEY_PATH: /tmp/rekor-tiles/tests/testdata/pki/mldsa-pub-key.pem
+        run: go test -v -tags=e2e -run=TestIdentitySignVerify ./test/e2e

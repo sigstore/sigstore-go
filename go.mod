@@ -1,8 +1,9 @@
 module github.com/sigstore/sigstore-go
 
-go 1.25.8
+go 1.26.0
 
 require (
+	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7
 	github.com/go-openapi/runtime v0.33.0
@@ -23,7 +24,7 @@ require (
 	github.com/transparency-dev/merkle v0.0.2
 	golang.org/x/crypto v0.54.0
 	golang.org/x/mod v0.38.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
 
 require (
@@ -31,7 +32,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.19.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20230818184609-3a137a874352 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
@@ -89,9 +90,13 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260523011958-0a33c5d7ca68 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/grpc v1.82.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
+
+replace github.com/sigstore/protobuf-specs => github.com/kommendorkapten/protobuf-specs v0.0.0-20260708130507-5d7899d513d6
+
+replace github.com/sigstore/rekor-tiles/v2 => github.com/Hayden-IO/rekor-tiles/v2 v2.0.0-20260727231736-50079c8e12be
