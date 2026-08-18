@@ -4,7 +4,7 @@ This document walks through using `sigstore-go` to verify the attestations PyPI 
 
 ## Disclaimer
 
-This is an example of how to use the `sigstore-go` library to verify PyPI attestations and is not intended to replace [`pypi-attestations`](https://github.com/pypi/pypi-attestations) and/or be reused in production. The `sigstore-go` library is still in development and is subject to change.
+This is an example of how to use the `sigstore-go` library to verify PyPI attestations and is not intended to replace [`pypi-attestations`](https://github.com/pypi/pypi-attestations) and/or be reused in production.
 
 ## Overview
 
