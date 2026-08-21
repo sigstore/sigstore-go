@@ -18,12 +18,15 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +36,36 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"golang.org/x/crypto/ed25519"
 )
+
+func TestDefaultOptionsRetriesTransientDownloads(t *testing.T) {
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if attempts.Add(1) < 3 {
+			http.Error(w, "temporary error", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(server.Close)
+
+	got, err := DefaultOptions().Fetcher.DownloadFile(server.URL, 1024, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("ok"), got)
+	assert.Equal(t, int32(3), attempts.Load())
+}
+
+func TestDefaultOptionsDoesNotRetryNotFound(t *testing.T) {
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		http.NotFound(w, nil)
+	}))
+	t.Cleanup(server.Close)
+
+	_, err := DefaultOptions().Fetcher.DownloadFile(server.URL, 1024, 0)
+	assert.Error(t, err)
+	assert.Equal(t, int32(1), attempts.Load())
+}
 
 func TestNewOfflineClientFail(t *testing.T) {
 	var opt = DefaultOptions()
