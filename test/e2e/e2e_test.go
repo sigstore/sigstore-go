@@ -17,14 +17,22 @@
 package e2e
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/rand"
+	"encoding/pem"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
+	"filippo.io/mldsa"
+	mldsax509 "filippo.io/mldsa/x509"
+
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -323,4 +331,177 @@ type verifyTrustedMaterial struct {
 
 func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstrainedVerifier, error) {
 	return v.keyTrustedMaterial.PublicKeyVerifier(hint)
+}
+
+func TestIdentitySignVerify(t *testing.T) {
+	identityRekorURL := os.Getenv("IDENTITY_REKOR_URL")
+	if identityRekorURL == "" {
+		t.Skip("must set IDENTITY_REKOR_URL")
+	}
+
+	identityOIDCURL := os.Getenv("IDENTITY_OIDC_URL")
+	if identityOIDCURL == "" {
+		t.Skip("must set IDENTITY_OIDC_URL")
+	}
+
+	pubKeyPath := os.Getenv("PQC_REKOR_PUB_KEY_PATH")
+	if pubKeyPath == "" {
+		t.Skip("must set PQC_REKOR_PUB_KEY_PATH")
+	}
+
+	pubKeyBytes, err := os.ReadFile(pubKeyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block, _ := pem.Decode(pubKeyBytes)
+	if block == nil {
+		t.Fatal("failed to decode pem")
+	}
+
+	rekorPubKey, err := mldsax509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pqcRekorLog := &root.TransparencyLog{
+		PublicKey: rekorPubKey,
+	}
+
+	mockRoot := &mockTrustedMaterial{
+		rekorLog: pqcRekorLog,
+	}
+
+	trustedRoot := mockRoot
+
+	token, err := getOIDCToken(identityOIDCURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	randomData := make([]byte, 32)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Fatal(err)
+	}
+
+	content := &sign.PlainData{
+		Data: randomData,
+	}
+
+	t.Run("identity_based_transparent_signing", func(t *testing.T) {
+		cred := &sign.OIDCCredential{Token: token}
+
+		opts := sign.IdentityBundleOptions{
+			TransparencyLogs: []sign.IdentityTransparencyLog{
+				sign.NewIdentityRekorClient(identityRekorURL),
+			},
+		}
+
+		b, err := sign.IdentityBundle(content, cred, opts)
+		require.NoError(t, err)
+		require.NotNil(t, b)
+
+		result, err := verifyIdentityBundle(b, "http://fakeoidc:8080", defaultCertID, randomData, false, trustedRoot)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.Verified)
+	})
+
+	t.Run("key_based_transparent_signing", func(t *testing.T) {
+		keypair, err := sign.NewMLDSAKeypair()
+		require.NoError(t, err)
+
+		cred := &sign.PublicKeyCredential{
+			Keypair: keypair,
+		}
+
+		opts := sign.IdentityBundleOptions{
+			TransparencyLogs: []sign.IdentityTransparencyLog{
+				sign.NewIdentityRekorClient(identityRekorURL),
+			},
+		}
+
+		b, err := sign.IdentityBundle(content, cred, opts)
+		require.NoError(t, err)
+		require.NotNil(t, b)
+
+		pubKey := keypair.GetPublicKey()
+		mldsaPK, ok := pubKey.(*mldsa.PublicKey)
+		require.True(t, ok)
+
+		mockRoot.keyID = string(keypair.GetHint())
+		mockRoot.verifier = root.NewExpiringKey(&mockMLDSAVerifier{pubKey: mldsaPK}, time.Time{}, time.Time{})
+
+		result, err := verifyIdentityBundle(b, "", "", randomData, true, trustedRoot)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.Verified)
+	})
+}
+
+func verifyIdentityBundle(b *bundleV2.Bundle, issuer, san string, artifact []byte, useKey bool, trustedRoot root.TrustedMaterial) (*verify.IdentityVerificationResult, error) {
+	bundleObj := bundle.BundleV2{Bundle: b}
+
+	verifier, err := verify.NewIdentityVerifier(trustedRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	var identityPolicies []verify.PolicyOption
+	if !useKey {
+		certID, err := verify.NewShortCertificateIdentity(issuer, "", san, "")
+		if err != nil {
+			return nil, err
+		}
+		identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
+	} else {
+		identityPolicies = append(identityPolicies, verify.WithKey())
+	}
+
+	artifactPolicy := verify.WithArtifact(bytes.NewReader(artifact))
+
+	return verifier.Verify(&bundleObj, verify.NewPolicy(artifactPolicy, identityPolicies...))
+}
+
+type mockTrustedMaterial struct {
+	root.BaseTrustedMaterial
+	rekorLog *root.TransparencyLog
+	keyID    string
+	verifier root.TimeConstrainedVerifier
+}
+
+func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
+	return map[string]*root.TransparencyLog{
+		"mock-pqc-rekor": m.rekorLog,
+	}
+}
+
+func (m *mockTrustedMaterial) PublicKeyVerifier(keyID string) (root.TimeConstrainedVerifier, error) {
+	if m.verifier != nil && m.keyID == keyID {
+		return m.verifier, nil
+	}
+	return nil, fmt.Errorf("public key not found")
+}
+
+type mockMLDSAVerifier struct {
+	pubKey *mldsa.PublicKey
+}
+
+func (m *mockMLDSAVerifier) PublicKey(_ ...signature.PublicKeyOption) (crypto.PublicKey, error) {
+	return m.pubKey, nil
+}
+
+func (m *mockMLDSAVerifier) VerifySignature(sig, message io.Reader, _ ...signature.VerifyOption) error {
+	sigBytes, err := io.ReadAll(sig)
+	if err != nil {
+		return err
+	}
+	msgBytes, err := io.ReadAll(message)
+	if err != nil {
+		return err
+	}
+	if err := mldsa.Verify(m.pubKey, msgBytes, sigBytes, nil); err != nil {
+		return fmt.Errorf("ML-DSA signature verification failed: %w", err)
+	}
+	return nil
 }

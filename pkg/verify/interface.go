@@ -21,6 +21,7 @@ import (
 
 	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 )
@@ -55,12 +56,17 @@ type VersionProvider interface {
 	Version() (string, error)
 }
 
+type TlogProofProvider interface {
+	TlogProofs() ([]*bundleV2.TlogProof, error)
+}
+
 type SignedEntity interface {
 	HasInclusionPromise
 	HasInclusionProof
 	SignatureProvider
 	SignedTimestampProvider
 	TlogEntryProvider
+	TlogProofProvider
 	VerificationProvider
 	VersionProvider
 }
@@ -128,4 +134,8 @@ func (b *BaseSignedEntity) TlogEntries() ([]*tlog.Entry, error) {
 
 func (b *BaseSignedEntity) Version() (string, error) {
 	return "", errNotImplemented
+}
+
+func (b *BaseSignedEntity) TlogProofs() ([]*bundleV2.TlogProof, error) {
+	return nil, errNotImplemented
 }
