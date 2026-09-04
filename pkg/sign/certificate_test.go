@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -97,20 +98,37 @@ func (m *mockFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
 
 type failFirstFulcio struct {
 	Count       int
+	Attempts    int
 	detachedSct bool
 }
 
 func (f *failFirstFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
+	f.Attempts++
 	if f.Count <= 0 {
 		f.Count++
 		response := &http.Response{
 			StatusCode: 500,
-			Body:       io.NopCloser(bytes.NewReader([]byte(""))),
+			Body:       io.NopCloser(bytes.NewReader([]byte("internal error"))),
 		}
 		return response, nil
 	}
 
 	return getFulcioResponse(f.detachedSct)
+}
+
+// errorFirstFulcio returns a transport error on the first attempt and
+// succeeds afterwards.
+type errorFirstFulcio struct {
+	Attempts int
+}
+
+func (e *errorFirstFulcio) RoundTrip(_ *http.Request) (*http.Response, error) {
+	e.Attempts++
+	if e.Attempts == 1 {
+		return nil, errors.New("connection reset by peer")
+	}
+
+	return getFulcioResponse(false)
 }
 
 func Test_GetCertificate(t *testing.T) {
@@ -139,16 +157,39 @@ func Test_GetCertificate(t *testing.T) {
 	roundTripper := &failFirstFulcio{}
 	retryFulcioOpts := &FulcioOptions{Retries: 1, Transport: roundTripper}
 	retryFulcio := NewFulcio(retryFulcioOpts)
+	disableBackoff(t, retryFulcio.client.Transport)
 
 	cert, err = retryFulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.NotNil(t, cert)
 	assert.Nil(t, err)
+	assert.Equal(t, 2, roundTripper.Attempts)
 
-	// Test unsuccessful retry
+	// Test unsuccessful retry; the final response body is included in the error
 	roundTripper.Count = -1
+	roundTripper.Attempts = 0
 	cert, err = retryFulcio.GetCertificate(ctx, keypair, certOpts)
 	assert.Nil(t, cert)
-	assert.NotNil(t, err)
+	assert.ErrorContains(t, err, "Fulcio returned 500: internal error")
+	assert.Equal(t, 2, roundTripper.Attempts)
+
+	// Test that transport errors are retried
+	errorTripper := &errorFirstFulcio{}
+	errorFulcio := NewFulcio(&FulcioOptions{Retries: 1, Transport: errorTripper})
+	disableBackoff(t, errorFulcio.client.Transport)
+
+	cert, err = errorFulcio.GetCertificate(ctx, keypair, certOpts)
+	assert.NotNil(t, cert)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, errorTripper.Attempts)
+
+	// Test that zero retries means a single attempt
+	noRetryTripper := &failFirstFulcio{}
+	noRetryFulcio := NewFulcio(&FulcioOptions{Retries: 0, Transport: noRetryTripper})
+
+	cert, err = noRetryFulcio.GetCertificate(ctx, keypair, certOpts)
+	assert.Nil(t, cert)
+	assert.ErrorContains(t, err, "Fulcio returned 500")
+	assert.Equal(t, 1, noRetryTripper.Attempts)
 
 	// Test detached SCT
 	detachedOpts := &FulcioOptions{Retries: 1, Transport: &mockFulcio{detachedSct: true}}
