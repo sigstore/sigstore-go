@@ -51,10 +51,17 @@ func summarizeStatement(envelope EnvelopeContent) (*in_toto.Statement, error) {
 		return nil, fmt.Errorf("decoding DSSE payload: %w", err)
 	}
 
+	// protojson accepts both the JSON name and the proto field name for
+	// every field, so "type" and "predicate_type" have to be read as well
+	// as "_type" and "predicateType". Reading only the JSON names leaves
+	// Type and PredicateType empty on a statement that the full parse
+	// populates.
 	var lite struct {
-		Type          string `json:"_type"` //nolint:tagliatelle // in-toto statement field name
-		PredicateType string `json:"predicateType"`
-		Subject       []struct {
+		Type               string `json:"_type"` //nolint:tagliatelle // in-toto statement field name
+		ProtoType          string `json:"type"`
+		PredicateType      string `json:"predicateType"`
+		ProtoPredicateType string `json:"predicate_type"` //nolint:tagliatelle // proto field name
+		Subject            []struct {
 			Name   string            `json:"name"`
 			Digest map[string]string `json:"digest"`
 		} `json:"subject"`
@@ -63,9 +70,18 @@ func summarizeStatement(envelope EnvelopeContent) (*in_toto.Statement, error) {
 		return nil, fmt.Errorf("parsing in-toto statement: %w", err)
 	}
 
+	statementType, err := pickSpelling("_type", lite.Type, "type", lite.ProtoType)
+	if err != nil {
+		return nil, fmt.Errorf("parsing in-toto statement: %w", err)
+	}
+	predicateType, err := pickSpelling("predicateType", lite.PredicateType, "predicate_type", lite.ProtoPredicateType)
+	if err != nil {
+		return nil, fmt.Errorf("parsing in-toto statement: %w", err)
+	}
+
 	statement := &in_toto.Statement{
-		Type:          lite.Type,
-		PredicateType: lite.PredicateType,
+		Type:          statementType,
+		PredicateType: predicateType,
 	}
 	for _, s := range lite.Subject {
 		statement.Subject = append(statement.Subject, &in_toto.ResourceDescriptor{
@@ -74,4 +90,18 @@ func summarizeStatement(envelope EnvelopeContent) (*in_toto.Statement, error) {
 		})
 	}
 	return statement, nil
+}
+
+// pickSpelling returns whichever of the two spellings of a field is set,
+// rejecting a statement that carries both, the way protojson rejects a
+// field given twice.
+func pickSpelling(jsonName, jsonValue, protoName, protoValue string) (string, error) {
+	switch {
+	case jsonValue != "" && protoValue != "":
+		return "", fmt.Errorf("statement sets both %q and %q", jsonName, protoName)
+	case protoValue != "":
+		return protoValue, nil
+	default:
+		return jsonValue, nil
+	}
 }
