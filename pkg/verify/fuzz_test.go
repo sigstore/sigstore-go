@@ -29,12 +29,21 @@ import (
 
 var FuzzSkipArtifactAndIdentitiesPolicy = verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe())
 
+const maxFuzzAttestationInputSize = 64 * 1024
+
 /*
 Tests VerifySignedTimestamp with an entity that contains
 a randomized email and statement
 */
 func FuzzVerifySignedTimestampWithoutThreshold(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string, statement []byte) {
+		// Attestation creation performs several encodings and cryptographic
+		// operations over the inputs before the timestamp is verified. Bound the
+		// generated data so large inputs cannot exhaust the fuzzer's per-input
+		// timeout.
+		if len(email)+len(statement) > maxFuzzAttestationInputSize {
+			t.Skip()
+		}
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
