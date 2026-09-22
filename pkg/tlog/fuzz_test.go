@@ -21,12 +21,14 @@ import (
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 )
 
+const maxFuzzEntryInputSize = 64 * 1024
+
 /*
 FuzzParseEntry creates a randomized
 TransparencyLogEntry and parses it
 */
 func FuzzParseEntry(f *testing.F) {
-	f.Fuzz(func(_ *testing.T, proofTreeSize,
+	f.Fuzz(func(t *testing.T, proofTreeSize,
 		proofLogIndex,
 		tlEntryIntegratedTime,
 		tlEntryIndex int64,
@@ -40,6 +42,14 @@ func FuzzParseEntry(f *testing.F) {
 		kindVersion,
 		kindKind,
 		checkpointEnvelope string) {
+		// Parsing expands several fields through hex and JSON decoding. Keep the
+		// aggregate work bounded when libFuzzer repeats a testcase many times.
+		inputSize := len(proofRootHash) + len(proofHash1) + len(proofHash2) +
+			len(proofHash3) + len(promiseSETimestamp) + len(tlEntryCanonicalizedBody) +
+			len(logIdKeyId) + len(kindVersion) + len(kindKind) + len(checkpointEnvelope)
+		if inputSize > maxFuzzEntryInputSize {
+			t.Skip()
+		}
 		//nolint:errcheck
 		ParseEntry(&v1.TransparencyLogEntry{
 			LogIndex: tlEntryIndex,

@@ -29,7 +29,17 @@ import (
 
 var FuzzSkipArtifactAndIdentitiesPolicy = verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithoutIdentitiesUnsafe())
 
-const maxFuzzAttestationInputSize = 64 * 1024
+const maxFuzzInputSize = 64 * 1024
+
+// These targets perform several encodings and cryptographic operations over
+// their inputs. Bound the generated data so large inputs cannot exhaust the
+// fuzzer's per-input timeout.
+func skipLargeFuzzInput(t *testing.T, inputSize int) {
+	t.Helper()
+	if inputSize > maxFuzzInputSize {
+		t.Skip()
+	}
+}
 
 /*
 Tests VerifySignedTimestamp with an entity that contains
@@ -37,13 +47,7 @@ a randomized email and statement
 */
 func FuzzVerifySignedTimestampWithoutThreshold(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string, statement []byte) {
-		// Attestation creation performs several encodings and cryptographic
-		// operations over the inputs before the timestamp is verified. Bound the
-		// generated data so large inputs cannot exhaust the fuzzer's per-input
-		// timeout.
-		if len(email)+len(statement) > maxFuzzAttestationInputSize {
-			t.Skip()
-		}
+		skipLargeFuzzInput(t, len(email)+len(statement))
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
@@ -68,6 +72,7 @@ func FuzzVerifySignedTimestampWithThreshold(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string,
 		statement []byte,
 		threshold int) {
+		skipLargeFuzzInput(t, len(email)+len(statement))
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
@@ -95,6 +100,7 @@ func FuzzVerifyTlogEntry(f *testing.F) {
 		statement []byte,
 		logThreshold int,
 		trustIntegratedTime bool) {
+		skipLargeFuzzInput(t, len(email)+len(statement))
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
@@ -150,6 +156,7 @@ from an entity that contains a randomized email and statement.
 */
 func FuzzVerifySignatureWithoutArtifactOrDigest(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string, statement []byte) {
+		skipLargeFuzzInput(t, len(email)+len(statement))
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
@@ -182,6 +189,7 @@ func FuzzVerifySignatureWithArtifactWithoutDigest(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email string,
 		statement,
 		artifactBytes []byte) {
+		skipLargeFuzzInput(t, len(email)+len(statement)+len(artifactBytes))
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
@@ -218,6 +226,7 @@ func FuzzVerifySignatureWithArtifactDigest(f *testing.F) {
 	f.Fuzz(func(t *testing.T, email,
 		artifactDigestAlgorithm string,
 		statement, artifactDigest []byte) {
+		skipLargeFuzzInput(t, len(email)+len(artifactDigestAlgorithm)+len(statement)+len(artifactDigest))
 		virtualSigstore, err := ca.NewVirtualSigstore()
 		if err != nil {
 			t.Fatal(err)
