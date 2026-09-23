@@ -112,6 +112,62 @@ func TestSummarizeStatementMatchesFullParse(t *testing.T) {
 	assert.Nil(t, summary.Predicate)
 }
 
+// protoSpellingStatement is the same statement written with the proto field
+// names. protojson accepts "type" and "predicate_type" alongside the JSON
+// names "_type" and "predicateType".
+const protoSpellingStatement = `{"type":"https://in-toto.io/Statement/v1",` +
+	`"predicate_type":"https://example.dev/predicate/v1",` +
+	`"subject":[{"name":"subject-0","digest":{"sha256":"` +
+	`0000000000000000000000000000000000000000000000000000000000000000"}}],` +
+	`"predicate":{"a":"b"}}`
+
+func TestSummarizeStatementProtoFieldNames(t *testing.T) {
+	env := envelopeWithPayload(t, intotoMediaType, []byte(protoSpellingStatement))
+
+	full, err := env.Statement()
+	require.NoError(t, err)
+	require.NotEmpty(t, full.Type)
+	require.NotEmpty(t, full.PredicateType)
+
+	summary, err := summarizeStatement(env)
+	require.NoError(t, err)
+	assert.Equal(t, full.Type, summary.Type)
+	assert.Equal(t, full.PredicateType, summary.PredicateType)
+	require.Len(t, summary.Subject, 1)
+	assert.Equal(t, full.Subject[0].Digest, summary.Subject[0].Digest)
+	assert.Nil(t, summary.Predicate)
+}
+
+func TestSummarizeStatementRejectsWhatFullParseRejects(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		payload string
+	}{
+		{
+			"both spellings of the type field",
+			`{"_type":"t","type":"t2","predicateType":"p","subject":[]}`,
+		},
+		{
+			"both spellings of the predicate type field",
+			`{"_type":"t","predicateType":"p","predicate_type":"p2","subject":[]}`,
+		},
+		{
+			"trailing data",
+			`{"_type":"t","predicateType":"p","subject":[]} {"_type":"other"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := envelopeWithPayload(t, intotoMediaType, []byte(tc.payload))
+
+			_, fullErr := env.Statement()
+			require.Error(t, fullErr, "the full parse is expected to reject this payload")
+
+			_, err := summarizeStatement(env)
+			assert.Error(t, err)
+		})
+	}
+}
+
 func TestSummarizeStatementErrors(t *testing.T) {
 	t.Run("unsupported payload type", func(t *testing.T) {
 		env := envelopeWithPayload(t, "application/json", statementJSON(t, 1, 0))
