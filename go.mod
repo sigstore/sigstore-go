@@ -7,7 +7,6 @@ require (
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7
 	github.com/go-openapi/runtime v0.33.2
 	github.com/go-openapi/strfmt v0.27.1
-	github.com/go-openapi/swag/conv v0.29.1
 	github.com/google/certificate-transparency-go v1.3.3
 	github.com/in-toto/attestation v1.2.0
 	github.com/in-toto/in-toto-golang v0.11.0
@@ -44,6 +43,7 @@ require (
 	github.com/go-openapi/loads v0.25.2 // indirect
 	github.com/go-openapi/runtime/server-middleware v0.33.2 // indirect
 	github.com/go-openapi/spec v1.0.0 // indirect
+	github.com/go-openapi/swag/conv v0.29.1 // indirect
 	github.com/go-openapi/swag/fileutils v0.29.1 // indirect
 	github.com/go-openapi/swag/jsonutils v0.29.1 // indirect
 	github.com/go-openapi/swag/loading v0.29.1 // indirect
