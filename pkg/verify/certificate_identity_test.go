@@ -32,29 +32,27 @@ func TestCertificateIdentityVerify(t *testing.T) {
 	// given a certificate summary, it does what we expect
 
 	actualCert := certificate.Summary{
-		SubjectAlternativeName: SigstoreSanValue,
-		Extensions: certificate.Extensions{
-			Issuer:                              ActionsIssuerValue,
-			GithubWorkflowTrigger:               "push",
-			GithubWorkflowSHA:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			GithubWorkflowName:                  "Release",
-			GithubWorkflowRepository:            "sigstore/sigstore-js",
-			GithubWorkflowRef:                   "refs/heads/main",
-			BuildSignerURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
-			BuildSignerDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			RunnerEnvironment:                   "github-hosted",
-			SourceRepositoryURI:                 "https://github.com/sigstore/sigstore-js",
-			SourceRepositoryDigest:              "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			SourceRepositoryRef:                 "refs/heads/main",
-			SourceRepositoryIdentifier:          "495574555",
-			SourceRepositoryOwnerURI:            "https://github.com/sigstore",
-			SourceRepositoryOwnerIdentifier:     "71096353",
-			BuildConfigURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
-			BuildConfigDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			BuildTrigger:                        "push",
-			RunInvocationURI:                    "https://github.com/sigstore/sigstore-js/actions/runs/5904696764/attempts/1",
-			SourceRepositoryVisibilityAtSigning: "public",
-		},
+		SubjectAlternativeName:              SigstoreSanValue,
+		Issuer:                              ActionsIssuerValue,
+		GithubWorkflowTrigger:               "push",
+		GithubWorkflowSHA:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		GithubWorkflowName:                  "Release",
+		GithubWorkflowRepository:            "sigstore/sigstore-js",
+		GithubWorkflowRef:                   "refs/heads/main",
+		BuildSignerURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
+		BuildSignerDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		RunnerEnvironment:                   "github-hosted",
+		SourceRepositoryURI:                 "https://github.com/sigstore/sigstore-js",
+		SourceRepositoryDigest:              "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		SourceRepositoryRef:                 "refs/heads/main",
+		SourceRepositoryIdentifier:          "495574555",
+		SourceRepositoryOwnerURI:            "https://github.com/sigstore",
+		SourceRepositoryOwnerIdentifier:     "71096353",
+		BuildConfigURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
+		BuildConfigDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		BuildTrigger:                        "push",
+		RunInvocationURI:                    "https://github.com/sigstore/sigstore-js/actions/runs/5904696764/attempts/1",
+		SourceRepositoryVisibilityAtSigning: "public",
 	}
 
 	// First, let's test happy paths:
@@ -147,5 +145,5 @@ func certIDForTesting(sanValue, sanRegex, issuer, issuerRegex, runnerEnv string)
 		return CertificateIdentity{}, err
 	}
 
-	return CertificateIdentity{SubjectAlternativeName: san, Issuer: issuerMatcher, Extensions: certificate.Extensions{RunnerEnvironment: runnerEnv}}, nil
+	return CertificateIdentity{SubjectAlternativeName: san, Issuer: issuerMatcher, RunnerEnvironment: runnerEnv}, nil
 }

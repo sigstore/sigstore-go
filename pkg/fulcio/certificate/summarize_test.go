@@ -42,30 +42,28 @@ func TestSummarizeCertificateWithActionsBundle(t *testing.T) {
 	}
 
 	expected := certificate.Summary{
-		CertificateIssuer:      "CN=sigstore-intermediate,O=sigstore.dev",
-		SubjectAlternativeName: "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
-		Extensions: certificate.Extensions{
-			Issuer:                              "https://token.actions.githubusercontent.com",
-			GithubWorkflowTrigger:               "push",
-			GithubWorkflowSHA:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			GithubWorkflowName:                  "Release",
-			GithubWorkflowRepository:            "sigstore/sigstore-js",
-			GithubWorkflowRef:                   "refs/heads/main",
-			BuildSignerURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
-			BuildSignerDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			RunnerEnvironment:                   "github-hosted",
-			SourceRepositoryURI:                 "https://github.com/sigstore/sigstore-js",
-			SourceRepositoryDigest:              "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			SourceRepositoryRef:                 "refs/heads/main",
-			SourceRepositoryIdentifier:          "495574555",
-			SourceRepositoryOwnerURI:            "https://github.com/sigstore",
-			SourceRepositoryOwnerIdentifier:     "71096353",
-			BuildConfigURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
-			BuildConfigDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
-			BuildTrigger:                        "push",
-			RunInvocationURI:                    "https://github.com/sigstore/sigstore-js/actions/runs/5904696764/attempts/1",
-			SourceRepositoryVisibilityAtSigning: "public",
-		},
+		CertificateIssuer:                   "CN=sigstore-intermediate,O=sigstore.dev",
+		SubjectAlternativeName:              "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
+		Issuer:                              "https://token.actions.githubusercontent.com",
+		GithubWorkflowTrigger:               "push",
+		GithubWorkflowSHA:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		GithubWorkflowName:                  "Release",
+		GithubWorkflowRepository:            "sigstore/sigstore-js",
+		GithubWorkflowRef:                   "refs/heads/main",
+		BuildSignerURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
+		BuildSignerDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		RunnerEnvironment:                   "github-hosted",
+		SourceRepositoryURI:                 "https://github.com/sigstore/sigstore-js",
+		SourceRepositoryDigest:              "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		SourceRepositoryRef:                 "refs/heads/main",
+		SourceRepositoryIdentifier:          "495574555",
+		SourceRepositoryOwnerURI:            "https://github.com/sigstore",
+		SourceRepositoryOwnerIdentifier:     "71096353",
+		BuildConfigURI:                      "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main",
+		BuildConfigDigest:                   "f0b49a04e5a62250e0f60fb128004a73110fe311",
+		BuildTrigger:                        "push",
+		RunInvocationURI:                    "https://github.com/sigstore/sigstore-js/actions/runs/5904696764/attempts/1",
+		SourceRepositoryVisibilityAtSigning: "public",
 	}
 
 	assert.Equal(t, expected, cs)
@@ -93,9 +91,7 @@ func TestSummarizeCertificateWithOauthBundle(t *testing.T) {
 	expected := certificate.Summary{
 		CertificateIssuer:      "CN=sigstore-intermediate,O=sigstore.dev",
 		SubjectAlternativeName: "brian@dehamer.com",
-		Extensions: certificate.Extensions{
-			Issuer: "https://github.com/login/oauth",
-		},
+		Issuer:                 "https://github.com/login/oauth",
 	}
 
 	assert.Equal(t, expected, cs)
@@ -118,9 +114,7 @@ func TestSummarizeCertificateWithOtherNameSAN(t *testing.T) {
 	expected := certificate.Summary{
 		CertificateIssuer:      "O=Linux Foundation,POSTALCODE=57274,STREET=548 Market St,L=San Francisco,ST=California,C=USA",
 		SubjectAlternativeName: "foo!oidc.local",
-		Extensions: certificate.Extensions{
-			Issuer: "http://oidc.local:8080",
-		},
+		Issuer:                 "http://oidc.local:8080",
 	}
 	assert.Equal(t, expected, cs)
 }

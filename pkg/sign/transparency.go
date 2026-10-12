@@ -301,8 +301,7 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 	resp, err := r.options.Client.CreateLogEntry(params)
 	var entry models.LogEntryAnon
 	if err != nil {
-		var conflictErr *entries.CreateLogEntryConflict
-		if errors.As(err, &conflictErr) {
+		if conflictErr, ok := errors.AsType[*entries.CreateLogEntryConflict](err); ok {
 			uuid := path.Base(conflictErr.Location.String())
 			getParams := entries.NewGetLogEntryByUUIDParamsWithContext(ctx)
 			getParams.SetEntryUUID(uuid)
