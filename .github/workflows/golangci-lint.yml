@@ -44,3 +44,21 @@ jobs:
           # sometimes the pkg cache gets corrupted, skipping cache avoids this
           # https://github.com/golangci/golangci-lint-action/issues/23
           skip-cache: true
+
+  go-fix:
+    name: go fix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+
+      - name: Check go fix
+        run: |
+          go fix ./...
+          git diff --exit-code
