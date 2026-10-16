@@ -58,8 +58,8 @@ const (
 )
 
 type RekorClient interface {
-	CreateLogEntry(params *entries.CreateLogEntryParams, opts ...entries.ClientOption) (*entries.CreateLogEntryCreated, error)
-	GetLogEntryByUUID(params *entries.GetLogEntryByUUIDParams, opts ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error)
+	CreateLogEntryContext(ctx context.Context, params *entries.CreateLogEntryParams, opts ...entries.ClientOption) (*entries.CreateLogEntryCreated, error)
+	GetLogEntryByUUIDContext(ctx context.Context, params *entries.GetLogEntryByUUIDParams, opts ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error)
 }
 
 type RekorV2Client interface {
@@ -288,7 +288,6 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 		params.SetTimeout(r.options.Timeout)
 	}
 	params.SetProposedEntry(proposedEntry)
-	params.SetContext(ctx)
 
 	if r.options.Client == nil {
 		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(util.ConstructUserAgent()), client.WithRetryCount(r.options.Retries))
@@ -298,15 +297,14 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 		r.options.Client = client.Entries
 	}
 
-	resp, err := r.options.Client.CreateLogEntry(params)
+	resp, err := r.options.Client.CreateLogEntryContext(ctx, params)
 	var entry models.LogEntryAnon
 	if err != nil {
-		var conflictErr *entries.CreateLogEntryConflict
-		if errors.As(err, &conflictErr) {
+		if conflictErr, ok := errors.AsType[*entries.CreateLogEntryConflict](err); ok {
 			uuid := path.Base(conflictErr.Location.String())
-			getParams := entries.NewGetLogEntryByUUIDParamsWithContext(ctx)
+			getParams := entries.NewGetLogEntryByUUIDParams()
 			getParams.SetEntryUUID(uuid)
-			getResp, getErr := r.options.Client.GetLogEntryByUUID(getParams)
+			getResp, getErr := r.options.Client.GetLogEntryByUUIDContext(ctx, getParams)
 			if getErr != nil {
 				return nil, fmt.Errorf("failed to fetch conflicting entry: %w", getErr)
 			}

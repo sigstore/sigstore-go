@@ -40,7 +40,7 @@ var envelopeBody []byte
 
 type mockRekor struct{}
 
-func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
+func (m *mockRekor) CreateLogEntryContext(_ context.Context, _ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
 	virtualSigstoreOnce.Do(setupVirtualSigstore)
 	if virtualSigstoreErr != nil {
 		return nil, virtualSigstoreErr
@@ -106,7 +106,7 @@ func (m *mockRekor) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries
 	return created, nil
 }
 
-func (m *mockRekor) GetLogEntryByUUID(_ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+func (m *mockRekor) GetLogEntryByUUIDContext(_ context.Context, _ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -187,18 +187,18 @@ type mockRekorConflict struct {
 	mockRekor
 }
 
-func (m *mockRekorConflict) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
+func (m *mockRekorConflict) CreateLogEntryContext(_ context.Context, _ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
 	return nil, &entries.CreateLogEntryConflict{
 		Location: strfmt.URI("http://rekor.example.com/api/v1/log/entries/abcdef1234567890"),
 	}
 }
 
-func (m *mockRekorConflict) GetLogEntryByUUID(params *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+func (m *mockRekorConflict) GetLogEntryByUUIDContext(ctx context.Context, params *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
 	if params.EntryUUID != "abcdef1234567890" {
 		return nil, fmt.Errorf("unexpected uuid: %s", params.EntryUUID)
 	}
 
-	created, err := m.mockRekor.CreateLogEntry(nil)
+	created, err := m.mockRekor.CreateLogEntryContext(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

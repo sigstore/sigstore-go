@@ -29,10 +29,10 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: './go.mod'
+          go-version: 'stable'
           check-latest: true
       - name: Install addlicense
-        run: go install github.com/google/addlicense@v1.1.1
+        run: go install github.com/google/addlicense@v1.2.0
       - name: Check license headers
         run: |
           set -e
