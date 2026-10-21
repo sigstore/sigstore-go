@@ -83,7 +83,7 @@ type RekorOptions struct {
 	Client   RekorClient
 	ClientV2 RekorV2Client
 	Version  uint32
-	// Optional User-Agent for requests (defaults to sigstore-go/<version>)
+	// Optional User-Agent prefix for requests; sigstore-go/<version> is always appended
 	UserAgent string
 }
 

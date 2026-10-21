@@ -58,7 +58,7 @@ type FulcioOptions struct {
 	Retries uint
 	// Optional base Transport (for dependency injection); it is wrapped by the retrying transport, so set Retries to 0 if it already retries
 	Transport http.RoundTripper
-	// Optional User-Agent for requests (defaults to sigstore-go/<version>)
+	// Optional User-Agent prefix for requests; sigstore-go/<version> is always appended
 	UserAgent string
 }
 

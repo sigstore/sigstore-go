@@ -16,10 +16,11 @@ package sign
 
 import "github.com/sigstore/sigstore-go/pkg/util"
 
-// userAgent returns ua if set, otherwise the default sigstore-go User-Agent.
+// userAgent returns the default sigstore-go User-Agent, prefixed with ua if set,
+// so the underlying SDK is always identified.
 func userAgent(ua string) string {
 	if ua != "" {
-		return ua
+		return ua + " " + util.ConstructUserAgent()
 	}
 	return util.ConstructUserAgent()
 }

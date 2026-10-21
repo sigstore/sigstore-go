@@ -23,5 +23,5 @@ import (
 
 func TestUserAgent(t *testing.T) {
 	assert.Equal(t, util.ConstructUserAgent(), userAgent(""))
-	assert.Equal(t, "cosign/v3.0.0 sigstore-go/v1.3.0", userAgent("cosign/v3.0.0 sigstore-go/v1.3.0"))
+	assert.Equal(t, "cosign/v3.0.0 (linux; amd64) "+util.ConstructUserAgent(), userAgent("cosign/v3.0.0 (linux; amd64)"))
 }
