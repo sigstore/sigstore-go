@@ -28,7 +28,6 @@ import (
 	"time"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
-	"github.com/sigstore/sigstore-go/pkg/util"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 )
 
@@ -59,6 +58,8 @@ type FulcioOptions struct {
 	Retries uint
 	// Optional base Transport (for dependency injection); it is wrapped by the retrying transport, so set Retries to 0 if it already retries
 	Transport http.RoundTripper
+	// Optional User-Agent prefix for requests; sigstore-go/<version> is always appended
+	UserAgent string
 }
 
 var FulcioAPIVersions = []uint32{1}
@@ -180,7 +181,7 @@ func (f *Fulcio) GetCertificate(ctx context.Context, keypair Keypair, opts *Cert
 	}
 	request.Header.Add("Authorization", "Bearer "+opts.IDToken)
 	request.Header.Add("Content-Type", "application/json")
-	request.Header.Add("User-Agent", util.ConstructUserAgent())
+	request.Header.Add("User-Agent", userAgent(f.options.UserAgent))
 
 	response, err := f.client.Do(request) // #nosec G704 -- Client controls the URL
 	if err != nil {
