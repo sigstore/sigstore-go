@@ -48,8 +48,6 @@ import (
 	// To initialize rekor types
 	_ "github.com/sigstore/rekor/pkg/types/dsse/v0.0.1"
 	_ "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
-
-	"github.com/sigstore/sigstore-go/pkg/util"
 )
 
 const (
@@ -85,6 +83,8 @@ type RekorOptions struct {
 	Client   RekorClient
 	ClientV2 RekorV2Client
 	Version  uint32
+	// Optional User-Agent for requests (defaults to sigstore-go/<version>)
+	UserAgent string
 }
 
 var RekorAPIVersions = []uint32{1, 2}
@@ -211,7 +211,7 @@ func (r *Rekor) getRekorV2TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 		return nil, fmt.Errorf("unable to find signature in bundle")
 	}
 	if r.options.ClientV2 == nil {
-		client, err := write.NewWriter(r.options.BaseURL, rekortilesclient.WithUserAgent(util.ConstructUserAgent()))
+		client, err := write.NewWriter(r.options.BaseURL, rekortilesclient.WithUserAgent(userAgent(r.options.UserAgent)))
 		if err != nil {
 			return nil, fmt.Errorf("creating rekor v2 client: %w", err)
 		}
@@ -290,7 +290,7 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 	params.SetProposedEntry(proposedEntry)
 
 	if r.options.Client == nil {
-		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(util.ConstructUserAgent()), client.WithRetryCount(r.options.Retries))
+		client, err := client.GetRekorClient(r.options.BaseURL, client.WithUserAgent(userAgent(r.options.UserAgent)), client.WithRetryCount(r.options.Retries))
 		if err != nil {
 			return nil, err
 		}
