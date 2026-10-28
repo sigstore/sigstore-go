@@ -80,13 +80,7 @@ func (b *BundleV2) VerificationContent() (verify.VerificationContent, error) {
 		if content.TlogProof == nil {
 			return nil, ErrMissingVerificationMaterial
 		}
-		if pk := content.TlogProof.GetPublicKey(); pk != nil {
-			return &PublicKey{
-				hint: pk.Hint,
-			}, nil
-		}
-		// If OIDC, it might not have a public key hint in the proof
-		return nil, ErrUnimplemented
+		return &PublicKey{}, nil
 	case *bundleV2.VerificationMaterial_PublicKey:
 		if content.PublicKey == nil || content.PublicKey.GetPublicKey() == nil {
 			return nil, ErrMissingVerificationMaterial

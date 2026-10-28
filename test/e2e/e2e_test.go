@@ -429,7 +429,6 @@ func TestIdentitySignVerify(t *testing.T) {
 		mldsaPK, ok := pubKey.(*mldsa.PublicKey)
 		require.True(t, ok)
 
-		mockRoot.keyID = string(keypair.GetHint())
 		mockRoot.verifier = root.NewExpiringKey(&mockMLDSAVerifier{pubKey: mldsaPK}, time.Time{}, time.Time{})
 
 		result, err := verifyIdentityBundle(b, "", "", randomData, true, trustedRoot)
@@ -466,7 +465,6 @@ func verifyIdentityBundle(b *bundleV2.Bundle, issuer, san string, artifact []byt
 type mockTrustedMaterial struct {
 	root.BaseTrustedMaterial
 	rekorLog *root.TransparencyLog
-	keyID    string
 	verifier root.TimeConstrainedVerifier
 }
 
@@ -476,8 +474,8 @@ func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
 	}
 }
 
-func (m *mockTrustedMaterial) PublicKeyVerifier(keyID string) (root.TimeConstrainedVerifier, error) {
-	if m.verifier != nil && m.keyID == keyID {
+func (m *mockTrustedMaterial) PublicKeyVerifier(_ string) (root.TimeConstrainedVerifier, error) {
+	if m.verifier != nil {
 		return m.verifier, nil
 	}
 	return nil, fmt.Errorf("public key not found")

@@ -80,10 +80,11 @@ jobs:
           go-version: 'stable'
       - name: Setup PQC Rekor
         run: |
+          REKOR_TILES_VERSION=$(go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' github.com/sigstore/rekor-tiles/v2)
+          REKOR_TILES_REF="${REKOR_TILES_VERSION##*-}"
           git clone https://github.com/sigstore/rekor-tiles.git /tmp/rekor-tiles
           cd /tmp/rekor-tiles
-          git fetch origin pull/879/head:pqc-rekor
-          git checkout pqc-rekor
+          git checkout "${REKOR_TILES_REF}"
           docker compose -f identity-posix-compose.yml up -d --build --wait --wait-timeout 120
       - name: Run e2e tests
         env:

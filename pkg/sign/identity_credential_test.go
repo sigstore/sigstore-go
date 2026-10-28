@@ -64,5 +64,4 @@ func TestPublicKeyCredential(t *testing.T) {
 	assert.NotNil(t, req.GetPublicKey())
 	assert.Equal(t, sig1, req.GetPublicKey().Signature)
 	assert.Equal(t, []byte("test-context"), req.GetPublicKey().Context)
-	assert.Equal(t, keypair.GetSigningAlgorithm(), req.GetPublicKey().Algorithm)
 }
