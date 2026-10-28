@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
-	pbcommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 )
 
 type IdentityBundleOptions struct {
@@ -60,13 +59,6 @@ func IdentityBundle(content Content, cred IdentityCredential, opts IdentityBundl
 	if artifactSigBytes != nil {
 		pbSig = &bundleV2.Signature{
 			Signature: artifactSigBytes,
-		}
-
-		// If we have an artifact signature, we also have a public key hint we should inject into the TlogProof
-		if pkc, ok := cred.(*PublicKeyCredential); ok {
-			proof.PublicKey = &pbcommon.PublicKeyIdentifier{
-				Hint: string(pkc.Keypair.GetHint()),
-			}
 		}
 	}
 

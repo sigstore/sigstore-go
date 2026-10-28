@@ -82,8 +82,7 @@ jobs:
         run: |
           git clone https://github.com/sigstore/rekor-tiles.git /tmp/rekor-tiles
           cd /tmp/rekor-tiles
-          git fetch origin pull/879/head:pqc-rekor
-          git checkout pqc-rekor
+          git checkout v2.4.0
           docker compose -f identity-posix-compose.yml up -d --build --wait --wait-timeout 120
       - name: Run e2e tests
         env:

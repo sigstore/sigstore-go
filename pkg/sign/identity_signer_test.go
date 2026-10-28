@@ -124,5 +124,4 @@ func TestIdentityBundle_OIDCCredential(t *testing.T) {
 	assert.Nil(t, bundle.Content)
 	assert.NotNil(t, bundle.VerificationMaterial.GetTlogProof())
 	assert.Equal(t, []byte("mock-proof"), bundle.VerificationMaterial.GetTlogProof().Proof)
-	assert.Nil(t, bundle.VerificationMaterial.GetTlogProof().PublicKey) // No public key for OIDC in bundle creation
 }

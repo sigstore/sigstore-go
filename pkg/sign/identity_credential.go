@@ -62,6 +62,13 @@ func (c *PublicKeyCredential) ArtifactSignature(ctx context.Context, messageDige
 	// c2sp.org/identity-transparency/v1 || 0x00 || SHA256(messageDigest)
 	doubleHash := sha256.Sum256(messageDigest)
 	prehashedData := append([]byte("c2sp.org/identity-transparency/v1\x00"), doubleHash[:]...)
+	if len(c.Context) > 0 {
+		k1 := sha256.Sum256([]byte("context"))
+		kDoubleHash := sha256.Sum256(k1[:])
+		vDoubleHash := sha256.Sum256(c.Context)
+		prehashedData = append(prehashedData, kDoubleHash[:]...)
+		prehashedData = append(prehashedData, vDoubleHash[:]...)
+	}
 
 	sig, _, err := c.Keypair.SignData(ctx, prehashedData)
 	if err != nil {
@@ -89,7 +96,6 @@ func (c *PublicKeyCredential) ToIdentityRequestV001(ctx context.Context, message
 				PublicKey: pubKeyBytes,
 				Signature: sig,
 				Context:   c.Context,
-				Algorithm: c.Keypair.GetSigningAlgorithm(),
 			},
 		},
 		Message: messageDigest, // First hash: SHA256(artifact)

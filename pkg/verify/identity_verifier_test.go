@@ -302,10 +302,17 @@ func TestIdentityVerifier_Verify_Success_OIDC(t *testing.T) {
 	hv2_2 := sha256.Sum256(hv2[:])
 
 	var contextHashes []byte
-	contextHashes = append(contextHashes, hk1_2[:]...)
-	contextHashes = append(contextHashes, hv1_2[:]...)
-	contextHashes = append(contextHashes, hk2_2[:]...)
-	contextHashes = append(contextHashes, hv2_2[:]...)
+	if bytes.Compare(hk1_2[:], hk2_2[:]) < 0 {
+		contextHashes = append(contextHashes, hk1_2[:]...)
+		contextHashes = append(contextHashes, hv1_2[:]...)
+		contextHashes = append(contextHashes, hk2_2[:]...)
+		contextHashes = append(contextHashes, hv2_2[:]...)
+	} else {
+		contextHashes = append(contextHashes, hk2_2[:]...)
+		contextHashes = append(contextHashes, hv2_2[:]...)
+		contextHashes = append(contextHashes, hk1_2[:]...)
+		contextHashes = append(contextHashes, hv1_2[:]...)
+	}
 
 	leafHash := []byte{0x01}
 	leafHash = append(leafHash, rootOfTrustHash[:]...)
@@ -346,11 +353,12 @@ func TestIdentityVerifier_Verify_Success_OIDC(t *testing.T) {
 	fullSig = append([]byte("1234"), fullSig...) // 4-byte keyhash
 	checkpointStr := string(cpBytes) + "\n\u2014 \n" + origin + " " + base64.StdEncoding.EncodeToString(fullSig) + "\n"
 
+	extraData := "issuer:" + base64.StdEncoding.EncodeToString([]byte("https://example.com")) + "\nidentity:" + base64.StdEncoding.EncodeToString([]byte("foo@bar.com"))
 	tlogProof := proof.TLogProof{
 		Index:      0,
 		Hashes:     nil,
 		Checkpoint: []byte(checkpointStr),
-		ExtraData:  []byte("issuer:https://example.com\nidentity:foo@bar.com"),
+		ExtraData:  []byte(extraData),
 	}
 	tlogProofBytes := tlogProof.Marshal()
 

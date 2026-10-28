@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
-	pbcommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -32,9 +31,6 @@ func TestBundleV2_InterfaceMethods(t *testing.T) {
 			Content: &bundleV2.VerificationMaterial_TlogProof{
 				TlogProof: &bundleV2.TlogProof{
 					Proof: []byte("proof"),
-					PublicKey: &pbcommon.PublicKeyIdentifier{
-						Hint: "hint",
-					},
 				},
 			},
 		},
@@ -67,7 +63,7 @@ func TestBundleV2_InterfaceMethods(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, verContent)
 	assert.NotNil(t, verContent.PublicKey())
-	assert.Equal(t, "hint", verContent.PublicKey().Hint())
+	assert.Empty(t, verContent.PublicKey().Hint())
 
 	tlogProofs, err := b.TlogProofs()
 	assert.NoError(t, err)

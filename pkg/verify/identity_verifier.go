@@ -164,33 +164,16 @@ func (v *IdentityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*Ident
 			}
 			parts := bytes.SplitN(line, []byte(":"), 2)
 			if len(parts) == 2 {
-				extraClaims[string(parts[0])] = string(parts[1])
+				decodedVal, err := base64.StdEncoding.DecodeString(string(parts[1]))
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode extra data value: %w", err)
+				}
+				extraClaims[string(parts[0])] = string(decodedVal)
 			}
 		}
 	}
 
 	var contextHashes []byte
-	if len(extraClaims) > 0 {
-		type kv struct {
-			k, v string
-			hk   []byte
-		}
-		var kvs []kv
-		for k, val := range extraClaims {
-			hk := sha256.Sum256([]byte(k))
-			hk2 := sha256.Sum256(hk[:])
-			kvs = append(kvs, kv{k, val, hk2[:]})
-		}
-		sort.Slice(kvs, func(i, j int) bool {
-			return kvs[i].k < kvs[j].k
-		})
-		for _, pair := range kvs {
-			hv := sha256.Sum256([]byte(pair.v))
-			hv2 := sha256.Sum256(hv[:])
-			contextHashes = append(contextHashes, pair.hk...)
-			contextHashes = append(contextHashes, hv2[:]...)
-		}
-	}
 
 	// Artifact double hash
 	msgHash := sha256.Sum256(artifactDigest)
@@ -201,6 +184,14 @@ func (v *IdentityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*Ident
 	if len(artifactSig) > 0 {
 		// Receipt Digest
 		receiptDigest = sha256.Sum256(artifactSig)
+
+		if contextVal, ok := extraClaims["context"]; ok && len(contextVal) > 0 {
+			k1 := sha256.Sum256([]byte("context"))
+			kDoubleHash := sha256.Sum256(k1[:])
+			vDoubleHash := sha256.Sum256([]byte(contextVal))
+			contextHashes = append(contextHashes, kDoubleHash[:]...)
+			contextHashes = append(contextHashes, vDoubleHash[:]...)
+		}
 
 		vc, err := entity.VerificationContent()
 		if err != nil {
@@ -226,9 +217,9 @@ func (v *IdentityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*Ident
 			rot := append([]byte("ML-DSA-44"), pubKeyBytes...)
 			rootOfTrustHash = sha256.Sum256(rot)
 
-			// c2sp.org/identity-transparency/v1 || 0x00 || SHA256(messageDigest)
-			doubleHash := sha256.Sum256(artifactDigest)
-			prehashedData := append([]byte("c2sp.org/identity-transparency/v1\x00"), doubleHash[:]...)
+			// c2sp.org/identity-transparency/v1 || 0x00 || SHA256(messageDigest) [|| contextHashes]
+			prehashedData := append([]byte("c2sp.org/identity-transparency/v1\x00"), msgHash[:]...)
+			prehashedData = append(prehashedData, contextHashes...)
 			if err := verifier.VerifySignature(bytes.NewReader(artifactSig), bytes.NewReader(prehashedData)); err != nil {
 				return nil, fmt.Errorf("artifact signature verification failed: %w", err)
 			}
@@ -237,6 +228,29 @@ func (v *IdentityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*Ident
 		}
 	} else {
 		// OIDC Credential
+		if len(extraClaims) > 0 {
+			type kv struct {
+				hk [sha256.Size]byte
+				hv [sha256.Size]byte
+			}
+			var kvs []kv
+			for k, val := range extraClaims {
+				hk := sha256.Sum256([]byte(k))
+				hv := sha256.Sum256([]byte(val))
+				kvs = append(kvs, kv{
+					hk: sha256.Sum256(hk[:]),
+					hv: sha256.Sum256(hv[:]),
+				})
+			}
+			sort.Slice(kvs, func(i, j int) bool {
+				return bytes.Compare(kvs[i].hk[:], kvs[j].hk[:]) < 0
+			})
+			for _, pair := range kvs {
+				contextHashes = append(contextHashes, pair.hk[:]...)
+				contextHashes = append(contextHashes, pair.hv[:]...)
+			}
+		}
+
 		issuer, ok := extraClaims["issuer"]
 		if !ok {
 			return nil, errors.New("missing issuer in tlog extra claims for OIDC credential")
