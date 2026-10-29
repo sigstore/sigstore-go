@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"time"
 
@@ -70,6 +71,8 @@ type Transparency interface {
 
 type Rekor struct {
 	options *RekorOptions
+	// HTTP client for Rekor v1 requests when Transport is set
+	httpClient *http.Client
 }
 
 type RekorOptions struct {
@@ -85,6 +88,9 @@ type RekorOptions struct {
 	Version  uint32
 	// Optional User-Agent prefix for requests; sigstore-go/<version> is always appended
 	UserAgent string
+	// Optional transport for Rekor requests; existing options such as
+	// Retries and UserAgent still apply
+	Transport http.RoundTripper
 }
 
 var RekorAPIVersions = []uint32{1, 2}
@@ -211,7 +217,11 @@ func (r *Rekor) getRekorV2TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 		return nil, fmt.Errorf("unable to find signature in bundle")
 	}
 	if r.options.ClientV2 == nil {
-		client, err := write.NewWriter(r.options.BaseURL, rekortilesclient.WithUserAgent(userAgent(r.options.UserAgent)))
+		writerOpts := []rekortilesclient.Option{rekortilesclient.WithUserAgent(userAgent(r.options.UserAgent))}
+		if r.options.Transport != nil {
+			writerOpts = append(writerOpts, rekortilesclient.WithTransport(r.options.Transport))
+		}
+		client, err := write.NewWriter(r.options.BaseURL, writerOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating rekor v2 client: %w", err)
 		}
@@ -295,6 +305,15 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 			return nil, err
 		}
 		r.options.Client = client.Entries
+		if r.options.Transport != nil {
+			// Use Transport with the configured Retries and UserAgent.
+			r.httpClient = &http.Client{
+				Transport: userAgentTransport{base: newRetryTransport(r.options.Transport, r.options.Retries), userAgent: userAgent(r.options.UserAgent)},
+			}
+		}
+	}
+	if r.httpClient != nil {
+		params.SetHTTPClient(r.httpClient)
 	}
 
 	resp, err := r.options.Client.CreateLogEntryContext(ctx, params)
@@ -304,6 +323,9 @@ func (r *Rekor) getRekorV1TLE(ctx context.Context, keyOrCertPEM []byte, b *proto
 			uuid := path.Base(conflictErr.Location.String())
 			getParams := entries.NewGetLogEntryByUUIDParams()
 			getParams.SetEntryUUID(uuid)
+			if r.httpClient != nil {
+				getParams.SetHTTPClient(r.httpClient)
+			}
 			getResp, getErr := r.options.Client.GetLogEntryByUUIDContext(ctx, getParams)
 			if getErr != nil {
 				return nil, fmt.Errorf("failed to fetch conflicting entry: %w", getErr)
