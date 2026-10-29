@@ -14,7 +14,11 @@
 
 package sign
 
-import "github.com/sigstore/sigstore-go/pkg/util"
+import (
+	"net/http"
+
+	"github.com/sigstore/sigstore-go/pkg/util"
+)
 
 // userAgent returns the default sigstore-go User-Agent, prefixed with ua if set,
 // so the underlying SDK is always identified.
@@ -23,4 +27,16 @@ func userAgent(ua string) string {
 		return ua + " " + util.ConstructUserAgent()
 	}
 	return util.ConstructUserAgent()
+}
+
+// userAgentTransport adds the configured User-Agent to each request.
+type userAgentTransport struct {
+	base      http.RoundTripper
+	userAgent string
+}
+
+func (t userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set("User-Agent", t.userAgent)
+	return t.base.RoundTrip(req)
 }
