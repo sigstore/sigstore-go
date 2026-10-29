@@ -319,7 +319,10 @@ type PolicyBuilder struct {
 }
 
 func (pc PolicyBuilder) options() []PolicyOption {
-	arr := []PolicyOption{PolicyOption(pc.artifactPolicy)}
+	var arr []PolicyOption
+	if pc.artifactPolicy != nil {
+		arr = append(arr, PolicyOption(pc.artifactPolicy))
+	}
 	return append(arr, pc.policyOptions...)
 }
 
