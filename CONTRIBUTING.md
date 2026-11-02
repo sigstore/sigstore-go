@@ -3,6 +3,10 @@
 When contributing to a repository in the Sigstore organization, please first discuss the change you wish
 to make via an issue in the repository.
 
+## AI Policy
+
+Please read [AI policy](https://github.com/sigstore/.github/blob/main/AI_POLICY.md) before making any contributions using AI.
+
 ## Pull Request Process
 
 1. Create an issue in the repository outlining the fix or feature.
