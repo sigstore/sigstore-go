@@ -21,6 +21,7 @@ import (
 
 	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 )
@@ -127,5 +128,76 @@ func (b *BaseSignedEntity) TlogEntries() ([]*tlog.Entry, error) {
 }
 
 func (b *BaseSignedEntity) Version() (string, error) {
+	return "", errNotImplemented
+}
+
+// ===== Bundle v2 Interfaces =====
+
+// VerifiableEntity represents a v2 bundle or entity that can be verified.
+type VerifiableEntity interface {
+	SignedTimestampProvider
+	VersionProvider
+	// HasTransparencyLogProof reports whether the entity's verification material contains a transparency log proof.
+	HasTransparencyLogProof() bool
+	// HasCertificate reports whether the entity's verification material contains an X.509 certificate.
+	HasCertificate() bool
+	// HasPublicKey reports whether the entity's verification material indicates a raw public key.
+	HasPublicKey() bool
+	// HasEnvelope reports whether the entity's content is an embedded DSSE envelope.
+	HasEnvelope() bool
+	// Signature returns the raw signature bytes from the entity's verification material.
+	Signature() ([]byte, error)
+	// Envelope returns the embedded DSSE envelope content when HasEnvelope is true.
+	Envelope() (EnvelopeContent, error)
+	// TransparencyLogProof returns the transparency log proof when HasTransparencyLogProof is true.
+	TransparencyLogProof() (*bundleV2.TransparencyLogProof, error)
+	// Certificate returns the leaf X.509 certificate and optional untrusted intermediates when HasCertificate is true.
+	Certificate() (*x509.Certificate, []*x509.Certificate, error)
+}
+
+// BaseVerifiableEntity is a helper struct that implements all the interfaces
+// of VerifiableEntity. It can be embedded in a struct to implement the VerifiableEntity
+// interface.
+type BaseVerifiableEntity struct{}
+
+var _ VerifiableEntity = &BaseVerifiableEntity{}
+
+func (b *BaseVerifiableEntity) HasTransparencyLogProof() bool {
+	return false
+}
+
+func (b *BaseVerifiableEntity) HasCertificate() bool {
+	return false
+}
+
+func (b *BaseVerifiableEntity) HasPublicKey() bool {
+	return false
+}
+
+func (b *BaseVerifiableEntity) HasEnvelope() bool {
+	return false
+}
+
+func (b *BaseVerifiableEntity) Signature() ([]byte, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseVerifiableEntity) Envelope() (EnvelopeContent, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseVerifiableEntity) Certificate() (*x509.Certificate, []*x509.Certificate, error) {
+	return nil, nil, errNotImplemented
+}
+
+func (b *BaseVerifiableEntity) Timestamps() ([][]byte, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseVerifiableEntity) TransparencyLogProof() (*bundleV2.TransparencyLogProof, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseVerifiableEntity) Version() (string, error) {
 	return "", errNotImplemented
 }
