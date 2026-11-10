@@ -474,11 +474,11 @@ func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
 	}
 }
 
-func (m *mockTrustedMaterial) PublicKeyVerifier(_ string) (root.TimeConstrainedVerifier, error) {
+func (m *mockTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
 	if m.verifier != nil {
-		return m.verifier, nil
+		return []root.TimeConstrainedVerifier{m.verifier}
 	}
-	return nil, fmt.Errorf("public key not found")
+	return nil
 }
 
 type mockMLDSAVerifier struct {

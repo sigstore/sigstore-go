@@ -134,18 +134,18 @@ func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
 	}
 }
 
-func (m *mockTrustedMaterial) PublicKeyVerifier(_ string) (root.TimeConstrainedVerifier, error) {
+func (m *mockTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
 	if len(m.pubKeyBytes) == 0 {
-		return nil, fmt.Errorf("public key not found")
+		return nil
 	}
 
 	// Parse the exported ML-DSA public key
 	pubKey, err := mldsax509.ParsePKIXPublicKey(m.pubKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse ML-DSA public key: %w", err)
+		return nil
 	}
 
-	return &mldsaVerifier{pubKey: pubKey.(*mldsa.PublicKey)}, nil
+	return []root.TimeConstrainedVerifier{&mldsaVerifier{pubKey: pubKey.(*mldsa.PublicKey)}}
 }
 
 type mldsaVerifier struct {

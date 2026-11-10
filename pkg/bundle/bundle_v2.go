@@ -82,7 +82,7 @@ func (b *BundleV2) VerificationContent() (verify.VerificationContent, error) {
 		}
 		return &PublicKey{}, nil
 	case *bundleV2.VerificationMaterial_PublicKey:
-		if content.PublicKey == nil || content.PublicKey.GetPublicKey() == nil {
+		if content.PublicKey == nil {
 			return nil, ErrMissingVerificationMaterial
 		}
 		return &PublicKey{

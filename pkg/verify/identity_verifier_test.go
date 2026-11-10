@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
-	"errors"
 	"io"
 	"testing"
 	"time"
@@ -141,11 +140,11 @@ func (m *mockTCVerifier) PublicKey(_ ...signature.PublicKeyOption) (crypto.Publi
 }
 func (m *mockTCVerifier) ValidAtTime(_ time.Time) bool { return true }
 
-func (m *mockIdentityTrustedMaterial) PublicKeyVerifier(_ string) (root.TimeConstrainedVerifier, error) {
+func (m *mockIdentityTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
 	if m.rekorLog != nil {
-		return &mockTCVerifier{pk: m.rekorLog.PublicKey}, nil
+		return []root.TimeConstrainedVerifier{&mockTCVerifier{pk: m.rekorLog.PublicKey}}
 	}
-	return nil, errors.New("not found")
+	return nil
 }
 
 type mockSignedEntity struct {

@@ -198,34 +198,53 @@ func (v *IdentityVerifier) Verify(entity SignedEntity, pb PolicyBuilder) (*Ident
 		if err != nil {
 			return nil, err
 		}
-		pk := vc.PublicKey()
-		if pk != nil {
-			verifier, err := v.trustedMaterial.PublicKeyVerifier(pk.Hint())
-			if err != nil {
-				return nil, fmt.Errorf("failed to get public key verifier: %w", err)
+		if vc.PublicKey() == nil {
+			return nil, errors.New("only PublicKey is supported for now when signature is present")
+		}
+
+		// c2sp.org/identity-transparency/v1 || 0x00 || SHA256(messageDigest) [|| contextHashes]
+		prehashedData := append([]byte("c2sp.org/identity-transparency/v1\x00"), msgHash[:]...)
+		prehashedData = append(prehashedData, contextHashes...)
+
+		var verifiers []root.TimeConstrainedVerifier
+		if p, ok := v.trustedMaterial.(root.PublicKeyVerifiersProvider); ok {
+			verifiers = p.PublicKeyVerifiers()
+		}
+
+		var keyVerified bool
+		for _, verifier := range verifiers {
+			validAtAll := true
+			for _, ts := range allTimestamps {
+				if !verifier.ValidAtTime(ts) {
+					validAtAll = false
+					break
+				}
+			}
+			if !validAtAll {
+				continue
 			}
 
 			pubKey, err := verifier.PublicKey()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get public key from verifier: %w", err)
+				continue
 			}
 
 			pubKeyBytes, err := mldsax509.MarshalPKIXPublicKey(pubKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to marshal public key: %w", err)
+				continue
+			}
+
+			if err := verifier.VerifySignature(bytes.NewReader(artifactSig), bytes.NewReader(prehashedData)); err != nil {
+				continue
 			}
 
 			rot := append([]byte("ML-DSA-44"), pubKeyBytes...)
 			rootOfTrustHash = sha256.Sum256(rot)
-
-			// c2sp.org/identity-transparency/v1 || 0x00 || SHA256(messageDigest) [|| contextHashes]
-			prehashedData := append([]byte("c2sp.org/identity-transparency/v1\x00"), msgHash[:]...)
-			prehashedData = append(prehashedData, contextHashes...)
-			if err := verifier.VerifySignature(bytes.NewReader(artifactSig), bytes.NewReader(prehashedData)); err != nil {
-				return nil, fmt.Errorf("artifact signature verification failed: %w", err)
-			}
-		} else {
-			return nil, errors.New("only PublicKey is supported for now when signature is present")
+			keyVerified = true
+			break
+		}
+		if !keyVerified {
+			return nil, errors.New("artifact signature verification failed: no matching trusted public key")
 		}
 	} else {
 		// OIDC Credential
