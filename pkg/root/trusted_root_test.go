@@ -19,8 +19,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"os"
@@ -243,4 +245,76 @@ func TestValidityPeriods(t *testing.T) {
 	assert.True(t, trustedRoot.certificateAuthorities[1].(*FulcioCertificateAuthority).ValidityPeriodEnd.IsZero())
 	assert.True(t, trustedRoot.rekorLogs["c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"].ValidityPeriodEnd.IsZero())
 	assert.True(t, trustedRoot.timestampingAuthorities[0].(*SigstoreTimestampingAuthority).ValidityPeriodEnd.IsZero())
+}
+
+func TestPublicKeyVerifiers(t *testing.T) {
+	base := &BaseTrustedMaterial{}
+	assert.Nil(t, base.PublicKeyVerifiers())
+
+	key1, _, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+	edVerifier1, err := signature.LoadED25519Verifier(key1)
+	assert.NoError(t, err)
+	v1 := NewExpiringKey(edVerifier1, time.Time{}, time.Time{})
+
+	key2, _, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+	edVerifier2, err := signature.LoadED25519Verifier(key2)
+	assert.NoError(t, err)
+	v2 := NewExpiringKey(edVerifier2, time.Time{}, time.Time{})
+
+	// Test NewTrustedPublicKeyVerifiers (hint-less)
+	tmHintless := NewTrustedPublicKeyVerifiers(v1)
+	assert.Equal(t, []TimeConstrainedVerifier{v1}, tmHintless.PublicKeyVerifiers())
+	_, err = tmHintless.PublicKeyVerifier("any-hint")
+	assert.Error(t, err)
+
+	// Test NewTrustedPublicKeyMaterial with hint-ignoring callback (fallback in PublicKeyVerifiers)
+	tmCallback := NewTrustedPublicKeyMaterial(func(_ string) (TimeConstrainedVerifier, error) {
+		return v1, nil
+	})
+	assert.Equal(t, []TimeConstrainedVerifier{v1}, tmCallback.PublicKeyVerifiers())
+
+	// Test NewTrustedPublicKeyMaterialFromMapping (both hint and hint-less)
+	tmMapping := NewTrustedPublicKeyMaterialFromMapping(map[string]*ExpiringKey{
+		"b": v2,
+		"a": v1,
+	})
+	assert.ElementsMatch(t, []TimeConstrainedVerifier{v1, v2}, tmMapping.PublicKeyVerifiers())
+	gotV1, err := tmMapping.PublicKeyVerifier("a")
+	assert.NoError(t, err)
+	assert.Equal(t, v1, gotV1)
+	_, err = tmMapping.PublicKeyVerifier("missing")
+	assert.Error(t, err)
+
+	// Test TrustedMaterialCollection aggregation
+	coll := TrustedMaterialCollection{base, tmHintless, tmMapping}
+	assert.ElementsMatch(t, []TimeConstrainedVerifier{v1, v1, v2}, coll.PublicKeyVerifiers())
+}
+
+func TestTrustedRootMLDSA(t *testing.T) {
+	trustedrootJSON, err := os.ReadFile("../../examples/trusted-root-public-good.json")
+	assert.NoError(t, err)
+
+	trustedRootProto, err := NewTrustedRootProtobuf(trustedrootJSON)
+	assert.NoError(t, err)
+
+	privKey, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	assert.NoError(t, err)
+	rawBytes, err := x509.MarshalPKIXPublicKey(privKey.Public())
+	assert.NoError(t, err)
+
+	for _, tlog := range trustedRootProto.Tlogs {
+		tlog.PublicKey.KeyDetails = protocommon.PublicKeyDetails_ML_DSA_44
+		tlog.PublicKey.RawBytes = rawBytes
+	}
+
+	trustedRoot, err := NewTrustedRootFromProtobuf(trustedRootProto)
+	assert.NoError(t, err)
+
+	jsonBytes, err := json.Marshal(trustedRoot)
+	assert.NoError(t, err)
+
+	_, err = NewTrustedRootFromJSON(jsonBytes)
+	assert.NoError(t, err)
 }
