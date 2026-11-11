@@ -62,6 +62,12 @@ func Bundle(content Content, keypair Keypair, opts BundleOptions) (*protobundle.
 	if keypair == nil {
 		return nil, errors.New("must provide a keypair for signing, like EphemeralKeypair")
 	}
+	switch keypair.GetSigningAlgorithm() {
+	case protocommon.PublicKeyDetails_ML_DSA_44,
+		protocommon.PublicKeyDetails_ML_DSA_65,
+		protocommon.PublicKeyDetails_ML_DSA_87:
+		return nil, errors.New("ML-DSA keys are not supported for v0.3 bundles")
+	}
 
 	if opts.Context == nil {
 		opts.Context = context.Background()
