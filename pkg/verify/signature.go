@@ -254,6 +254,13 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 	if err := verifyEnvelope(verifier, envelope); err != nil {
 		return err
 	}
+	return verifyStatementWithArtifacts(envelope, artifacts)
+}
+
+func verifyStatementWithArtifacts(envelope EnvelopeContent, artifacts []io.Reader) error {
+	if len(artifacts) == 0 {
+		return fmt.Errorf("no artifacts provided for verification")
+	}
 	// Verification only consumes the statement's subjects; summarizing
 	// avoids materializing the (potentially very large) predicate.
 	statement, err := summarizeStatement(envelope)
@@ -276,6 +283,9 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 
 	hashedArtifacts := make([]map[crypto.Hash][]byte, len(artifacts))
 	for i, artifact := range artifacts {
+		if artifact == nil {
+			return errors.New("could not verify artifact: artifact is nil")
+		}
 		// Compute digest of the artifact.
 		hasher, err := newMultihasher(hashFuncs)
 		if err != nil {
@@ -337,6 +347,13 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 	}
 	if err := verifyEnvelope(verifier, envelope); err != nil {
 		return err
+	}
+	return verifyStatementWithArtifactDigests(envelope, digests)
+}
+
+func verifyStatementWithArtifactDigests(envelope EnvelopeContent, digests []ArtifactDigest) error {
+	if len(digests) == 0 {
+		return fmt.Errorf("no artifact digests provided for verification")
 	}
 	// Verification only consumes the statement's subjects; summarizing
 	// avoids materializing the (potentially very large) predicate.
