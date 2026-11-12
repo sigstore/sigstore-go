@@ -7,8 +7,8 @@ replace github.com/sigstore/sigstore-go => ../../
 require (
 	github.com/google/go-containerregistry v0.22.1
 	github.com/sigstore/protobuf-specs v0.5.2
-	github.com/sigstore/sigstore v1.11.1
-	github.com/sigstore/sigstore-go v1.3.0
+	github.com/sigstore/sigstore v1.11.2
+	github.com/sigstore/sigstore-go v1.4.0
 )
 
 require (
@@ -55,7 +55,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sigstore/rekor v1.5.5 // indirect
-	github.com/sigstore/rekor-tiles/v2 v2.4.0 // indirect
+	github.com/sigstore/rekor-tiles/v2 v2.4.1 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
@@ -76,7 +76,7 @@ require (
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20261012220534-4341edf3f941 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261005182115-fad411399dd8 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/grpc v1.84.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
