@@ -20,6 +20,8 @@ build-examples:
 	go build -C ./examples/oci-image-verification -o oci-image-verification .
 	go build -C ./examples/sigstore-go-signing -o sigstore-go-signing .
 	go build -C ./examples/sigstore-go-verification -o sigstore-go-verification .
+	go build -C ./examples/sigstore-go-transparent-signing -o sigstore-go-transparent-signing .
+	go build -C ./examples/sigstore-go-transparent-verification -o sigstore-go-transparent-verification .
 
 .PHONY: test
 test:
