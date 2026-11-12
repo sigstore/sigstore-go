@@ -17,14 +17,20 @@
 package e2e
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -327,4 +333,152 @@ func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstra
 
 func (v *verifyTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
 	return v.keyTrustedMaterial.PublicKeyVerifiers()
+}
+
+func TestIdentitySignVerify(t *testing.T) {
+	identityRekorURL := os.Getenv("IDENTITY_REKOR_URL")
+	if identityRekorURL == "" {
+		t.Skip("must set IDENTITY_REKOR_URL")
+	}
+
+	identityOIDCURL := os.Getenv("IDENTITY_OIDC_URL")
+	if identityOIDCURL == "" {
+		t.Skip("must set IDENTITY_OIDC_URL")
+	}
+
+	pubKeyPath := os.Getenv("PQC_REKOR_PUB_KEY_PATH")
+	if pubKeyPath == "" {
+		t.Skip("must set PQC_REKOR_PUB_KEY_PATH")
+	}
+
+	pubKeyBytes, err := os.ReadFile(filepath.Clean(pubKeyPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block, _ := pem.Decode(pubKeyBytes)
+	if block == nil {
+		t.Fatal("failed to decode pem")
+	}
+
+	rekorPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pqcRekorLog := &root.TransparencyLog{
+		BaseURL:   "http://rekor-local",
+		PublicKey: rekorPubKey,
+	}
+
+	mockRoot := &mockTrustedMaterial{
+		rekorLog: pqcRekorLog,
+	}
+
+	token, err := getOIDCToken(identityOIDCURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	randomData := make([]byte, 32)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Fatal(err)
+	}
+
+	content := &sign.PlainData{
+		Data: randomData,
+	}
+
+	t.Run("identity_based_transparent_signing", func(t *testing.T) {
+		cred := &sign.OIDCCredential{Token: token}
+
+		opts := sign.IdentityBundleOptions{
+			TransparencyLog: sign.NewIdentityRekorClient(identityRekorURL),
+			TrustedRoot:     mockRoot,
+		}
+
+		b, err := sign.IdentityBundle(content, cred, opts)
+		require.NoError(t, err)
+		require.NotNil(t, b)
+
+		result, err := verifyIdentityBundle(b, "http://fakeoidc:8080", defaultCertID, randomData, false, mockRoot)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.True(t, result.Verified)
+		require.NotNil(t, result.VerifiedIdentity)
+		assert.Equal(t, defaultCertID, result.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName)
+	})
+
+	t.Run("key_based_transparent_signing", func(t *testing.T) {
+		keypair, err := sign.NewMLDSAKeypair()
+		require.NoError(t, err)
+
+		cred := &sign.PublicKeyCredential{
+			Keypair: keypair,
+		}
+
+		verifier, err := signature.LoadVerifier(keypair.GetPublicKey(), crypto.Hash(0))
+		require.NoError(t, err)
+		mockRoot.verifier = root.NewExpiringKey(verifier, time.Time{}, time.Time{})
+
+		opts := sign.IdentityBundleOptions{
+			TransparencyLog: sign.NewIdentityRekorClient(identityRekorURL),
+			TrustedRoot:     mockRoot,
+		}
+
+		b, err := sign.IdentityBundle(content, cred, opts)
+		require.NoError(t, err)
+		require.NotNil(t, b)
+
+		result, err := verifyIdentityBundle(b, "", "", randomData, true, mockRoot)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.Verified)
+	})
+}
+
+func verifyIdentityBundle(b *bundleV2.Bundle, issuer, san string, artifact []byte, useKey bool, trustedRoot root.TrustedMaterial) (*verify.IdentityVerificationResult, error) {
+	bundleObj, err := bundle.NewBundleV2(b)
+	if err != nil {
+		return nil, err
+	}
+
+	verifier, err := verify.NewIdentityVerifier(trustedRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	var identityPolicies []verify.PolicyOption
+	if !useKey {
+		certID, err := verify.NewShortCertificateIdentity(issuer, "", san, "")
+		if err != nil {
+			return nil, err
+		}
+		identityPolicies = append(identityPolicies, verify.WithCertificateIdentity(certID))
+	} else {
+		identityPolicies = append(identityPolicies, verify.WithKey())
+	}
+
+	artifactPolicy := verify.WithArtifact(bytes.NewReader(artifact))
+
+	return verifier.Verify(bundleObj, verify.NewPolicy(artifactPolicy, identityPolicies...))
+}
+
+type mockTrustedMaterial struct {
+	root.BaseTrustedMaterial
+	rekorLog *root.TransparencyLog
+	verifier root.TimeConstrainedVerifier
+}
+
+func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
+	return map[string]*root.TransparencyLog{
+		"mock-pqc-rekor": m.rekorLog,
+	}
+}
+
+func (m *mockTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
+	if m.verifier != nil {
+		return []root.TimeConstrainedVerifier{m.verifier}
+	}
+	return nil
 }
