@@ -15,16 +15,27 @@
 package sign
 
 import (
+	"bytes"
 	"context"
+	"crypto"
+	"crypto/mldsa"
 	"crypto/sha256"
+	"encoding/hex"
 	"testing"
+	"time"
 
 	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
 	pbrekor "github.com/sigstore/rekor-tiles/v2/pkg/generated/protobuf"
+	"github.com/sigstore/rekor-tiles/v2/pkg/note"
 	verifyBundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	formatsLog "github.com/transparency-dev/formats/log"
+	"github.com/transparency-dev/formats/proof"
+	"github.com/transparency-dev/merkle/rfc6962"
+	sumdbNote "golang.org/x/mod/sumdb/note"
 )
 
 type mockTlog struct {
@@ -199,33 +210,152 @@ func TestIdentityBundle_OIDCCredential(t *testing.T) {
 	assert.Nil(t, dsseSig)
 }
 
+type verifiableMockTlog struct {
+	logPrivKey *mldsa.PrivateKey
+	origin     string
+}
+
+func (m *verifiableMockTlog) GetIdentityTransparencyLogEntry(ctx context.Context, req *pbrekor.IdentityRequestV001) (*bundleV2.TransparencyLogProof, error) {
+	msgHash := sha256.Sum256(req.GetMessage())
+
+	var rotHash [32]byte
+	var receiptDigest [32]byte
+	var contextHashes []byte
+	var extraData []byte
+
+	if pk := req.GetPublicKey(); pk != nil {
+		rot := append([]byte("ML-DSA-44"), pk.GetPublicKey()...)
+		rotHash = sha256.Sum256(rot)
+		receiptDigest = sha256.Sum256(pk.GetSignature())
+		if len(pk.GetContext()) > 0 {
+			extraData = []byte("context:" + hex.EncodeToString(pk.GetContext()))
+			k1 := sha256.Sum256([]byte("context"))
+			k2 := sha256.Sum256(k1[:])
+			v2 := sha256.Sum256(pk.GetContext())
+			contextHashes = append(contextHashes, k2[:]...)
+			contextHashes = append(contextHashes, v2[:]...)
+		}
+	} else {
+		extraData = []byte("identity:foo@bar.com\nissuer:https://example.com")
+		rotHash = sha256.Sum256([]byte("https://example.com"))
+		ik1 := sha256.Sum256([]byte("identity"))
+		ik2 := sha256.Sum256(ik1[:])
+		iv1 := sha256.Sum256([]byte("foo@bar.com"))
+		iv2 := sha256.Sum256(iv1[:])
+		issk1 := sha256.Sum256([]byte("issuer"))
+		issk2 := sha256.Sum256(issk1[:])
+		issv1 := sha256.Sum256([]byte("https://example.com"))
+		issv2 := sha256.Sum256(issv1[:])
+		if bytes.Compare(ik2[:], issk2[:]) < 0 {
+			contextHashes = append(contextHashes, ik2[:]...)
+			contextHashes = append(contextHashes, iv2[:]...)
+			contextHashes = append(contextHashes, issk2[:]...)
+			contextHashes = append(contextHashes, issv2[:]...)
+		} else {
+			contextHashes = append(contextHashes, issk2[:]...)
+			contextHashes = append(contextHashes, issv2[:]...)
+			contextHashes = append(contextHashes, ik2[:]...)
+			contextHashes = append(contextHashes, iv2[:]...)
+		}
+	}
+
+	leaf := []byte{0x01}
+	leaf = append(leaf, rotHash[:]...)
+	leaf = append(leaf, msgHash[:]...)
+	leaf = append(leaf, contextHashes...)
+	leaf = append(leaf, receiptDigest[:]...)
+	leafHash := rfc6962.DefaultHasher.HashLeaf(leaf)
+
+	cp := formatsLog.Checkpoint{
+		Origin: m.origin,
+		Size:   1,
+		Hash:   leafHash,
+	}
+	signer, err := signature.LoadDefaultSigner(m.logPrivKey)
+	if err != nil {
+		return nil, err
+	}
+	noteSigner, err := note.NewNoteSigner(ctx, m.origin, signer)
+	if err != nil {
+		return nil, err
+	}
+	signedNote, err := sumdbNote.Sign(&sumdbNote.Note{Text: string(cp.Marshal())}, noteSigner)
+	if err != nil {
+		return nil, err
+	}
+
+	tlogProof := proof.TLogProof{
+		Index:      0,
+		Checkpoint: signedNote,
+		ExtraData:  extraData,
+	}
+	return &bundleV2.TransparencyLogProof{
+		Proof: tlogProof.Marshal(),
+	}, nil
+}
+
+type mockSignTrustedMaterial struct {
+	root.BaseTrustedMaterial
+	rekorLog  *root.TransparencyLog
+	verifiers []root.TimeConstrainedVerifier
+}
+
+func (m *mockSignTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
+	return map[string]*root.TransparencyLog{"log": m.rekorLog}
+}
+
+func (m *mockSignTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
+	return m.verifiers
+}
+
 func TestIdentityBundle_TrustedRoot(t *testing.T) {
+	logPrivKey, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	require.NoError(t, err)
+
 	keypair, err := NewMLDSAKeypair()
 	require.NoError(t, err)
 
-	tm := &root.BaseTrustedMaterial{}
-	tlog := &mockTlog{}
+	verifier, err := signature.LoadVerifier(keypair.GetPublicKey(), crypto.Hash(0))
+	require.NoError(t, err)
+
+	tm := &mockSignTrustedMaterial{
+		rekorLog: &root.TransparencyLog{
+			BaseURL:   "https://rekor-local",
+			PublicKey: logPrivKey.Public(),
+		},
+		verifiers: []root.TimeConstrainedVerifier{
+			root.NewExpiringKey(verifier, time.Time{}, time.Time{}),
+		},
+	}
+
+	tlog := &verifiableMockTlog{
+		logPrivKey: logPrivKey,
+		origin:     "rekor-local",
+	}
 	content := &PlainData{Data: []byte("hello world")}
 
 	// 1. PublicKeyCredential without Context
-	_, err = IdentityBundle(content, &PublicKeyCredential{Keypair: keypair}, IdentityBundleOptions{
+	b, err := IdentityBundle(content, &PublicKeyCredential{Keypair: keypair}, IdentityBundleOptions{
 		TransparencyLog: tlog,
 		TrustedRoot:     tm,
 	})
-	assert.ErrorContains(t, err, "not implemented")
+	require.NoError(t, err)
+	require.NotNil(t, b)
 
 	// 2. PublicKeyCredential with 32-byte Context
 	ctxDigest := sha256.Sum256([]byte("test-context"))
-	_, err = IdentityBundle(content, &PublicKeyCredential{Keypair: keypair, Context: ctxDigest[:]}, IdentityBundleOptions{
+	b, err = IdentityBundle(content, &PublicKeyCredential{Keypair: keypair, Context: ctxDigest[:]}, IdentityBundleOptions{
 		TransparencyLog: tlog,
 		TrustedRoot:     tm,
 	})
-	assert.ErrorContains(t, err, "not implemented")
+	require.NoError(t, err)
+	require.NotNil(t, b)
 
 	// 3. OIDCCredential
-	_, err = IdentityBundle(content, &OIDCCredential{Token: "fake-token"}, IdentityBundleOptions{
+	b, err = IdentityBundle(content, &OIDCCredential{Token: "fake-token"}, IdentityBundleOptions{
 		TransparencyLog: tlog,
 		TrustedRoot:     tm,
 	})
-	assert.ErrorContains(t, err, "not implemented")
+	require.NoError(t, err)
+	require.NotNil(t, b)
 }
