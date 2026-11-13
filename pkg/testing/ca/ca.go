@@ -31,8 +31,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math/big"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -600,6 +602,14 @@ func (ca *VirtualSigstore) PublicKeyVerifier(keyID string) (root.TimeConstrained
 		return nil, fmt.Errorf("public key not found for keyID: %s", keyID)
 	}
 	return v, nil
+}
+
+func (ca *VirtualSigstore) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
+	verifiers := make([]root.TimeConstrainedVerifier, 0, len(ca.publicKeyVerifier))
+	for _, k := range slices.Sorted(maps.Keys(ca.publicKeyVerifier)) {
+		verifiers = append(verifiers, ca.publicKeyVerifier[k])
+	}
+	return verifiers
 }
 
 func generateRekorEntry(kind, version string, artifact []byte, cert []byte, sig []byte, algorithmDetails signature.AlgorithmDetails) (string, error) {
