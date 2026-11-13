@@ -27,7 +27,10 @@ type TrustedMaterial interface {
 	FulcioCertificateAuthorities() []CertificateAuthority
 	RekorLogs() map[string]*TransparencyLog
 	CTLogs() map[string]*TransparencyLog
+	// PublicKeyVerifier returns a trusted public key verifier matching the given key hint.
 	PublicKeyVerifier(string) (TimeConstrainedVerifier, error)
+	// PublicKeyVerifiers returns all trusted public key verifiers without requiring a key hint.
+	PublicKeyVerifiers() []TimeConstrainedVerifier
 }
 
 type BaseTrustedMaterial struct{}
@@ -52,11 +55,16 @@ func (b *BaseTrustedMaterial) PublicKeyVerifier(_ string) (TimeConstrainedVerifi
 	return nil, fmt.Errorf("public key verifier not found")
 }
 
+func (b *BaseTrustedMaterial) PublicKeyVerifiers() []TimeConstrainedVerifier {
+	return nil
+}
+
 type TrustedMaterialCollection []TrustedMaterial
 
 // Ensure types implement interfaces
 var _ TrustedMaterial = &BaseTrustedMaterial{}
 var _ TrustedMaterial = TrustedMaterialCollection{}
+var _ TrustedMaterial = &TrustedPublicKeyMaterial{}
 
 func (tmc TrustedMaterialCollection) PublicKeyVerifier(keyID string) (TimeConstrainedVerifier, error) {
 	for _, tm := range tmc {
@@ -66,6 +74,14 @@ func (tmc TrustedMaterialCollection) PublicKeyVerifier(keyID string) (TimeConstr
 		}
 	}
 	return nil, fmt.Errorf("public key verifier not found for keyID: %s", keyID)
+}
+
+func (tmc TrustedMaterialCollection) PublicKeyVerifiers() []TimeConstrainedVerifier {
+	var verifiers []TimeConstrainedVerifier
+	for _, tm := range tmc {
+		verifiers = append(verifiers, tm.PublicKeyVerifiers()...)
+	}
+	return verifiers
 }
 
 func (tmc TrustedMaterialCollection) TimestampingAuthorities() []TimestampingAuthority {
@@ -111,16 +127,38 @@ type TimeConstrainedVerifier interface {
 
 type TrustedPublicKeyMaterial struct {
 	BaseTrustedMaterial
-	publicKeyVerifier func(string) (TimeConstrainedVerifier, error)
+	publicKeyVerifier  func(string) (TimeConstrainedVerifier, error)
+	publicKeyVerifiers []TimeConstrainedVerifier
 }
 
 func (tr *TrustedPublicKeyMaterial) PublicKeyVerifier(keyID string) (TimeConstrainedVerifier, error) {
-	return tr.publicKeyVerifier(keyID)
+	if tr.publicKeyVerifier != nil {
+		return tr.publicKeyVerifier(keyID)
+	}
+	return nil, fmt.Errorf("public key verifier not found for keyID: %s", keyID)
+}
+
+func (tr *TrustedPublicKeyMaterial) PublicKeyVerifiers() []TimeConstrainedVerifier {
+	if len(tr.publicKeyVerifiers) > 0 {
+		return tr.publicKeyVerifiers
+	}
+	if tr.publicKeyVerifier != nil {
+		if v, err := tr.publicKeyVerifier(""); err == nil && v != nil {
+			return []TimeConstrainedVerifier{v}
+		}
+	}
+	return nil
 }
 
 func NewTrustedPublicKeyMaterial(publicKeyVerifier func(string) (TimeConstrainedVerifier, error)) *TrustedPublicKeyMaterial {
 	return &TrustedPublicKeyMaterial{
 		publicKeyVerifier: publicKeyVerifier,
+	}
+}
+
+func NewTrustedPublicKeyVerifiers(verifiers ...TimeConstrainedVerifier) *TrustedPublicKeyMaterial {
+	return &TrustedPublicKeyMaterial{
+		publicKeyVerifiers: verifiers,
 	}
 }
 
@@ -159,11 +197,18 @@ func NewExpiringKey(verifier signature.Verifier, validityPeriodStart, validityPe
 // NewTrustedPublicKeyMaterialFromMapping returns a TrustedPublicKeyMaterial from a map of key IDs to
 // ExpiringKeys.
 func NewTrustedPublicKeyMaterialFromMapping(trustedPublicKeys map[string]*ExpiringKey) *TrustedPublicKeyMaterial {
-	return NewTrustedPublicKeyMaterial(func(keyID string) (TimeConstrainedVerifier, error) {
-		expiringKey, ok := trustedPublicKeys[keyID]
-		if !ok {
-			return nil, fmt.Errorf("public key not found for keyID: %s", keyID)
-		}
-		return expiringKey, nil
-	})
+	verifiers := make([]TimeConstrainedVerifier, 0, len(trustedPublicKeys))
+	for _, k := range trustedPublicKeys {
+		verifiers = append(verifiers, k)
+	}
+	return &TrustedPublicKeyMaterial{
+		publicKeyVerifier: func(keyID string) (TimeConstrainedVerifier, error) {
+			expiringKey, ok := trustedPublicKeys[keyID]
+			if !ok {
+				return nil, fmt.Errorf("public key not found for keyID: %s", keyID)
+			}
+			return expiringKey, nil
+		},
+		publicKeyVerifiers: verifiers,
+	}
 }
