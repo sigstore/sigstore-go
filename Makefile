@@ -32,3 +32,8 @@ tidy:
 .PHONY: lint
 lint:
 	golangci-lint run
+
+.PHONY: update-embedded-root
+update-embedded-root:
+	go run ./hack/update-tuf-root
+
