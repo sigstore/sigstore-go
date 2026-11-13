@@ -324,3 +324,7 @@ type verifyTrustedMaterial struct {
 func (v *verifyTrustedMaterial) PublicKeyVerifier(hint string) (root.TimeConstrainedVerifier, error) {
 	return v.keyTrustedMaterial.PublicKeyVerifier(hint)
 }
+
+func (v *verifyTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
+	return v.keyTrustedMaterial.PublicKeyVerifiers()
+}

@@ -15,6 +15,7 @@
 package verify
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/json"
@@ -319,7 +320,10 @@ type PolicyBuilder struct {
 }
 
 func (pc PolicyBuilder) options() []PolicyOption {
-	arr := []PolicyOption{PolicyOption(pc.artifactPolicy)}
+	var arr []PolicyOption
+	if pc.artifactPolicy != nil {
+		arr = append(arr, PolicyOption(pc.artifactPolicy))
+	}
 	return append(arr, pc.policyOptions...)
 }
 
@@ -350,6 +354,7 @@ type PolicyConfig struct {
 	ignoreArtifact        bool
 	ignoreIdentities      bool
 	requireSigningKey     bool
+	context               []byte
 	certificateIdentities CertificateIdentities
 	verifyArtifacts       bool
 	artifacts             []io.Reader
@@ -368,6 +373,9 @@ func (p *PolicyConfig) withVerifyAlreadyConfigured() error {
 func (p *PolicyConfig) validate() error {
 	if p.RequireIdentities() && len(p.certificateIdentities) == 0 {
 		return errors.New("can't verify identities without providing at least one identity")
+	}
+	if len(p.context) > 0 && !p.requireSigningKey {
+		return errors.New("WithContext must be used with WithKey")
 	}
 
 	return nil
@@ -459,6 +467,9 @@ func WithCertificateIdentity(identity CertificateIdentity) PolicyOption {
 		if p.requireSigningKey {
 			return errors.New("can't use WithCertificateIdentity while using WithKey")
 		}
+		if len(p.context) > 0 {
+			return errors.New("can't use WithCertificateIdentity while using WithContext")
+		}
 
 		p.certificateIdentities = append(p.certificateIdentities, identity)
 		return nil
@@ -475,6 +486,22 @@ func WithKey() PolicyOption {
 
 		p.requireSigningKey = true
 		p.ignoreIdentities = true
+		return nil
+	}
+}
+
+// WithContext allows the caller of Verify to require that a public-key-signed
+// entity was logged with the given 32-byte SHA-256 context digest.
+func WithContext(context []byte) PolicyOption {
+	return func(p *PolicyConfig) error {
+		if len(context) != sha256.Size {
+			return fmt.Errorf("context must be a %d-byte SHA-256 digest, got %d bytes", sha256.Size, len(context))
+		}
+		if len(p.certificateIdentities) > 0 {
+			return errors.New("can't use WithContext while using WithCertificateIdentity")
+		}
+
+		p.context = context
 		return nil
 	}
 }
@@ -623,6 +650,9 @@ func (v *Verifier) Verify(entity SignedEntity, pb PolicyBuilder) (*VerificationR
 	policy, err := pb.BuildConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build policy: %w", err)
+	}
+	if len(policy.context) > 0 {
+		return nil, errors.New("WithContext is only supported by IdentityVerifier")
 	}
 
 	// Let's go by the spec: https://docs.google.com/document/d/1kbhK2qyPPk8SLavHzYSDM8-Ueul9_oxIMVFuWMWKz0E/edit#heading=h.g11ovq2s1jxh
