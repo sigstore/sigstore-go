@@ -27,7 +27,7 @@ test:
 
 .PHONY: tidy
 tidy:
-	go mod tidy
+	find . -name "go.mod" -execdir go mod tidy \;
 
 .PHONY: lint
 lint:
