@@ -58,7 +58,7 @@ require (
 	github.com/sigstore/rekor-tiles/v2 v2.4.1 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.2.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
-	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
+	github.com/theupdateframework/go-tuf/v2 v2.4.3-0.20261112120819-b5b48bc8591b // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
