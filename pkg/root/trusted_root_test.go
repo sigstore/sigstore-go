@@ -19,8 +19,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"os"
@@ -243,4 +245,31 @@ func TestValidityPeriods(t *testing.T) {
 	assert.True(t, trustedRoot.certificateAuthorities[1].(*FulcioCertificateAuthority).ValidityPeriodEnd.IsZero())
 	assert.True(t, trustedRoot.rekorLogs["c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"].ValidityPeriodEnd.IsZero())
 	assert.True(t, trustedRoot.timestampingAuthorities[0].(*SigstoreTimestampingAuthority).ValidityPeriodEnd.IsZero())
+}
+
+func TestTrustedRootMLDSA(t *testing.T) {
+	trustedrootJSON, err := os.ReadFile("../../examples/trusted-root-public-good.json")
+	assert.NoError(t, err)
+
+	trustedRootProto, err := NewTrustedRootProtobuf(trustedrootJSON)
+	assert.NoError(t, err)
+
+	privKey, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	assert.NoError(t, err)
+	rawBytes, err := x509.MarshalPKIXPublicKey(privKey.Public())
+	assert.NoError(t, err)
+
+	for _, tlog := range trustedRootProto.Tlogs {
+		tlog.PublicKey.KeyDetails = protocommon.PublicKeyDetails_ML_DSA_44
+		tlog.PublicKey.RawBytes = rawBytes
+	}
+
+	trustedRoot, err := NewTrustedRootFromProtobuf(trustedRootProto)
+	assert.NoError(t, err)
+
+	jsonBytes, err := json.Marshal(trustedRoot)
+	assert.NoError(t, err)
+
+	_, err = NewTrustedRootFromJSON(jsonBytes)
+	assert.NoError(t, err)
 }

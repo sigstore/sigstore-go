@@ -17,7 +17,7 @@ require (
 	github.com/sigstore/sigstore v1.11.2
 	github.com/sigstore/timestamp-authority/v2 v2.2.0
 	github.com/stretchr/testify v1.12.1
-	github.com/theupdateframework/go-tuf/v2 v2.4.2
+	github.com/theupdateframework/go-tuf/v2 v2.4.3-0.20261112120819-b5b48bc8591b
 	github.com/transparency-dev/formats v0.1.1
 	github.com/transparency-dev/merkle v0.0.2
 	golang.org/x/crypto v0.58.0

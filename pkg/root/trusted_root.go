@@ -19,6 +19,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
@@ -199,6 +200,20 @@ func ParseTransparencyLogs(tlogs []*prototrustroot.TransparencyLogInstance) (tra
 				return nil, fmt.Errorf("tlog public key is not RSA: %s", tlog.GetPublicKey().GetKeyDetails())
 			}
 			tlogEntry.PublicKey = edKey
+		case protocommon.PublicKeyDetails_ML_DSA_44:
+			key, err := x509.ParsePKIXPublicKey(tlog.GetPublicKey().GetRawBytes())
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse public key for tlog: %s %w",
+					tlog.GetBaseUrl(),
+					err,
+				)
+			}
+			var mldsaKey *mldsa.PublicKey
+			var ok bool
+			if mldsaKey, ok = key.(*mldsa.PublicKey); !ok || mldsaKey.Parameters() != mldsa.MLDSA44() {
+				return nil, fmt.Errorf("tlog public key is not ML-DSA-44: %s", tlog.GetPublicKey().GetKeyDetails())
+			}
+			tlogEntry.PublicKey = mldsaKey
 		// This key format is deprecated, but currently in use for Sigstore staging instance
 		case protocommon.PublicKeyDetails_PKCS1_RSA_PKCS1V5: //nolint:staticcheck
 			key, err := x509.ParsePKCS1PublicKey(tlog.GetPublicKey().GetRawBytes())
@@ -449,6 +464,8 @@ func getSignatureHashAlgo(pubKey crypto.PublicKey) crypto.Hash {
 		}
 	case ed25519.PublicKey:
 		h = crypto.SHA512
+	case *mldsa.PublicKey:
+		h = crypto.Hash(0)
 	default:
 		h = crypto.SHA256
 	}
