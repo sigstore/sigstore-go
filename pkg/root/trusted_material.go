@@ -17,6 +17,7 @@ package root
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -27,7 +28,10 @@ type TrustedMaterial interface {
 	FulcioCertificateAuthorities() []CertificateAuthority
 	RekorLogs() map[string]*TransparencyLog
 	CTLogs() map[string]*TransparencyLog
+	// PublicKeyVerifier returns a trusted public key verifier matching the given key hint.
 	PublicKeyVerifier(string) (TimeConstrainedVerifier, error)
+	// PublicKeyVerifiers returns all trusted public key verifiers without requiring a key hint.
+	PublicKeyVerifiers() []TimeConstrainedVerifier
 }
 
 type BaseTrustedMaterial struct{}
@@ -52,11 +56,16 @@ func (b *BaseTrustedMaterial) PublicKeyVerifier(_ string) (TimeConstrainedVerifi
 	return nil, fmt.Errorf("public key verifier not found")
 }
 
+func (b *BaseTrustedMaterial) PublicKeyVerifiers() []TimeConstrainedVerifier {
+	return nil
+}
+
 type TrustedMaterialCollection []TrustedMaterial
 
 // Ensure types implement interfaces
 var _ TrustedMaterial = &BaseTrustedMaterial{}
 var _ TrustedMaterial = TrustedMaterialCollection{}
+var _ TrustedMaterial = &TrustedPublicKeyMaterial{}
 
 func (tmc TrustedMaterialCollection) PublicKeyVerifier(keyID string) (TimeConstrainedVerifier, error) {
 	for _, tm := range tmc {
@@ -66,6 +75,14 @@ func (tmc TrustedMaterialCollection) PublicKeyVerifier(keyID string) (TimeConstr
 		}
 	}
 	return nil, fmt.Errorf("public key verifier not found for keyID: %s", keyID)
+}
+
+func (tmc TrustedMaterialCollection) PublicKeyVerifiers() []TimeConstrainedVerifier {
+	var verifiers []TimeConstrainedVerifier
+	for _, tm := range tmc {
+		verifiers = append(verifiers, tm.PublicKeyVerifiers()...)
+	}
+	return verifiers
 }
 
 func (tmc TrustedMaterialCollection) TimestampingAuthorities() []TimestampingAuthority {
@@ -109,18 +126,43 @@ type TimeConstrainedVerifier interface {
 	signature.Verifier
 }
 
+// TrustedPublicKeyMaterial holds trusted public key verifiers configured either for
+// key-ID lookup (via NewTrustedPublicKeyMaterial or NewTrustedPublicKeyMaterialFromMapping)
+// or for hint-less enumeration (via NewTrustedPublicKeyVerifiers). The two modes are
+// mutually exclusive.
 type TrustedPublicKeyMaterial struct {
 	BaseTrustedMaterial
-	publicKeyVerifier func(string) (TimeConstrainedVerifier, error)
+	publicKeyVerifier  func(string) (TimeConstrainedVerifier, error)
+	publicKeyVerifiers []TimeConstrainedVerifier
 }
 
 func (tr *TrustedPublicKeyMaterial) PublicKeyVerifier(keyID string) (TimeConstrainedVerifier, error) {
-	return tr.publicKeyVerifier(keyID)
+	if tr.publicKeyVerifier != nil && len(tr.publicKeyVerifiers) == 0 {
+		return tr.publicKeyVerifier(keyID)
+	}
+	return nil, fmt.Errorf("public key verifier not found for keyID: %s", keyID)
 }
 
+func (tr *TrustedPublicKeyMaterial) PublicKeyVerifiers() []TimeConstrainedVerifier {
+	if tr.publicKeyVerifier != nil {
+		return nil
+	}
+	return slices.Clone(tr.publicKeyVerifiers)
+}
+
+// NewTrustedPublicKeyMaterial returns a TrustedPublicKeyMaterial that resolves keys by key ID
+// via publicKeyVerifier. PublicKeyVerifiers returns nil on the returned instance.
 func NewTrustedPublicKeyMaterial(publicKeyVerifier func(string) (TimeConstrainedVerifier, error)) *TrustedPublicKeyMaterial {
 	return &TrustedPublicKeyMaterial{
 		publicKeyVerifier: publicKeyVerifier,
+	}
+}
+
+// NewTrustedPublicKeyVerifiers returns a TrustedPublicKeyMaterial containing a static set of
+// hint-less public key verifiers. PublicKeyVerifier returns an error on the returned instance.
+func NewTrustedPublicKeyVerifiers(verifiers ...TimeConstrainedVerifier) *TrustedPublicKeyMaterial {
+	return &TrustedPublicKeyMaterial{
+		publicKeyVerifiers: slices.Clone(verifiers),
 	}
 }
 

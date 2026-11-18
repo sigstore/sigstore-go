@@ -19,6 +19,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
@@ -258,6 +259,11 @@ func publicKeyToProtobufPublicKey(publicKey crypto.PublicKey, start time.Time, e
 		}
 	case ed25519.PublicKey:
 		pkd.KeyDetails = protocommon.PublicKeyDetails_PKIX_ED25519
+	case *mldsa.PublicKey:
+		if p.Parameters() != mldsa.MLDSA44() {
+			return nil, fmt.Errorf("unsupported parameters for ML-DSA key: %v", p.Parameters())
+		}
+		pkd.KeyDetails = protocommon.PublicKeyDetails_ML_DSA_44
 	default:
 		return nil, fmt.Errorf("unknown public key type: %T", p)
 	}
