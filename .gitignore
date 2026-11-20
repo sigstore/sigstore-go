@@ -8,4 +8,6 @@
 /examples/oci-image-verification/oci-image-verification
 /examples/sigstore-go-signing/sigstore-go-signing
 /examples/sigstore-go-verification/sigstore-go-verification
+/examples/sigstore-go-transparent-signing/sigstore-go-transparent-signing
+/examples/sigstore-go-transparent-verification/sigstore-go-transparent-verification
 /.vscode
