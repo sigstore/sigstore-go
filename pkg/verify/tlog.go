@@ -17,6 +17,7 @@ package verify
 import (
 	"bytes"
 	"crypto"
+	"crypto/mldsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -297,6 +298,9 @@ func reconstructV2EntryHash(sigContent SignatureContent, verificationContent Ver
 }
 
 func getVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (*signature.Verifier, error) {
+	if _, ok := publicKey.(*mldsa.PublicKey); ok {
+		return nil, errors.New("ML-DSA transparency log keys are not supported for v1 bundles")
+	}
 	verifier, err := signature.LoadVerifier(publicKey, hashFunc)
 	if err != nil {
 		return nil, err
