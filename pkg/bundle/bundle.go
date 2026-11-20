@@ -276,18 +276,9 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 		}
 		var intermediates []*x509.Certificate
 		if b.allowCertificateChain {
-			for _, cert := range certs[1:] {
-				intermediate, err := x509.ParseCertificate(cert.RawBytes)
-				if err != nil {
-					return nil, ErrValidationError(err)
-				}
-				if certificate.IsSelfSigned(intermediate) {
-					return nil, ErrValidationError(errors.New("self-signed certificate found in certificate chain"))
-				}
-				if !intermediate.IsCA {
-					return nil, ErrValidationError(errors.New("non-CA certificate found in certificate chain"))
-				}
-				intermediates = append(intermediates, intermediate)
+			intermediates, err = parseIntermediateCertificates(certs[1:])
+			if err != nil {
+				return nil, err
 			}
 		}
 		cert := &Certificate{
@@ -447,4 +438,25 @@ func parseEnvelope(input *protodsse.Envelope) (*Envelope, error) {
 		output.Signatures[i].Sig = base64.StdEncoding.EncodeToString(sig.GetSig())
 	}
 	return &Envelope{Envelope: output}, nil
+}
+
+func parseIntermediateCertificates(rawCerts []*protocommon.X509Certificate) ([]*x509.Certificate, error) {
+	var intermediates []*x509.Certificate
+	for _, cert := range rawCerts {
+		if cert == nil || cert.RawBytes == nil {
+			return nil, ErrMissingVerificationMaterial
+		}
+		intermediate, err := x509.ParseCertificate(cert.RawBytes)
+		if err != nil {
+			return nil, ErrValidationError(err)
+		}
+		if certificate.IsSelfSigned(intermediate) {
+			return nil, ErrValidationError(errors.New("self-signed certificate found in certificate chain"))
+		}
+		if !intermediate.IsCA {
+			return nil, ErrValidationError(errors.New("non-CA certificate found in certificate chain"))
+		}
+		intermediates = append(intermediates, intermediate)
+	}
+	return intermediates, nil
 }
