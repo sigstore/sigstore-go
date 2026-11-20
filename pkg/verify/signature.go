@@ -20,6 +20,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
@@ -208,14 +209,27 @@ func compatSignatureVerifier(leafCert *x509.Certificate, enableCompat bool, isDS
 }
 
 func getSignatureVerifier(sigContent SignatureContent, verificationContent VerificationContent, tm root.TrustedMaterial, enableCompat bool) (signature.Verifier, error) {
+	var verifier signature.Verifier
+	var err error
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
 		isDSSE := sigContent.EnvelopeContent() != nil
-		return compatSignatureVerifier(leafCert, enableCompat, isDSSE)
+		verifier, err = compatSignatureVerifier(leafCert, enableCompat, isDSSE)
 	} else if pk := verificationContent.PublicKey(); pk != nil {
-		return tm.PublicKeyVerifier(pk.Hint())
+		verifier, err = tm.PublicKeyVerifier(pk.Hint())
+	} else {
+		return nil, fmt.Errorf("no public key or certificate found")
 	}
-
-	return nil, fmt.Errorf("no public key or certificate found")
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := verifier.PublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch verifier public key: %w", err)
+	}
+	if _, ok := pubKey.(*mldsa.PublicKey); ok {
+		return nil, errors.New("ML-DSA keys are not supported for v1 bundles")
+	}
+	return verifier, nil
 }
 
 func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {
