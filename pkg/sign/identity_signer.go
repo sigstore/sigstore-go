@@ -15,13 +15,21 @@
 package sign
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 
 	bundleV2 "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2"
+	verifyBundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
+const bundleV20MediaType = "application/vnd.dev.sigstore.bundle.v2.0+json"
+
+// IdentityBundleOptions configures the IdentityBundle signing flow.
 type IdentityBundleOptions struct {
 	// TransparencyLog to submit the entry to and obtain a c2sp.org/tlog-proof from.
 	TransparencyLog IdentityTransparencyLog
@@ -33,8 +41,92 @@ type IdentityBundleOptions struct {
 
 // IdentityBundle creates a Bundle V2 using the transparent signature flow
 // with either an OIDC token or a public key credential.
-func IdentityBundle(_ Content, _ IdentityCredential, _ IdentityBundleOptions) (*bundleV2.Bundle, error) {
-	return nil, errors.New("not implemented")
+func IdentityBundle(content Content, cred IdentityCredential, opts IdentityBundleOptions) (*bundleV2.Bundle, error) {
+	if content == nil {
+		return nil, errors.New("content must not be nil")
+	}
+	if cred == nil {
+		return nil, errors.New("credential must not be nil")
+	}
+	if opts.TransparencyLog == nil {
+		return nil, errors.New("transparency log is required for IdentityBundle")
+	}
+	if d, ok := content.(*DSSEData); ok && (d == nil || len(d.Data) == 0 || d.PayloadType == "") {
+		return nil, errors.New("DSSEData must have non-empty data and payload type")
+	}
+
+	ctx := opts.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	payload := content.PreAuthEncoding()
+	digest := sha256.Sum256(payload)
+
+	req, err := cred.ToIdentityRequestV001(ctx, digest[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to create identity request: %w", err)
+	}
+
+	proof, err := opts.TransparencyLog.GetIdentityTransparencyLogEntry(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transparency log entry: %w", err)
+	}
+	if proof == nil {
+		return nil, errors.New("transparency log returned nil proof")
+	}
+
+	if sig := req.GetPublicKey().GetSignature(); len(sig) > 0 {
+		proof.Signature = &bundleV2.Signature{
+			Signature: sig,
+		}
+	}
+
+	bundle := &bundleV2.Bundle{
+		MediaType: bundleV20MediaType,
+		VerificationMaterial: &bundleV2.VerificationMaterial{
+			Content: &bundleV2.VerificationMaterial_TransparencyLogProof{
+				TransparencyLogProof: proof,
+			},
+		},
+	}
+
+	if d, ok := content.(*DSSEData); ok {
+		bundle.Payload = &bundleV2.Payload{
+			Payload:     d.Data,
+			PayloadType: d.PayloadType,
+		}
+	}
+
+	if opts.TrustedRoot != nil {
+		iv, err := verify.NewIdentityVerifier(opts.TrustedRoot)
+		if err != nil {
+			return nil, err
+		}
+		b, err := verifyBundle.NewBundleV2(bundle)
+		if err != nil {
+			return nil, err
+		}
+		artifactOpts := verify.WithoutArtifactUnsafe()
+		if bundle.GetPayload() == nil {
+			artifactOpts = verify.WithArtifact(bytes.NewReader(payload))
+		}
+		var policyOpts []verify.PolicyOption
+		if pk := req.GetPublicKey(); pk != nil {
+			policyOpts = append(policyOpts, verify.WithKey())
+			if len(pk.GetContext()) > 0 {
+				policyOpts = append(policyOpts, verify.WithContext(pk.GetContext()))
+			}
+		} else {
+			policyOpts = append(policyOpts, verify.WithoutIdentitiesUnsafe())
+		}
+		policy := verify.NewPolicy(artifactOpts, policyOpts...)
+		if _, err := iv.Verify(b, policy); err != nil {
+			return nil, err
+		}
+	}
+
+	return bundle, nil
 }
 
 type PKIBundleOptions struct {
