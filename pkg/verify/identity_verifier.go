@@ -36,7 +36,14 @@ import (
 // IdentityVerificationResult holds the verified outputs of an IdentityVerifier,
 // PKIVerifier, or KeyVerifier check.
 type IdentityVerificationResult struct {
-	Verified         bool
+	Verified bool
+	// Timestamps holds verified timestamps from the entity (e.g. checkpoint
+	// signature timestamps for IdentityVerifier or RFC 3161 timestamps for
+	// PKIVerifier/KeyVerifier).
+	//
+	// Note: For IdentityVerifier, witness cosignature verification is not yet
+	// implemented, so Timestamps currently contains only the log's own
+	// checkpoint signature timestamp.
 	Timestamps       []time.Time
 	Statement        *in_toto.Statement
 	VerifiedIdentity *CertificateIdentity
@@ -44,6 +51,10 @@ type IdentityVerificationResult struct {
 
 // IdentityVerifier verifies transparent signatures logged with an OIDC identity token
 // or a public key credential.
+//
+// Note: Witness cosignature verification and witness policy enforcement are not
+// yet implemented; IdentityVerifier currently verifies only the transparency
+// log's own ML-DSA checkpoint signature.
 type IdentityVerifier struct {
 	trustedMaterial root.TrustedMaterial
 }
@@ -103,6 +114,9 @@ func (v *IdentityVerifier) Verify(entity VerifiableEntity, pb PolicyBuilder) (*I
 	parsedCheckpoint, allTimestamps, err := verifyIdentityCheckpoint(&tlogProof, v.trustedMaterial)
 	if err != nil {
 		return nil, err
+	}
+	if len(allTimestamps) == 0 {
+		return nil, errors.New("no verified timestamps found in checkpoint")
 	}
 
 	extraClaims, err := parseExtraData(tlogProof.ExtraData)
@@ -306,6 +320,9 @@ func verifyDSSEEnvelopeStatement(envelope EnvelopeContent, policy *PolicyConfig)
 // TrustedMaterial that are valid at all provided timestamps, returning the root-of-trust hash.
 func verifyPublicKeySignature(tm root.TrustedMaterial, artifactSig, prehashedData []byte, timestamps []time.Time) ([32]byte, error) {
 	for _, verifier := range tm.PublicKeyVerifiers() {
+		if verifier == nil {
+			continue
+		}
 		validAtAll := true
 		for _, ts := range timestamps {
 			if !verifier.ValidAtTime(ts) {
@@ -322,7 +339,7 @@ func verifyPublicKeySignature(tm root.TrustedMaterial, artifactSig, prehashedDat
 			continue
 		}
 		mldsaKey, ok := pubKey.(*mldsa.PublicKey)
-		if !ok || mldsaKey.Parameters() != mldsa.MLDSA44() {
+		if !ok || mldsaKey == nil || mldsaKey.Parameters() != mldsa.MLDSA44() {
 			continue
 		}
 
