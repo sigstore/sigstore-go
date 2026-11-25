@@ -28,8 +28,8 @@ require (
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
 	github.com/go-openapi/jsonreference v1.0.3 // indirect
 	github.com/go-openapi/loads v0.25.3 // indirect
-	github.com/go-openapi/runtime v0.33.4 // indirect
-	github.com/go-openapi/runtime/server-middleware v0.33.4 // indirect
+	github.com/go-openapi/runtime v0.33.5 // indirect
+	github.com/go-openapi/runtime/server-middleware v0.33.5 // indirect
 	github.com/go-openapi/spec v1.0.1 // indirect
 	github.com/go-openapi/strfmt v0.27.4 // indirect
 	github.com/go-openapi/swag/conv v0.29.2 // indirect
@@ -55,9 +55,9 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/rekor v1.6.1 // indirect
+	github.com/sigstore/rekor v1.6.3 // indirect
 	github.com/sigstore/rekor-tiles/v2 v2.4.2 // indirect
-	github.com/sigstore/timestamp-authority/v2 v2.2.0 // indirect
+	github.com/sigstore/timestamp-authority/v2 v2.2.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/theupdateframework/go-tuf/v2 v2.4.3-0.20261112120819-b5b48bc8591b // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
@@ -68,7 +68,7 @@ require (
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/mod v0.43.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
