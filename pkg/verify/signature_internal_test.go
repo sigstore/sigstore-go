@@ -19,14 +19,19 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/x509"
 	"testing"
+	"time"
 
 	in_toto "github.com/in-toto/attestation/go/v1"
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMultiHasher(t *testing.T) {
@@ -251,6 +256,62 @@ func TestVerifyMessageDigest(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+type testSigContent struct{}
+
+func (t *testSigContent) Signature() []byte                                { return nil }
+func (t *testSigContent) EnvelopeContent() EnvelopeContent                 { return nil }
+func (t *testSigContent) MessageSignatureContent() MessageSignatureContent { return nil }
+
+type testPubKeyProvider struct{ hint string }
+
+func (p *testPubKeyProvider) Hint() string { return p.hint }
+
+type testVerificationContent struct {
+	cert   *x509.Certificate
+	pubKey PublicKeyProvider
+}
+
+func (v *testVerificationContent) CompareKey(any, root.TrustedMaterial) bool        { return false }
+func (v *testVerificationContent) ValidAtTime(time.Time, root.TrustedMaterial) bool { return true }
+func (v *testVerificationContent) Certificate() *x509.Certificate                   { return v.cert }
+func (v *testVerificationContent) Intermediates() []*x509.Certificate               { return nil }
+func (v *testVerificationContent) PublicKey() PublicKeyProvider                     { return v.pubKey }
+
+func TestRejectMLDSAForV1Bundles(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		params mldsa.Parameters
+	}{
+		{"ML-DSA-44", mldsa.MLDSA44()},
+		{"ML-DSA-65", mldsa.MLDSA65()},
+		{"ML-DSA-87", mldsa.MLDSA87()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			privKey, err := mldsa.GenerateKey(tc.params)
+			require.NoError(t, err)
+			pubKey := privKey.Public()
+
+			verifier, err := signature.LoadDefaultVerifier(pubKey)
+			require.NoError(t, err)
+			tm := root.NewTrustedPublicKeyMaterial(func(_ string) (root.TimeConstrainedVerifier, error) {
+				return root.NewExpiringKey(verifier, time.Time{}, time.Time{}), nil
+			})
+
+			// Public key in v1 bundle
+			_, err = getSignatureVerifier(&testSigContent{}, &testVerificationContent{pubKey: &testPubKeyProvider{hint: "hint"}}, tm, false)
+			assert.ErrorContains(t, err, "ML-DSA keys are not supported for v1 bundles")
+
+			// Certificate with ML-DSA public key in v1 bundle
+			_, err = getSignatureVerifier(&testSigContent{}, &testVerificationContent{cert: &x509.Certificate{PublicKey: pubKey}}, tm, false)
+			assert.ErrorContains(t, err, "ML-DSA keys are not supported for v1 bundles")
+
+			// Transparency log key in v1 bundle
+			_, err = getVerifier(pubKey, crypto.Hash(0))
+			assert.ErrorContains(t, err, "ML-DSA transparency log keys are not supported for v1 bundles")
 		})
 	}
 }

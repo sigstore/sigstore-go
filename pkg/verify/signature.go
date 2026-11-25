@@ -20,6 +20,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
@@ -208,14 +209,27 @@ func compatSignatureVerifier(leafCert *x509.Certificate, enableCompat bool, isDS
 }
 
 func getSignatureVerifier(sigContent SignatureContent, verificationContent VerificationContent, tm root.TrustedMaterial, enableCompat bool) (signature.Verifier, error) {
+	var verifier signature.Verifier
+	var err error
 	if leafCert := verificationContent.Certificate(); leafCert != nil {
 		isDSSE := sigContent.EnvelopeContent() != nil
-		return compatSignatureVerifier(leafCert, enableCompat, isDSSE)
+		verifier, err = compatSignatureVerifier(leafCert, enableCompat, isDSSE)
 	} else if pk := verificationContent.PublicKey(); pk != nil {
-		return tm.PublicKeyVerifier(pk.Hint())
+		verifier, err = tm.PublicKeyVerifier(pk.Hint())
+	} else {
+		return nil, fmt.Errorf("no public key or certificate found")
 	}
-
-	return nil, fmt.Errorf("no public key or certificate found")
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := verifier.PublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch verifier public key: %w", err)
+	}
+	if _, ok := pubKey.(*mldsa.PublicKey); ok {
+		return nil, errors.New("ML-DSA keys are not supported for v1 bundles")
+	}
+	return verifier, nil
 }
 
 func verifyEnvelope(verifier signature.Verifier, envelope EnvelopeContent) error {
@@ -254,6 +268,13 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 	if err := verifyEnvelope(verifier, envelope); err != nil {
 		return err
 	}
+	return verifyStatementWithArtifacts(envelope, artifacts)
+}
+
+func verifyStatementWithArtifacts(envelope EnvelopeContent, artifacts []io.Reader) error {
+	if len(artifacts) == 0 {
+		return fmt.Errorf("no artifacts provided for verification")
+	}
 	// Verification only consumes the statement's subjects; summarizing
 	// avoids materializing the (potentially very large) predicate.
 	statement, err := summarizeStatement(envelope)
@@ -276,6 +297,9 @@ func verifyEnvelopeWithArtifacts(verifier signature.Verifier, envelope EnvelopeC
 
 	hashedArtifacts := make([]map[crypto.Hash][]byte, len(artifacts))
 	for i, artifact := range artifacts {
+		if artifact == nil {
+			return errors.New("could not verify artifact: artifact is nil")
+		}
 		// Compute digest of the artifact.
 		hasher, err := newMultihasher(hashFuncs)
 		if err != nil {
@@ -337,6 +361,13 @@ func verifyEnvelopeWithArtifactDigests(verifier signature.Verifier, envelope Env
 	}
 	if err := verifyEnvelope(verifier, envelope); err != nil {
 		return err
+	}
+	return verifyStatementWithArtifactDigests(envelope, digests)
+}
+
+func verifyStatementWithArtifactDigests(envelope EnvelopeContent, digests []ArtifactDigest) error {
+	if len(digests) == 0 {
+		return fmt.Errorf("no artifact digests provided for verification")
 	}
 	// Verification only consumes the statement's subjects; summarizing
 	// avoids materializing the (potentially very large) predicate.
