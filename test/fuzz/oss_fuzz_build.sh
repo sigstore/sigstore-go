@@ -23,6 +23,11 @@ compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify/fuzz Fuzz
 compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifySignatureWithoutArtifactOrDigest FuzzVerifySignatureWithoutArtifactOrDigest
 compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifySignatureWithArtifactWithoutDigest FuzzVerifySignatureWithArtifactWithoutDigest
 compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify/fuzz FuzzVerifySignatureWithArtifactDigest FuzzVerifySignatureWithArtifactDigest
+# The SCT fuzzers exercise unexported parsers, so they are built from
+# pkg/verify/sct_fuzz_test.go in package verify rather than being moved above.
+compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify FuzzParseSCT FuzzParseSCT
+compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify FuzzParseSCTsFromCertificate FuzzParseSCTsFromCertificate
+compile_native_go_fuzzer_v2 github.com/sigstore/sigstore-go/pkg/verify FuzzRemoveSCTListExtension FuzzRemoveSCTListExtension
 
 zip -j $OUT/FuzzVerifier_seed_corpus.zip examples/trusted-root-public-good.json
 
