@@ -144,7 +144,7 @@ func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold in
 
 // timestampToTime converts an RFC 6962 timestamp (milliseconds since UNIX epoch) to time.Time.
 func timestampToTime(ts uint64) time.Time {
-	secs := int64(ts / 1000)
+	secs := int64(ts / 1000) //nolint:gosec // max uint64/1000 < math.MaxInt64
 	msecs := int64(ts % 1000)
 	return time.Unix(secs, msecs*int64(time.Millisecond))
 }
