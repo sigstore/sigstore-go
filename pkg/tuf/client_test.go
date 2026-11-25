@@ -16,6 +16,7 @@ package tuf
 
 import (
 	"crypto"
+	"crypto/mldsa"
 	"crypto/sha256"
 	"fmt"
 	"net/http"
@@ -34,6 +35,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/theupdateframework/go-tuf/v2/examples/repository/repository"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -111,6 +114,76 @@ func TestRefresh(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, target)
 	assert.Equal(t, target, []byte("foo version 2"))
+}
+
+func TestRefreshMLDSA(t *testing.T) {
+	r := newMLDSATestRepo(t)
+	r.AddTarget("foo", []byte("foo pqc version 1"))
+	rootJSON, err := r.roles.Root().ToBytes(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL("https://testing.local").
+		WithRoot(rootJSON).
+		WithCachePath(t.TempDir()).
+		WithFetcher(r).
+		WithDisableLocalCache()
+	c, err := New(opt)
+	assert.NotNil(t, c)
+	assert.NoError(t, err)
+
+	target, err := c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, target)
+	assert.Equal(t, target, []byte("foo pqc version 1"))
+
+	r.AddTarget("foo", []byte("foo pqc version 2"))
+	assert.NoError(t, c.Refresh())
+
+	target, err = c.GetTarget("foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, target)
+	assert.Equal(t, target, []byte("foo pqc version 2"))
+}
+
+func TestInvalidMLDSARoot(t *testing.T) {
+	r := newMLDSATestRepo(t)
+	r2 := newMLDSATestRepo(t)
+	rootJSON, err := r.roles.Root().ToBytes(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt = DefaultOptions().
+		WithRepositoryBaseURL("https://testing.local").
+		WithRoot(rootJSON).
+		WithCachePath(t.TempDir()).
+		WithFetcher(r2).
+		WithDisableLocalCache()
+	c, err := New(opt)
+	assert.Nil(t, c)
+	assert.Error(t, err)
+}
+
+func TestStagingPQCRoot(t *testing.T) {
+	rootBytes := StagingPQCRoot()
+	assert.NotEmpty(t, rootBytes)
+
+	rootMeta, err := metadata.Root().FromBytes(rootBytes)
+	assert.NoError(t, err)
+	assert.NotNil(t, rootMeta)
+
+	err = rootMeta.VerifyDelegate(metadata.ROOT, rootMeta)
+	assert.NoError(t, err)
+
+	cfg, err := config.New(StagingPQCMirror, rootBytes)
+	assert.NoError(t, err)
+	cfg.DisableLocalCache = true
+	up, err := updater.New(cfg)
+	assert.NoError(t, err)
+	assert.NotNil(t, up)
 }
 
 func TestInvalidRoot(t *testing.T) {
@@ -285,16 +358,29 @@ func TestExpiredTimestamp(t *testing.T) {
 // client. Those other features should be covered by the go-tuf tests. This is
 // primarily intended to test the caching and fetching behavior of the client.
 type testRepo struct {
-	keys  map[string]ed25519.PrivateKey
+	keys  map[string]crypto.Signer
 	roles *repository.Type
 	dir   string
 	t     *testing.T
 }
 
 func newTestRepo(t *testing.T) *testRepo {
+	return newTestRepoWithKeyGen(t, func() (crypto.Signer, error) {
+		_, private, err := ed25519.GenerateKey(nil)
+		return private, err
+	})
+}
+
+func newMLDSATestRepo(t *testing.T) *testRepo {
+	return newTestRepoWithKeyGen(t, func() (crypto.Signer, error) {
+		return mldsa.GenerateKey(mldsa.MLDSA44())
+	})
+}
+
+func newTestRepoWithKeyGen(t *testing.T, genKey func() (crypto.Signer, error)) *testRepo {
 	var err error
 	r := &testRepo{
-		keys:  make(map[string]ed25519.PrivateKey),
+		keys:  make(map[string]crypto.Signer),
 		roles: repository.New(),
 		t:     t,
 	}
@@ -317,7 +403,7 @@ func newTestRepo(t *testing.T) *testRepo {
 	r.roles.SetRoot(root)
 
 	for _, name := range []string{metadata.TARGETS, metadata.SNAPSHOT, metadata.TIMESTAMP, metadata.ROOT} {
-		_, private, err := ed25519.GenerateKey(nil)
+		private, err := genKey()
 		if err != nil {
 			t.Fatal(err)
 		}

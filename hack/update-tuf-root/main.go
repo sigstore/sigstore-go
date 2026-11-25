@@ -110,8 +110,8 @@ func fetchInstanceUpdates(inst instanceUpdate) ([]pendingWrite, error) {
 	return writes, nil
 }
 
-func main() {
-	instances := []instanceUpdate{
+func defaultInstances() []instanceUpdate {
+	return []instanceUpdate{
 		{
 			name:      "production",
 			mirrorURL: tuf.DefaultMirror,
@@ -142,10 +142,18 @@ func main() {
 			rootBytes: tuf.StagingRoot(),
 			rootDest:  filepath.Join("pkg", "tuf", "repository", "staging_root.json"),
 		},
+		{
+			name:      "pqc-staging",
+			mirrorURL: tuf.StagingPQCMirror,
+			rootBytes: tuf.StagingPQCRoot(),
+			rootDest:  filepath.Join("pkg", "tuf", "repository", "pqc_staging_root.json"),
+		},
 	}
+}
 
+func main() {
 	var allWrites []pendingWrite
-	for _, inst := range instances {
+	for _, inst := range defaultInstances() {
 		writes, err := fetchInstanceUpdates(inst)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
