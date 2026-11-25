@@ -1,36 +1,36 @@
 # ML-DSA Transparent Signatures Verification Example
 
-This example demonstrates how to use the `IdentityVerifier` API in `pkg/verify` to verify a V2 Bundle containing an ML-DSA Transparent Signature.
+This example demonstrates how to use the `IdentityVerifier` API in `pkg/verify` to verify a v2.0 Bundle containing an ML-DSA Transparent Signature against the Sigstore PQC staging `TrustedRoot` (or a local `trusted_root.json`).
 
 ## Overview
 
 The example performs the following steps:
-1. Loads the signature bundle and the signed artifact.
-2. Configures the verification policy with expected identities or public key.
-3. Verifies the artifact's signature or identity claims against the bundle.
-4. Verifies the transparency log inclusion proof to ensure the signing event was logged.
+1. Loads the v2.0 signature bundle and the signed artifact.
+2. Fetches the `TrustedRoot` from the Sigstore PQC staging TUF repository (`https://tuf.v2.sigstage.dev`) by default, or loads one via `--trusted-root`.
+3. Configures the verification policy with expected OIDC issuer/identity or a trusted ML-DSA-44 public key.
+4. Verifies the transparency log checkpoint, inclusion proof, and either the public key signature or OIDC identity claims.
 
 ## Prerequisites
 
-You must first generate a valid V2 bundle using the transparent signing example. This process will create a `bundle.json` and (for key-based signing) a `pubkey.pub`.
+Generate a valid v2.0 bundle using `examples/sigstore-go-transparent-signing` first (producing `bundle.json` and, for key-based signing, `pubkey.pem`).
 
 ## Running the Example
 
-Follow the instructions in `examples/sigstore-go-transparent-signing/README.md` to generate a bundle first. Then you can run this example.
-
-For verifying with an identity token:
+For verifying with an OIDC identity:
 
 ```bash
-go run examples/sigstore-go-transparent-verification/main.go --log-key=/path/to/mldsa-pub-key.pem --expected-identity=foo@bar.com --expected-issuer=http://fakeoidc:8080 bundle.json artifact
+go run ./examples/sigstore-go-transparent-verification --expected-issuer=<issuer> --expected-identity=<identity> bundle.json artifact
 ```
 
 For verifying with a public key:
 
 ```bash
-go run examples/sigstore-go-transparent-verification/main.go --log-key=/path/to/mldsa-pub-key.pem --pub-key=pubkey.pub bundle.json artifact
+go run ./examples/sigstore-go-transparent-verification --pub-key=pubkey.pem bundle.json artifact
 ```
 
-If successful, the tool will output:
+Pass `--trusted-root=/path/to/trusted_root.json` to verify against a custom or local deployment instead of PQC staging.
+
+If successful, the tool outputs:
 ```text
 Transparent signature verified successfully!
 ```

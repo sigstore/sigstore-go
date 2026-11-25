@@ -26,14 +26,22 @@ import (
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
-var logKey = flag.String("log-key", "", "Path to the transparency log ML-DSA public key")
-var pubKey = flag.String("pub-key", "", "Path to the artifact verification ML-DSA public key")
-var expectedIssuer = flag.String("expected-issuer", "http://fakeoidc:8080", "Expected OIDC issuer for verification")
-var expectedIdentity = flag.String("expected-identity", "foo@bar.com", "Expected OIDC identity for verification")
+var (
+	trustedRootPath  string
+	pubKey           = flag.String("pub-key", "", "Path to the artifact verification ML-DSA-44 public key (PEM or DER)")
+	expectedIssuer   = flag.String("expected-issuer", "", "Expected OIDC issuer for verification (required unless --pub-key is set)")
+	expectedIdentity = flag.String("expected-identity", "", "Expected OIDC identity for verification (required unless --pub-key is set)")
+)
+
+func init() {
+	flag.StringVar(&trustedRootPath, "trusted-root", "", "Path to trusted_root.json file (defaults to PQC staging TUF)")
+	flag.StringVar(&trustedRootPath, "t", "", "Path to trusted_root.json file (defaults to PQC staging TUF)")
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -45,12 +53,9 @@ func run() error {
 	flag.Parse()
 
 	if flag.NArg() < 2 {
-		fmt.Printf("Usage: %s [OPTIONS] BUNDLE_FILE ARTIFACT_FILE\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] BUNDLE_FILE ARTIFACT_FILE\n", os.Args[0])
 		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	if *logKey == "" {
-		return fmt.Errorf("--log-key is required")
+		return fmt.Errorf("missing BUNDLE_FILE or ARTIFACT_FILE argument")
 	}
 
 	bundlePath := flag.Arg(0)
@@ -62,24 +67,53 @@ func run() error {
 	}
 	defer artifactFile.Close()
 
-	// Load the Bundle V2
 	b, err := bundle.LoadJSONFromPathV2(bundlePath)
 	if err != nil {
 		return fmt.Errorf("failed to load bundle v2: %w", err)
 	}
 
-	tm, err := newMockTrustedMaterial(*logKey, *pubKey)
-	if err != nil {
-		return err
+	var trustedRoot *root.TrustedRoot
+	if trustedRootPath != "" {
+		trustedRoot, err = root.NewTrustedRootFromPath(trustedRootPath)
+		if err != nil {
+			return fmt.Errorf("failed to load trusted root: %w", err)
+		}
+	} else {
+		tufOpts := tuf.DefaultOptions().
+			WithRoot(tuf.StagingPQCRoot()).
+			WithRepositoryBaseURL(tuf.StagingPQCMirror)
+		pqcTUFClient, err := tuf.New(tufOpts)
+		if err != nil {
+			return fmt.Errorf("failed to initialize PQC staging TUF client: %w", err)
+		}
+		trustedRoot, err = root.GetTrustedRoot(pqcTUFClient)
+		if err != nil {
+			return fmt.Errorf("failed to fetch trusted root from TUF: %w", err)
+		}
 	}
 
-	verifier, err := verify.NewIdentityVerifier(tm)
-	if err != nil {
-		return fmt.Errorf("failed to create verifier: %w", err)
-	}
+	trustedMaterial := root.TrustedMaterialCollection{trustedRoot}
 
 	var policyOpt verify.PolicyOption
 	if *pubKey != "" {
+		pubKeyBytes, err := os.ReadFile(*pubKey)
+		if err != nil {
+			return fmt.Errorf("failed to read public key: %w", err)
+		}
+		if pubBlock, _ := pem.Decode(pubKeyBytes); pubBlock != nil {
+			pubKeyBytes = pubBlock.Bytes
+		}
+		parsedPubKey, err := x509.ParsePKIXPublicKey(pubKeyBytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse public key: %w", err)
+		}
+		pkVerifier, err := signature.LoadVerifier(parsedPubKey, crypto.Hash(0))
+		if err != nil {
+			return fmt.Errorf("failed to load public key verifier: %w", err)
+		}
+		trustedMaterial = append(trustedMaterial, root.NewTrustedPublicKeyVerifiers(
+			root.NewExpiringKey(pkVerifier, time.Time{}, time.Time{}),
+		))
 		policyOpt = verify.WithKey()
 	} else {
 		certID, err := verify.NewShortCertificateIdentity(*expectedIssuer, "", *expectedIdentity, "")
@@ -89,9 +123,13 @@ func run() error {
 		policyOpt = verify.WithCertificateIdentity(certID)
 	}
 
+	verifier, err := verify.NewIdentityVerifier(trustedMaterial)
+	if err != nil {
+		return fmt.Errorf("failed to create verifier: %w", err)
+	}
+
 	pb := verify.NewPolicy(verify.WithArtifact(artifactFile), policyOpt)
 
-	// Verify the bundle
 	result, err := verifier.Verify(b, pb)
 	if err != nil {
 		return fmt.Errorf("verification failed: %w", err)
@@ -103,67 +141,4 @@ func run() error {
 		return fmt.Errorf("transparent signature verification failed")
 	}
 	return nil
-}
-
-// mockTrustedMaterial implements root.TrustedMaterial to provide the log and optional artifact public keys for verification.
-type mockTrustedMaterial struct {
-	root.BaseTrustedMaterial
-	rekorLog  *root.TransparencyLog
-	verifiers []root.TimeConstrainedVerifier
-}
-
-func newMockTrustedMaterial(logKeyPath, pubKeyPath string) (*mockTrustedMaterial, error) {
-	pemKey, err := os.ReadFile(logKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read log public key: %w", err)
-	}
-	block, _ := pem.Decode(pemKey)
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode log public key PEM")
-	}
-	logPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse log public key: %w", err)
-	}
-
-	tm := &mockTrustedMaterial{
-		rekorLog: &root.TransparencyLog{
-			BaseURL:           "http://rekor-local",
-			PublicKey:         logPubKey,
-			SignatureHashFunc: crypto.SHA256,
-		},
-	}
-
-	if pubKeyPath != "" {
-		pubKeyBytes, err := os.ReadFile(pubKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read public key: %w", err)
-		}
-		if pubBlock, _ := pem.Decode(pubKeyBytes); pubBlock != nil {
-			pubKeyBytes = pubBlock.Bytes
-		}
-		parsedPubKey, err := x509.ParsePKIXPublicKey(pubKeyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse public key: %w", err)
-		}
-		verifier, err := signature.LoadVerifier(parsedPubKey, crypto.Hash(0))
-		if err != nil {
-			return nil, fmt.Errorf("failed to load public key verifier: %w", err)
-		}
-		tm.verifiers = []root.TimeConstrainedVerifier{
-			root.NewExpiringKey(verifier, time.Time{}, time.Time{}),
-		}
-	}
-
-	return tm, nil
-}
-
-func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
-	return map[string]*root.TransparencyLog{
-		"mock-rekor": m.rekorLog,
-	}
-}
-
-func (m *mockTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
-	return m.verifiers
 }

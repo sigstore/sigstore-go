@@ -419,20 +419,23 @@ func TestIdentitySignVerify(t *testing.T) {
 
 		verifier, err := signature.LoadVerifier(keypair.GetPublicKey(), crypto.Hash(0))
 		require.NoError(t, err)
-		mockRoot.verifier = root.NewExpiringKey(verifier, time.Time{}, time.Time{})
+		keyRoot := root.TrustedMaterialCollection{
+			mockRoot,
+			root.NewTrustedPublicKeyVerifiers(root.NewExpiringKey(verifier, time.Time{}, time.Time{})),
+		}
 
 		opts := sign.IdentityBundleOptions{
 			TransparencyLog: sign.NewIdentityRekorClient(identityRekorURL),
-			TrustedRoot:     mockRoot,
+			TrustedRoot:     keyRoot,
 		}
 
 		b, err := sign.IdentityBundle(content, cred, opts)
 		require.NoError(t, err)
 		require.NotNil(t, b)
 
-		result, err := verifyIdentityBundle(b, "", "", randomData, true, mockRoot)
-		assert.NoError(t, err)
-		assert.NotNil(t, result)
+		result, err := verifyIdentityBundle(b, "", "", randomData, true, keyRoot)
+		require.NoError(t, err)
+		require.NotNil(t, result)
 		assert.True(t, result.Verified)
 	})
 }
@@ -467,18 +470,10 @@ func verifyIdentityBundle(b *bundleV2.Bundle, issuer, san string, artifact []byt
 type mockTrustedMaterial struct {
 	root.BaseTrustedMaterial
 	rekorLog *root.TransparencyLog
-	verifier root.TimeConstrainedVerifier
 }
 
 func (m *mockTrustedMaterial) RekorLogs() map[string]*root.TransparencyLog {
 	return map[string]*root.TransparencyLog{
 		"mock-pqc-rekor": m.rekorLog,
 	}
-}
-
-func (m *mockTrustedMaterial) PublicKeyVerifiers() []root.TimeConstrainedVerifier {
-	if m.verifier != nil {
-		return []root.TimeConstrainedVerifier{m.verifier}
-	}
-	return nil
 }

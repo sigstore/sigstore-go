@@ -1,19 +1,15 @@
 # ML-DSA Transparent Signatures Example
 
-This example demonstrates how to use the `IdentityBundle` API in `pkg/sign` to sign an artifact using the ML-DSA Transparent Signatures flow. It produces a V2 Bundle containing the signature and the identity transparency log proof.
+This example demonstrates how to use the `IdentityBundle` API in `pkg/sign` to sign an artifact using the ML-DSA Transparent Signatures flow against the Sigstore PQC staging instance (or a custom `SigningConfig`/`TrustedRoot`). It produces a v2.0 Bundle containing the identity transparency log proof (and signature when signing with a keypair).
 
 ## Overview
 
 The example performs the following steps:
-1. Generates an ephemeral signing keypair, or uses a provided identity token.
-2. Signs the artifact and requests an identity transparency log entry.
-3. Outputs the resulting Sigstore bundle containing the signature and log proof.
-4. Saves the public key to a file for later verification.
-
-## Prerequisites
-
-You will need an Identity Rekor service running to accept the transparency log entry. By default, the example connects to `http://localhost:3006`.
-This also assumes a fake OIDC server running on `localhost:8080`.
+1. Fetches the `SigningConfig` and `TrustedRoot` from the Sigstore PQC staging TUF repository (`https://tuf.v2.sigstage.dev`) by default, or loads them from local files.
+2. Selects an identity transparency log (`majorApiVersion: 3`) from the `SigningConfig`.
+3. Runs an interactive browser-based OIDC login against the `SigningConfig`'s OIDC provider by default, or generates an ephemeral ML-DSA-44 signing keypair when `--pub-key-out` is specified.
+4. Submits the artifact digest and credential to the identity transparency log and self-verifies the resulting bundle against the `TrustedRoot`.
+5. Writes the resulting Sigstore v2.0 bundle to `bundle.json` (configurable via `-o`/`--out`, or `-` for stdout), and prints the logged OIDC `issuer` and `identity` (or writes the PEM-encoded public key when `--pub-key-out` is set).
 
 ## Running the Example
 
@@ -22,20 +18,23 @@ This also assumes a fake OIDC server running on `localhost:8080`.
    head -c 128 < /dev/urandom > artifact
    ```
 
-2. Run the example (saving the bundle to a file):
+2. Sign interactively with OIDC (opens a browser to authenticate, prints the logged issuer/identity, and writes `bundle.json`):
    ```bash
-   go run examples/sigstore-go-transparent-signing/main.go --rekor-addr http://localhost:3006 artifact > bundle.json
-   ```
-   *You can also use `--identity-token <token>` to use an OIDC token instead of a public key.*
-
-   ```bash
-   curl localhost:8080/token > token
-   go run examples/sigstore-go-transparent-signing/main.go --rekor-addr http://localhost:3006 --identity-token $(cat token) artifact > bundle.json
+   go run ./examples/sigstore-go-transparent-signing -o bundle.json artifact
    ```
 
-3. The output will be a Sigstore V2 Bundle saved to `bundle.json`. Additionally, `pubkey.pub` will be created containing the ephemeral ML-DSA public key when signing with a keypair.
-
-4. To verify the signature and the log proof, use the transparent verification example:
+   Or sign with a generated ML-DSA-44 keypair instead of OIDC (writing the PEM public key to `pubkey.pem`):
    ```bash
-   go run examples/sigstore-go-transparent-verification/main.go --log-key=/path/to/mldsa-pub-key.pem --pub-key=pubkey.pub bundle.json artifact
+   go run ./examples/sigstore-go-transparent-signing --pub-key-out=pubkey.pem -o bundle.json artifact
+   ```
+
+   You can also point to a custom or local deployment with `--signing-config` and `--trusted-root`.
+
+3. Verify the resulting bundle with the transparent verification example:
+   ```bash
+   # For OIDC signing:
+   go run ./examples/sigstore-go-transparent-verification --expected-issuer=<issuer> --expected-identity=<identity> bundle.json artifact
+
+   # For keypair signing:
+   go run ./examples/sigstore-go-transparent-verification --pub-key=pubkey.pem bundle.json artifact
    ```
