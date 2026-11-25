@@ -27,6 +27,7 @@ import (
 	"math"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/sigstore/rekor-tiles/v2/pkg/note"
@@ -48,6 +49,10 @@ const (
 // verifyIdentityCheckpoint verifies a transparency log checkpoint against the
 // trusted material's Rekor logs and returns the parsed checkpoint and any
 // verified timestamps embedded in checkpoint signatures.
+//
+// TODO: Verify witness cosignatures once witness configuration is available in
+// TrustedMaterial. Currently only the log's own ML-DSA checkpoint signature
+// (and its embedded timestamp) is verified.
 func verifyIdentityCheckpoint(tlogProof *proof.TLogProof, trustedMaterial root.TrustedMaterial) (*formatsLog.Checkpoint, []time.Time, error) {
 	if len(tlogProof.Checkpoint) == 0 {
 		return nil, nil, errors.New("invalid checkpoint format")
@@ -58,17 +63,9 @@ func verifyIdentityCheckpoint(tlogProof *proof.TLogProof, trustedMaterial root.T
 		if rekorLog == nil {
 			continue
 		}
-		if rekorLog.BaseURL == "" {
-			verifyErrors = append(verifyErrors, errors.New("cannot verify checkpoint without baseUrl in transparency log"))
-			continue
-		}
-		u, err := url.Parse(rekorLog.BaseURL)
+		origin, err := tlogOriginFromBaseURL(rekorLog.BaseURL)
 		if err != nil {
 			verifyErrors = append(verifyErrors, err)
-			continue
-		}
-		if u.Hostname() == "" {
-			verifyErrors = append(verifyErrors, errors.New("cannot verify checkpoint without valid host in transparency log baseUrl"))
 			continue
 		}
 
@@ -78,12 +75,16 @@ func verifyIdentityCheckpoint(tlogProof *proof.TLogProof, trustedMaterial root.T
 			continue
 		}
 
-		parsedCheckpoint, timestamps, err := parseCheckpoint(tlogProof.Checkpoint, u.Hostname(), verifier)
+		parsedCheckpoint, timestamps, err := parseCheckpoint(tlogProof.Checkpoint, origin, verifier)
 		if err != nil {
 			verifyErrors = append(verifyErrors, fmt.Errorf("parseCheckpoint failed: %w", err))
 			continue
 		}
 
+		if len(timestamps) == 0 {
+			verifyErrors = append(verifyErrors, errors.New("no verified timestamps found in checkpoint"))
+			continue
+		}
 		validAtAll := true
 		for _, ts := range timestamps {
 			if (!rekorLog.ValidityPeriodStart.IsZero() && ts.Before(rekorLog.ValidityPeriodStart)) ||
@@ -103,13 +104,34 @@ func verifyIdentityCheckpoint(tlogProof *proof.TLogProof, trustedMaterial root.T
 	return nil, nil, fmt.Errorf("failed to verify checkpoint against any trusted log. Errors: %v", verifyErrors)
 }
 
+// tlogOriginFromBaseURL derives the C2SP checkpoint origin (host[/path]) from a
+// TransparencyLogInstance base_url, supporting both URLs with schemes and
+// scheme-less URLs as permitted by sigstore_trustroot.proto.
+func tlogOriginFromBaseURL(baseURL string) (string, error) {
+	if baseURL == "" {
+		return "", errors.New("cannot verify checkpoint without baseUrl in transparency log")
+	}
+	rawURL := baseURL
+	if !strings.Contains(rawURL, "://") {
+		rawURL = "https://" + rawURL
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Hostname() == "" {
+		return "", errors.New("cannot verify checkpoint without valid host in transparency log baseUrl")
+	}
+	return u.Host + strings.TrimRight(u.Path, "/"), nil
+}
+
 func parseCheckpoint(chkpt []byte, origin string, verifier signature.Verifier) (*formatsLog.Checkpoint, []time.Time, error) {
 	pk, err := verifier.PublicKey()
 	if err != nil {
 		return nil, nil, err
 	}
 	mldsaKey, isMLDSA := pk.(*mldsa.PublicKey)
-	if !isMLDSA || mldsaKey.Parameters() != mldsa.MLDSA44() {
+	if !isMLDSA || mldsaKey == nil || mldsaKey.Parameters() != mldsa.MLDSA44() {
 		return nil, nil, errors.New("checkpoint public key must be an ML-DSA-44 key")
 	}
 
@@ -117,6 +139,8 @@ func parseCheckpoint(chkpt []byte, origin string, verifier signature.Verifier) (
 	if err != nil {
 		return nil, nil, fmt.Errorf("loading note verifier: %w", err)
 	}
+	// TODO: Pass witness verifiers and verify witness quorum policy once
+	// witness configuration is available in TrustedMaterial.
 	cp, parsedNote, err := rekorVerify.VerifyWitnessedCheckpoint(string(chkpt), noteVerifier)
 	if err != nil {
 		return nil, nil, err
@@ -189,7 +213,7 @@ func computeContextClaimHashes(extraClaims map[string]string) ([]byte, []byte, e
 		}
 	}
 	contextVal, ok := extraClaims[contextClaimKey]
-	if !ok || len(contextVal) == 0 {
+	if !ok {
 		return nil, nil, nil
 	}
 	if len(contextVal) != sha256.Size*2 {

@@ -238,6 +238,35 @@ func TestVerifyIdentityCheckpoint_And_InclusionProof(t *testing.T) {
 		require.NotNil(t, cp)
 		require.Len(t, timestamps, 1)
 
+		// Scheme-less BaseURL should succeed
+		cp, timestamps, err = verifyIdentityCheckpoint(tlogProof, &mockTlogTrustedMaterial{
+			rekorLog: &root.TransparencyLog{
+				BaseURL:   origin,
+				PublicKey: privKey.Public(),
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cp)
+		require.Len(t, timestamps, 1)
+
+		// BaseURL with path should match checkpoint origin with path
+		pathOrigin := "rekor.example.com/log/v1"
+		pathCheckpoint := buildSignedCheckpoint(t, privKey, pathOrigin, 1, computedLeafHash)
+		pathProof := &proof.TLogProof{
+			Index:      0,
+			Checkpoint: pathCheckpoint,
+			ExtraData:  extraData,
+		}
+		cp, timestamps, err = verifyIdentityCheckpoint(pathProof, &mockTlogTrustedMaterial{
+			rekorLog: &root.TransparencyLog{
+				BaseURL:   "https://" + pathOrigin + "/",
+				PublicKey: privKey.Public(),
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, pathOrigin, cp.Origin)
+		require.Len(t, timestamps, 1)
+
 		// Empty RekorLogs should fail checkpoint verification
 		_, _, err = verifyIdentityCheckpoint(tlogProof, &mockTlogTrustedMaterial{})
 		assert.ErrorContains(t, err, "failed to verify checkpoint against any trusted log")
@@ -295,6 +324,9 @@ func TestParseExtraData_And_ContextClaims(t *testing.T) {
 	invalidHex64 := "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 	_, _, err = computeContextClaimHashes(map[string]string{"context": invalidHex64})
 	assert.ErrorContains(t, err, "failed to decode hex context value")
+
+	_, _, err = computeContextClaimHashes(map[string]string{"context": ""})
+	assert.ErrorContains(t, err, "context must be a 32-byte SHA-256 digest")
 
 	_, _, err = computeContextClaimHashes(map[string]string{"context": hex.EncodeToString([]byte("short"))})
 	assert.ErrorContains(t, err, "context must be a 32-byte SHA-256 digest")
