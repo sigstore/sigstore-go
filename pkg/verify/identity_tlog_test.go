@@ -72,6 +72,145 @@ func buildSignedCheckpoint(t *testing.T, privKey crypto.PrivateKey, origin strin
 	return signedNote
 }
 
+func TestTlogOriginFromBaseURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		baseURL    string
+		wantOrigin string
+		wantErr    string
+	}{
+		// Scheme-qualified URLs (host only)
+		{
+			name:       "https host",
+			baseURL:    "https://rekor.sigstore.dev",
+			wantOrigin: "rekor.sigstore.dev",
+		},
+		{
+			name:       "https host with trailing slash",
+			baseURL:    "https://rekor.sigstore.dev/",
+			wantOrigin: "rekor.sigstore.dev",
+		},
+		{
+			name:       "http host",
+			baseURL:    "http://rekor-local",
+			wantOrigin: "rekor-local",
+		},
+
+		// Path-based C2SP checkpoint origins (host/path)
+		{
+			name:       "https host with path",
+			baseURL:    "https://rekor.example.com/log/v1",
+			wantOrigin: "rekor.example.com/log/v1",
+		},
+		{
+			name:       "https host with path and trailing slashes",
+			baseURL:    "https://rekor.example.com/log/v1///",
+			wantOrigin: "rekor.example.com/log/v1",
+		},
+
+		// Scheme-less URLs (permitted by sigstore_trustroot.proto)
+		{
+			name:       "scheme-less host",
+			baseURL:    "rekor.sigstore.dev",
+			wantOrigin: "rekor.sigstore.dev",
+		},
+		{
+			name:       "scheme-less host with trailing slash",
+			baseURL:    "rekor.sigstore.dev/",
+			wantOrigin: "rekor.sigstore.dev",
+		},
+		{
+			name:       "scheme-less host with path",
+			baseURL:    "rekor.example.com/log/v1",
+			wantOrigin: "rekor.example.com/log/v1",
+		},
+		{
+			name:       "scheme-less host with port and path",
+			baseURL:    "rekor.example.com:8443/log/v1/",
+			wantOrigin: "rekor.example.com:8443/log/v1",
+		},
+
+		// Explicit ports and IPv6 hosts
+		{
+			name:       "http localhost with port",
+			baseURL:    "http://localhost:3006/",
+			wantOrigin: "localhost:3006",
+		},
+		{
+			name:       "https IPv6 host with port and path",
+			baseURL:    "https://[::1]:3006/log/",
+			wantOrigin: "[::1]:3006/log",
+		},
+
+		// Query parameters and fragments are not part of host[/path] origin
+		{
+			name:       "query and fragment ignored",
+			baseURL:    "https://rekor.example.com/log/v1?foo=bar#section",
+			wantOrigin: "rekor.example.com/log/v1",
+		},
+
+		// Invalid / rejected inputs
+		{
+			name:    "empty baseURL",
+			baseURL: "",
+			wantErr: "cannot verify checkpoint without baseUrl in transparency log",
+		},
+		{
+			name:    "scheme only",
+			baseURL: "https://",
+			wantErr: "cannot verify checkpoint without valid host in transparency log baseUrl",
+		},
+		{
+			name:    "scheme with path but empty host",
+			baseURL: "https:///log/v1",
+			wantErr: "cannot verify checkpoint without valid host in transparency log baseUrl",
+		},
+		{
+			name:    "path without host",
+			baseURL: "/log/v1",
+			wantErr: "cannot verify checkpoint without valid host in transparency log baseUrl",
+		},
+		{
+			name:    "protocol-relative URL",
+			baseURL: "//rekor.example.com/log",
+			wantErr: "cannot verify checkpoint without valid host in transparency log baseUrl",
+		},
+		{
+			name:    "port without hostname",
+			baseURL: ":8080",
+			wantErr: "cannot verify checkpoint without valid host in transparency log baseUrl",
+		},
+		{
+			name:    "scheme and port without hostname",
+			baseURL: "https://:8080",
+			wantErr: "cannot verify checkpoint without valid host in transparency log baseUrl",
+		},
+		{
+			name:    "invalid URL with space in host",
+			baseURL: "https://bad host/log",
+			wantErr: "invalid character",
+		},
+		{
+			name:    "invalid non-numeric port",
+			baseURL: "rekor.example.com:badport",
+			wantErr: "invalid port",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tlogOriginFromBaseURL(tc.baseURL)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantOrigin, got)
+		})
+	}
+}
+
 func TestParseCheckpoint_MLDSA(t *testing.T) {
 	privKey, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	require.NoError(t, err)
